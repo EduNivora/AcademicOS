@@ -375,6 +375,24 @@ class DatabaseHelper {
   }) async {
     final db = await database;
     await db.transaction((txn) async {
+      // A legacy v1 backup has no material metadata. Preserve current
+      // materials only when their course references remain valid.
+      if (materials == null) {
+        final currentMaterials = await txn.query(_materialsTable);
+        final incomingCourseIds =
+            courses.map((course) => course.id).whereType<int>().toSet();
+        final hasOrphanedMaterial = currentMaterials.any((material) {
+          final courseId = material['course_id'];
+          return courseId is! int || !incomingCourseIds.contains(courseId);
+        });
+        if (hasOrphanedMaterial) {
+          throw StateError(
+            'This legacy backup omits course materials and would orphan '
+            'existing attachments. Restore a v2 backup instead.',
+          );
+        }
+      }
+
       // Delete dependent records before their parent courses.
       if (materials != null) {
         await txn.delete(_materialsTable);
