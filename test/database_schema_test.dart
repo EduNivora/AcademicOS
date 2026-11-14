@@ -13,34 +13,37 @@ void main() {
       await helper.close();
 
       const existingCourseId = 987654;
-      await helper.insertCourse(
-        const CourseModel(
-          id: existingCourseId,
-          name: 'Existing course',
-          instructor: 'Existing instructor',
-          code: 'EXIST-1',
-          credits: 3,
-        ),
-      );
-
-      await expectLater(
-        helper.replaceAcademicData(
-          courses: const [],
-          tasks: const [],
-          exams: const [],
-          schedules: const [
-            {'column_that_does_not_exist': 'force transaction failure'},
-          ],
-        ),
-        throwsA(isA<Exception>()),
-      );
-
-      final preservedCourse = await helper.getCourseById(existingCourseId);
-      expect(preservedCourse, isNotNull);
-      expect(preservedCourse!.name, 'Existing course');
-
       await helper.deleteCourse(existingCourseId);
-      await helper.close();
+      try {
+        await helper.insertCourse(
+          const CourseModel(
+            id: existingCourseId,
+            name: 'Existing course',
+            instructor: 'Existing instructor',
+            code: 'EXIST-1',
+            credits: 3,
+          ),
+        );
+
+        await expectLater(
+          helper.replaceAcademicData(
+            courses: const [],
+            tasks: const [],
+            exams: const [],
+            schedules: const [
+              {'column_that_does_not_exist': 'force transaction failure'},
+            ],
+          ),
+          throwsA(isA<Exception>()),
+        );
+
+        final preservedCourse = await helper.getCourseById(existingCourseId);
+        expect(preservedCourse, isNotNull);
+        expect(preservedCourse!.name, 'Existing course');
+      } finally {
+        await helper.deleteCourse(existingCourseId);
+        await helper.close();
+      }
     });
 
     test(
