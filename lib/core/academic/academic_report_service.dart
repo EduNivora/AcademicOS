@@ -13,7 +13,8 @@ class AcademicReportService {
     required List<TaskModel> tasks,
     required List<ExamModel> exams,
     required List<Map<String, dynamic>> schedule,
-    String schema = 'academic_os_backup_v1',
+    List<Map<String, dynamic>> materials = const [],
+    String schema = 'academic_os_backup_v2',
   }) {
     final payload = <String, dynamic>{
       'schema': schema,
@@ -22,6 +23,7 @@ class AcademicReportService {
       'tasks': tasks.map((task) => task.toMap()).toList(),
       'exams': exams.map((exam) => exam.toMap()).toList(),
       'schedule': schedule,
+      'materials': materials,
     };
     return payload;
   }
