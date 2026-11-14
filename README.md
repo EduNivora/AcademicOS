@@ -42,6 +42,7 @@ Academic OS هو نظام إدارة أكاديمية مبني على Flutter و
 - قفل التطبيق باستخدام نظام PIN و/أو المصادقة البيومترية
 - تخزين بعض بيانات المصادقة والإعدادات الحساسة داخل `flutter_secure_storage`؛ قاعدة SQLite نفسها غير مشفرة حالياً.
 - إعدادات قفل التطبيق من شاشة الخصوصية والأمان
+- استخدام Argon2id للتحقق من كلمات المرور وأرقام PIN الجديدة، مع ترقية بيانات التحقق القديمة بعد نجاح المصادقة؛ هذا لا يعني أن ملف SQLite مشفر.
 
 ### 4. الجداول الدراسية والتخطيط الأكاديمي
 - عرض جدول أسبوعي للمحاضرات
@@ -113,7 +114,8 @@ Academic OS هو نظام إدارة أكاديمية مبني على Flutter و
 - `sqflite_common_ffi_web: ^1.0.0`
 - `shared_preferences: ^2.3.0`
 - `flutter_secure_storage: ^9.0.0`
-- `crypto: ^3.0.6`
+- `crypto: ^3.0.6` (legacy verifier migration and cryptographic utilities)
+- `cryptography: ^2.9.0` (Argon2id password and app-lock PIN verifiers)
 
 #### Auth and device security
 - `google_sign_in: ^6.2.1`
