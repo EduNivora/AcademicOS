@@ -7,6 +7,7 @@ import '../../domain/usecases/auth_use_cases.dart';
 import '../../domain/usecases/course_use_cases.dart';
 import '../../domain/usecases/task_use_cases.dart';
 import 'pin_lock_screen.dart';
+import 'login_screen.dart';
 import '../home/home_screen.dart';
 import '../onboarding/onboarding_screen.dart';
 
@@ -42,6 +43,8 @@ class _AuthGateScreenState extends State<AuthGateScreen> {
   bool _isLoading = true;
   bool _isLoggedIn = false;
   bool _isAppLocked = false;
+  bool _requiresLogin = false;
+  bool _authStateUnavailable = false;
 
   @override
   void initState() {
@@ -52,7 +55,21 @@ class _AuthGateScreenState extends State<AuthGateScreen> {
 
   Future<void> _checkAuthentication() async {
     try {
+      final logoutRequired =
+          await _secureStorageService.isAuthLogoutRequired();
+      if (logoutRequired) {
+        if (!mounted) return;
+        setState(() {
+          _requiresLogin = true;
+          _isLoggedIn = false;
+          _isAppLocked = false;
+          _isLoading = false;
+        });
+        return;
+      }
+
       final active = await widget.authUseCases.isLoggedIn.call();
+      if (!mounted) return;
 
       if (!AppPlatform.shouldUseNativeSecurity()) {
         setState(() {
@@ -65,6 +82,7 @@ class _AuthGateScreenState extends State<AuthGateScreen> {
 
       if (active) {
         final locked = await _appLockService?.shouldLockApp() ?? false;
+        if (!mounted) return;
         setState(() {
           _isAppLocked = locked;
           _isLoggedIn = true;
@@ -75,9 +93,11 @@ class _AuthGateScreenState extends State<AuthGateScreen> {
 
       final cachedGoogle =
           await widget.authUseCases.loginWithCachedGoogleAccount.call();
+      if (!mounted) return;
       final locked = cachedGoogle
           ? (await _appLockService?.shouldLockApp() ?? false)
           : false;
+      if (!mounted) return;
       setState(() {
         _isLoggedIn = cachedGoogle;
         _isAppLocked = locked;
@@ -87,10 +107,44 @@ class _AuthGateScreenState extends State<AuthGateScreen> {
       debugPrint(
         'AuthGateScreen._checkAuthentication error: $error\n$stackTrace',
       );
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
+        _isLoggedIn = false;
+        _isAppLocked = false;
+        _authStateUnavailable = true;
       });
     }
+  }
+
+  Future<void> _retryAuthentication() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _authStateUnavailable = false;
+    });
+    await _checkAuthentication();
+  }
+
+  Future<void> _handleLoginSuccess() async {
+    if (!mounted) return;
+    setState(() {
+      _requiresLogin = false;
+      _authStateUnavailable = false;
+      _isLoggedIn = true;
+      _isAppLocked = false;
+    });
+  }
+
+  Future<void> _handleContinueAsGuest() async {
+    await _secureStorageService.continueAsGuest();
+    if (!mounted) return;
+    setState(() {
+      _requiresLogin = false;
+      _authStateUnavailable = false;
+      _isLoggedIn = false;
+      _isAppLocked = false;
+    });
   }
 
   Future<void> _handleAppLockVerified() async {
@@ -105,6 +159,60 @@ class _AuthGateScreenState extends State<AuthGateScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (_authStateUnavailable) {
+      return Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.lock_outline_rounded,
+                      size: 48,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'تعذّر التحقق من حالة الدخول',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'لم نتمكن من قراءة بيانات المصادقة الآمنة. '
+                      'أوقفنا الوصول إلى المساحة الأكاديمية حتى لا نعرض '
+                      'بيانات جلسة سابقة بالخطأ.',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 20),
+                    FilledButton.icon(
+                      onPressed: _retryAuthentication,
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('إعادة المحاولة'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_requiresLogin) {
+      return LoginScreen(
+        authUseCases: widget.authUseCases,
+        onLoginSuccess: _handleLoginSuccess,
+        onContinueAsGuest: _handleContinueAsGuest,
+      );
     }
 
     if (_isLoggedIn && _isAppLocked) {
