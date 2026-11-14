@@ -29,5 +29,32 @@ void main() {
       await service.setPin('4826');
       expect(await service.verifyPin('1111'), isFalse);
     });
+
+    test('stores new PINs as Argon2id verifiers', () async {
+      await service.setPin('4826');
+      final hash = await AuthSecureStorageService().getAppLockPinHash();
+      expect(hash, startsWith('argon2id' + r'
+  });
+}
+));
+    });
+
+    test('upgrades legacy SHA-256 PINs after successful verification', () async {
+      final storage = AuthSecureStorageService();
+      const pin = '4826';
+      final salt = storage.generateSalt();
+      await storage.saveAppLockPinSalt(salt);
+      await storage.saveAppLockPinHash(storage.hashPassword(pin, salt));
+
+      final legacyService = AppLockService(storage, LocalAuthService());
+      expect(await legacyService.verifyPin(pin), isTrue);
+      expect(
+        await storage.getAppLockPinHash(),
+        startsWith('argon2id' + r'
+  });
+}
+),
+      );
+    });
   });
 }
