@@ -7,17 +7,15 @@ import 'package:academic_os/core/security/local_auth_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  FlutterSecureStorage.setMockInitialValues({});
 
   group('AppLockService PIN verification', () {
+    late AuthSecureStorageService storage;
     late AppLockService service;
 
     setUp(() {
       FlutterSecureStorage.setMockInitialValues({});
-      service = AppLockService(
-        AuthSecureStorageService(),
-        LocalAuthService(),
-      );
+      storage = AuthSecureStorageService();
+      service = AppLockService(storage, LocalAuthService());
     });
 
     test('accepts the configured PIN', () async {
@@ -32,29 +30,18 @@ void main() {
 
     test('stores new PINs as Argon2id verifiers', () async {
       await service.setPin('4826');
-      final hash = await AuthSecureStorageService().getAppLockPinHash();
-      expect(hash, startsWith('argon2id' + r'
-  });
-}
-));
+      final hash = await storage.getAppLockPinHash();
+      expect(hash, startsWith('argon2id'));
     });
 
     test('upgrades legacy SHA-256 PINs after successful verification', () async {
-      final storage = AuthSecureStorageService();
       const pin = '4826';
       final salt = storage.generateSalt();
       await storage.saveAppLockPinSalt(salt);
       await storage.saveAppLockPinHash(storage.hashPassword(pin, salt));
 
-      final legacyService = AppLockService(storage, LocalAuthService());
-      expect(await legacyService.verifyPin(pin), isTrue);
-      expect(
-        await storage.getAppLockPinHash(),
-        startsWith('argon2id' + r'
-  });
-}
-),
-      );
+      expect(await service.verifyPin(pin), isTrue);
+      expect(await storage.getAppLockPinHash(), startsWith('argon2id'));
     });
   });
 }
