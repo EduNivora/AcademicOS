@@ -60,7 +60,7 @@ jobs:
         run: flutter pub get --enforce-lockfile
 
       - name: Prepare SQLite WebAssembly runtime
-        run: dart run sqflite_common_ffi_web:setup --force
+        run: dart run sqflite_common_ffi_web:setup --force --verbose
 
       - name: Analyze Dart sources
         shell: bash
