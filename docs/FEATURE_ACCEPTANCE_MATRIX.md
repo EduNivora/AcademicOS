@@ -44,7 +44,7 @@
 
 | Target / gate | Current status | Acceptance evidence required |
 |---|---|---|
-| Android | Build verification pending on latest head | Successful CI APK build and artifact upload; install and smoke-test on physical Android devices |
+| Android | CI build verified on commit `5b9935817cc0080ad9e8ee9b1037e1312b6c0a8d` | Workflow run `43646657252` completed successfully: Dart analysis, Flutter tests, Android debug APK build, and artifact upload. Physical-device install and smoke tests remain outstanding |
 | Web | Configured in repository; runtime acceptance unverified | Production build, browser persistence, file picker, refresh/reopen, offline and supported-browser tests |
 | Windows | Configured in repository; runtime acceptance unverified | Windows release build, installer/runtime dependencies, database persistence and file access tests |
 | iOS | Not established by current repository configuration | Add/verify platform project, build, signing, secure storage, notifications and device tests before claiming support |
@@ -55,12 +55,9 @@
 
 ## Current automated test evidence
 
-The previously completed run on commit `fc493b366c81f1cd6f47ac811a5209f310b442ff` reported:
-- Dart analysis: success
-- Flutter tests: 59 passed
-- Android debug APK build: failed because the runner did not have Android NDK `27.0.12077973`; no artifact was uploaded.
+The earlier run on commit `fc493b366c81f1cd6f47ac811a5209f310b442ff` failed at Android APK build because the runner lacked Android NDK `27.0.12077973`. The workflow was updated to provision the Android SDK/NDK and CMake.
 
-The workflow was subsequently updated to provision the Android SDK and pinned NDK using `android-actions/setup-android@v3`. A newer run must pass before the Android build gate is marked successful. Results from an earlier commit must not be attributed to a newer commit.
+The subsequent run `43646657252` on commit `5b9935817cc0080ad9e8ee9b1037e1312b6c0a8d` completed successfully. Its recorded steps confirm successful dependency resolution, Dart analysis, Flutter tests, Android debug APK build, and APK artifact upload. This is CI build evidence only; it does not replace physical-device installation, runtime, upgrade, or release-signing tests. Results must remain tied to their exact commit SHA.
 
 ## Release acceptance rule
 
