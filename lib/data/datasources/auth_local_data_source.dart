@@ -68,7 +68,9 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
     final verifier = await _secureStorageService.createPasswordVerifier(password);
     await _secureStorageService.saveAuthUsername(username);
     await _secureStorageService.savePasswordHash(verifier);
-    await _secureStorageService.saveAuthSessionActive(true);
+    // Registration stores credentials but does not authenticate the user.
+    // Only a successful credential verification may activate a session.
+    await _secureStorageService.saveAuthSessionActive(false);
   }
 
   @override
