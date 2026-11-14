@@ -106,6 +106,15 @@ class AuthSecureStorageService {
     await clearGoogleAccountData();
   }
 
+  /// Clears any persisted authenticated session before allowing guest access.
+  ///
+  /// The logout marker is removed only after the inactive session and cached
+  /// Google credentials have both been persisted/cleared successfully.
+  Future<void> continueAsGuest() async {
+    await clearSessionData();
+    await clearAuthLogoutRequired();
+  }
+
   Future<bool> isAuthLogoutRequired() async {
     final value = await _secureStorage.read(key: _authLogoutRequiredKey);
     return value == 'true';
