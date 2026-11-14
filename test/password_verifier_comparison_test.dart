@@ -26,11 +26,9 @@ void main() {
     });
 
     test('rejects a mismatch at the last character', () {
+      final prefix = List<String>.filled(63, 'a').join();
       expect(
-        service.constantTimeEquals(
-          '${'a' * 63}b',
-          '${'a' * 63}c',
-        ),
+        service.constantTimeEquals('${prefix}b', '${prefix}c'),
         isFalse,
       );
     });
