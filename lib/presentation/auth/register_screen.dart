@@ -107,7 +107,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             'تم التسجيل، لكن فشل تسجيل الدخول تلقائياً. حاول تسجيل الدخول يدوياً.';
       });
     } catch (error, stackTrace) {
-      debugPrint('Local registration failed: $error\\n$stackTrace');
+      debugPrint('Local registration failed: $error\n$stackTrace');
       if (!mounted) return;
       setState(() {
         _errorMessage =
