@@ -38,7 +38,7 @@ void main() async {
   try {
     await appInitializer.initialize();
   } catch (error, stackTrace) {
-    debugPrint('AppInitializer failed during startup: $error\\n$stackTrace');
+    debugPrint('AppInitializer failed during startup: $error\n$stackTrace');
     runApp(_StartupFailureApp(onRetry: main));
     return;
   }
