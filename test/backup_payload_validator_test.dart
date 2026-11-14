@@ -100,6 +100,43 @@ void main() {
     expect(() => validator.validate(payload), throwsFormatException);
   });
 
+  test('rejects invalid optional numeric fields and malformed dates', () {
+    final payload = _validPayload();
+    (payload['courses'] as List).first['credits'] = 'many';
+    expect(() => validator.validate(payload), throwsFormatException);
+
+    payload['courses'] = [
+      {'id': 1, 'name': 'Math', 'instructor': 'Dr A', 'code': 'M101',
+       'mid_grade': double.nan},
+    ];
+    expect(() => validator.validate(payload), throwsFormatException);
+
+    payload['courses'] = [
+      {'id': 1, 'name': 'Math', 'instructor': 'Dr A', 'code': 'M101'},
+    ];
+    (payload['tasks'] as List).first['due_date'] = 'not-a-date';
+    expect(() => validator.validate(payload), throwsFormatException);
+  });
+
+  test('rejects malformed exam fields and task reminder offsets', () {
+    final payload = _validPayload();
+    (payload['exams'] as List).first['exam_date'] = 'not-a-date';
+    expect(() => validator.validate(payload), throwsFormatException);
+
+    payload['exams'] = [
+      {'id': 1, 'title': 'Midterm', 'exam_date': '2026-12-01',
+       'location': 42, 'course_id': 1},
+    ];
+    expect(() => validator.validate(payload), throwsFormatException);
+
+    payload['exams'] = [
+      {'id': 1, 'title': 'Midterm', 'exam_date': '2026-12-01',
+       'course_id': 1},
+    ];
+    (payload['tasks'] as List).first['reminder_offset_minutes'] = -10;
+    expect(() => validator.validate(payload), throwsFormatException);
+  });
+
   test('accepts v1 backups without materials metadata', () {
     final payload = _validPayload()
       ..['schema'] = 'academic_os_backup_v1'
