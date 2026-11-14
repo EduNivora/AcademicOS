@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/academic/academic_report_service.dart';
 import '../../data/database/database_helper.dart';
+import '../../data/models/course_material_model.dart';
 import '../../data/models/course_model.dart';
 import '../../data/models/exam_model.dart';
 import '../../data/models/task_model.dart';
@@ -42,12 +43,14 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
       final tasks = await _databaseHelper.getTasks();
       final exams = await _databaseHelper.getExams();
       final schedule = await _databaseHelper.getSchedules();
+      final materials = await _databaseHelper.getAllMaterials();
 
       final payload = _academicReportService.buildBackupPayload(
         courses: courses,
         tasks: tasks,
         exams: exams,
         schedule: List<Map<String, dynamic>>.from(schedule),
+        materials: materials,
       );
 
       final encodedBackup = _academicReportService.encodeBackupJson(payload);
@@ -99,16 +102,28 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
       }
 
       // Validate and deserialize every row before touching the live database.
+      final schema = decoded['schema'];
+      if (schema != null &&
+          schema != 'academic_os_backup_v1' &&
+          schema != 'academic_os_backup_v2') {
+        throw const FormatException(
+          'إصدار النسخة الاحتياطية غير مدعوم.',
+        );
+      }
+
       final rawCourses = decoded['courses'];
       final rawTasks = decoded['tasks'];
       final rawExams = decoded['exams'];
       final rawSchedule = decoded['schedule'];
+      final rawMaterials = decoded['materials'];
       if (rawCourses is! List ||
           rawTasks is! List ||
           rawExams is! List ||
-          rawSchedule is! List) {
+          rawSchedule is! List ||
+          (schema == 'academic_os_backup_v2' && rawMaterials is! List) ||
+          (rawMaterials != null && rawMaterials is! List)) {
         throw const FormatException(
-          'النسخة الاحتياطية لا تحتوي على جميع أقسام البيانات المطلوبة.',
+          'النسخة الاحتياطية لا تحتوي على أقسام البيانات المطلوبة أو أن بنيتها غير صالحة.',
         );
       }
 
@@ -130,12 +145,20 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
       final schedule = rawSchedule
           .map((item) => Map<String, dynamic>.from(item as Map))
           .toList(growable: false);
+      final materials = rawMaterials is List
+          ? rawMaterials
+              .map((item) => CourseMaterialModel.fromMap(
+                    Map<String, dynamic>.from(item as Map),
+                  ))
+              .toList(growable: false)
+          : null;
 
       await _databaseHelper.replaceAcademicData(
         courses: courses,
         tasks: tasks,
         exams: exams,
         schedules: schedule,
+        materials: materials,
       );
 
       if (!mounted) return;
@@ -171,9 +194,11 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
       final decoded = jsonDecode(rawText);
       if (decoded is Map<String, dynamic>) {
         if (decoded.containsKey('payload') && decoded['payload'] is String) {
+          if (decoded['format'] != 'academic_os_backup') return null;
           final payloadText =
               utf8.decode(base64.decode(decoded['payload'] as String));
-          return jsonDecode(payloadText) as Map<String, dynamic>;
+          final payload = jsonDecode(payloadText);
+          return payload is Map<String, dynamic> ? payload : null;
         }
         if (decoded.containsKey('courses') ||
             decoded.containsKey('tasks') ||
