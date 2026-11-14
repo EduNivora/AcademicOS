@@ -115,6 +115,57 @@ void main() {
       }
     });
 
+    test('legacy restore refuses to orphan existing course materials',
+        () async {
+      final helper = DatabaseHelper.instance;
+      await helper.close();
+
+      const courseId = 987657;
+      const materialId = 987658;
+      await helper.deleteMaterial(materialId);
+      await helper.deleteCourse(courseId);
+
+      try {
+        await helper.insertCourse(
+          const CourseModel(
+            id: courseId,
+            name: 'Course with attachment',
+            instructor: 'Instructor',
+            code: 'MAT-1',
+            credits: 3,
+          ),
+        );
+        await helper.insertMaterial({
+          'id': materialId,
+          'course_id': courseId,
+          'title': 'Existing attachment',
+          'file_path': '/tmp/existing.pdf',
+          'file_type': 'pdf',
+        });
+
+        await expectLater(
+          helper.replaceAcademicData(
+            courses: const [],
+            tasks: const [],
+            exams: const [],
+            schedules: const [],
+          ),
+          throwsA(isA<StateError>()),
+        );
+
+        expect(await helper.getCourseById(courseId), isNotNull);
+        expect(
+          (await helper.getAllMaterials())
+              .any((material) => material['id'] == materialId),
+          isTrue,
+        );
+      } finally {
+        await helper.deleteMaterial(materialId);
+        await helper.deleteCourse(courseId);
+        await helper.close();
+      }
+    });
+
     test(
         'initial database creation should not add duplicate course grade columns',
         () async {
