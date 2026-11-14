@@ -66,11 +66,11 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
     String? displayName,
   }) async {
     final verifier = await _secureStorageService.createPasswordVerifier(password);
+    // Close any existing session before changing identity credentials.
+    // A partial secure-storage write must never leave a previous session live.
+    await _secureStorageService.saveAuthSessionActive(false);
     await _secureStorageService.saveAuthUsername(username);
     await _secureStorageService.savePasswordHash(verifier);
-    // Registration stores credentials but does not authenticate the user.
-    // Only a successful credential verification may activate a session.
-    await _secureStorageService.saveAuthSessionActive(false);
   }
 
   @override
