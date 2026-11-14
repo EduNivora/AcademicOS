@@ -52,7 +52,7 @@ class _LoginScreenState extends State<LoginScreen> {
         password,
       );
     } catch (error, stackTrace) {
-      debugPrint('Local login failed: $error\\n$stackTrace');
+      debugPrint('Local login failed: $error\n$stackTrace');
       if (!mounted) return;
       setState(() {
         _isLoading = false;
