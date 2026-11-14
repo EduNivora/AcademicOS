@@ -137,7 +137,7 @@ class _AuthGateScreenState extends State<AuthGateScreen> {
   }
 
   Future<void> _handleContinueAsGuest() async {
-    await _secureStorageService.clearAuthLogoutRequired();
+    await _secureStorageService.continueAsGuest();
     if (!mounted) return;
     setState(() {
       _requiresLogin = false;
