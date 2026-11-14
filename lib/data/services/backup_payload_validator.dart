@@ -54,10 +54,10 @@ class BackupPayloadValidator {
       }).toList(growable: false);
     }
 
-    final courseRows = rows('courses', required: true);
-    final taskRows = rows('tasks', required: true);
-    final examRows = rows('exams', required: true);
-    final scheduleRows = rows('schedule', required: true);
+    final courseRows = rows('courses', isRequired: true);
+    final taskRows = rows('tasks', isRequired: true);
+    final examRows = rows('exams', isRequired: true);
+    final scheduleRows = rows('schedule', isRequired: true);
     final materialValue = payload['materials'];
     if (schema == 'academic_os_backup_v2' && materialValue is! List) {
       throw const FormatException('Backup v2 must contain materials as a list.');
@@ -67,7 +67,7 @@ class BackupPayloadValidator {
     }
     final materialRows = materialValue == null
         ? null
-        : rows('materials', required: true);
+        : rows('materials', isRequired: true);
 
     for (final row in taskRows) {
       _validateEnum(row['type'], const {
