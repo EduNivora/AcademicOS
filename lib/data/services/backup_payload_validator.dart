@@ -36,9 +36,9 @@ class BackupPayloadValidator {
       throw const FormatException('Unsupported backup schema version.');
     }
 
-    List<Map<String, dynamic>> rows(String key, {required bool required}) {
+    List<Map<String, dynamic>> rows(String key, {required bool isRequired}) {
       final value = payload[key];
-      if (value == null && !required) return <Map<String, dynamic>>[];
+      if (value == null && !isRequired) return <Map<String, dynamic>>[];
       if (value is! List) {
         throw FormatException('Backup section "$key" must be a list.');
       }
