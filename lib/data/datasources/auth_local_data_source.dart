@@ -31,7 +31,8 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
       return false;
     }
     final computedHash = _secureStorageService.hashPassword(password, salt);
-    final success = computedHash == storedHash;
+    final success =
+        _secureStorageService.constantTimeEquals(computedHash, storedHash);
     if (success) {
       await _secureStorageService.saveAuthSessionActive(true);
     }
