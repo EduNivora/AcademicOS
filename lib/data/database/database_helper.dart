@@ -12,42 +12,22 @@ import '../models/task_model.dart';
 /// مساعد قاعدة البيانات المسؤول عن إنشاء قاعدة البيانات والتعامل
 /// مع عمليات CRUD الخاصة بالمهام والمواد.
 class DatabaseHelper {
-  DatabaseHelper._() {
-    if (kIsWeb && !_webFactoryInitialized) {
-      _webFactoryInitialized = _initializeWebFactory();
-    }
-
-    if (!kIsWeb && _shouldUseNativeFactory() && !_nativeFactoryInitialized) {
-      _nativeFactoryInitialized = _initializeNativeFactory();
-    }
-  }
+  DatabaseHelper._();
 
   static bool _shouldUseNativeFactory() {
     return Platform.isWindows || Platform.isLinux || Platform.isMacOS;
   }
 
   static bool _initializeWebFactory() {
-    try {
-      databaseFactory = databaseFactoryFfiWeb;
-      debugPrint('SQLite FFI web factory initialized once.');
-      return true;
-    } catch (error) {
-      debugPrint(
-          'SQLite FFI web factory unavailable; keeping fallback mode. $error');
-      return false;
-    }
+    databaseFactory = databaseFactoryFfiWeb;
+    debugPrint('SQLite FFI web factory initialized once.');
+    return true;
   }
 
   static bool _initializeNativeFactory() {
-    try {
-      databaseFactory = databaseFactoryFfi;
-      debugPrint('SQLite FFI native factory initialized once.');
-      return true;
-    } catch (error) {
-      debugPrint(
-          'SQLite FFI native factory unavailable; keeping fallback mode. $error');
-      return false;
-    }
+    databaseFactory = databaseFactoryFfi;
+    debugPrint('SQLite FFI native factory initialized once.');
+    return true;
   }
 
   static final DatabaseHelper instance = DatabaseHelper._();
@@ -71,54 +51,36 @@ class DatabaseHelper {
   }
 
   Future<Database> _initDatabase() async {
-    if (kIsWeb && !_webFactoryInitialized) {
-      try {
-        databaseFactory = databaseFactoryFfiWeb;
-        _webFactoryInitialized = true;
-        debugPrint('SQLite FFI web factory initialized during DB setup.');
-      } catch (error) {
-        debugPrint(
-            'SQLite FFI web factory unavailable; keeping fallback mode. $error');
+    try {
+      if (kIsWeb && !_webFactoryInitialized) {
+        _webFactoryInitialized = _initializeWebFactory();
       }
-    }
 
-    if (!kIsWeb && _shouldUseNativeFactory() && !_nativeFactoryInitialized) {
-      try {
-        databaseFactory = databaseFactoryFfi;
-        _nativeFactoryInitialized = true;
-        debugPrint('SQLite FFI native factory initialized during DB setup.');
-      } catch (error) {
-        debugPrint(
-            'SQLite FFI native factory unavailable; keeping fallback mode. $error');
+      if (!kIsWeb &&
+          _shouldUseNativeFactory() &&
+          !_nativeFactoryInitialized) {
+        _nativeFactoryInitialized = _initializeNativeFactory();
       }
+    } catch (error, stackTrace) {
+      Error.throwWithStackTrace(
+        StateError('Unable to initialize the SQLite database factory: $error'),
+        stackTrace,
+      );
     }
 
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, _databaseName);
 
-    try {
-      return await openDatabase(
-        path,
-        version: _databaseVersion,
-        onConfigure: _onConfigure,
-        onCreate: _onCreateDatabase,
-        onUpgrade: _onUpgradeDatabase,
-      );
-    } catch (error, stackTrace) {
-      if (kIsWeb) {
-        debugPrint(
-          'SQLite web DB init failed; using in-memory fallback. $error\n$stackTrace',
-        );
-        return await openDatabase(
-          inMemoryDatabasePath,
-          version: _databaseVersion,
-          onConfigure: _onConfigure,
-          onCreate: _onCreateDatabase,
-          onUpgrade: _onUpgradeDatabase,
-        );
-      }
-      rethrow;
-    }
+    // Never replace persistent storage with an in-memory database.
+    // A failed open must be surfaced to startup so the user is not led to
+    // believe that writes are durable when they can disappear on refresh.
+    return await openDatabase(
+      path,
+      version: _databaseVersion,
+      onConfigure: _onConfigure,
+      onCreate: _onCreateDatabase,
+      onUpgrade: _onUpgradeDatabase,
+    );
   }
 
   Future<void> _onConfigure(Database db) async {
