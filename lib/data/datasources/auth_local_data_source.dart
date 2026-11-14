@@ -23,16 +23,33 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
   Future<bool> verifyCredentials(String username, String password) async {
     final storedUsername = await _secureStorageService.getAuthUsername();
     final storedHash = await _secureStorageService.getPasswordHash();
-    final salt = await _secureStorageService.getPasswordSalt();
-    if (storedUsername == null || storedHash == null || salt == null) {
+    if (storedUsername == null || storedHash == null ||
+        storedUsername != username) {
       return false;
     }
-    if (storedUsername != username) {
-      return false;
+
+    var success = false;
+    if (storedHash.startsWith('argon2id\\$')) {
+      success = await _secureStorageService.verifyPasswordVerifier(
+        password,
+        storedHash,
+      );
+    } else {
+      final legacySalt = await _secureStorageService.getPasswordSalt();
+      if (legacySalt == null) return false;
+      final legacyHash = _secureStorageService.hashPassword(password, legacySalt);
+      success = _secureStorageService.constantTimeEquals(
+        legacyHash,
+        storedHash,
+      );
+      if (success) {
+        // Persist the upgraded verifier before activating the session. If this
+        // write fails, the legacy verifier remains usable and no session starts.
+        final upgraded = await _secureStorageService.createPasswordVerifier(password);
+        await _secureStorageService.savePasswordHash(upgraded);
+      }
     }
-    final computedHash = _secureStorageService.hashPassword(password, salt);
-    final success =
-        _secureStorageService.constantTimeEquals(computedHash, storedHash);
+
     if (success) {
       await _secureStorageService.saveAuthSessionActive(true);
     }
@@ -46,11 +63,9 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
     String? email,
     String? displayName,
   }) async {
-    final salt = _secureStorageService.generateSalt();
-    final hash = _secureStorageService.hashPassword(password, salt);
+    final verifier = await _secureStorageService.createPasswordVerifier(password);
     await _secureStorageService.saveAuthUsername(username);
-    await _secureStorageService.savePasswordSalt(salt);
-    await _secureStorageService.savePasswordHash(hash);
+    await _secureStorageService.savePasswordHash(verifier);
     await _secureStorageService.saveAuthSessionActive(true);
   }
 
