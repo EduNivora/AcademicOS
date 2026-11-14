@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
+import 'package:cryptography/cryptography.dart' show Argon2id;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class AuthSecureStorageService {
@@ -165,6 +166,140 @@ class AuthSecureStorageService {
     final random = Random.secure();
     final bytes = List<int>.generate(32, (_) => random.nextInt(256));
     return base64UrlEncode(bytes);
+  }
+
+
+  static const int _argonMemoryKiB = 19456;
+  static const int _argonIterations = 2;
+  static const int _argonParallelism = 1;
+  static const int _argonHashLength = 32;
+
+  Future<String> createPasswordVerifier(String password) async {
+    final salt = generateSalt();
+    final saltBytes = base64Url.decode(salt);
+    final algorithm = Argon2id(
+      memory: _argonMemoryKiB,
+      iterations: _argonIterations,
+      parallelism: _argonParallelism,
+      hashLength: _argonHashLength,
+    );
+    final key = await algorithm.deriveKeyFromPassword(
+      password: password,
+      nonce: saltBytes,
+    );
+    final hash = base64UrlEncode(await key.extractBytes());
+    return [
+      'argon2id',
+      'v=1',
+      'm=$_argonMemoryKiB,t=$_argonIterations,p=$_argonParallelism',
+      salt,
+      hash,
+    ].join(r'
+    final key = utf8.encode(password + salt);
+    final digest = sha256.convert(key);
+    return digest.toString();
+  }
+
+  /// Compares fixed-format password verifiers without returning early on the
+  /// first mismatching character. This is a best-effort constant-time compare
+  /// at the Dart source level; it does not replace a slow password KDF.
+  bool constantTimeEquals(String candidate, String expected) {
+    final length = max(candidate.length, expected.length);
+    var difference = candidate.length ^ expected.length;
+
+    for (var index = 0; index < length; index++) {
+      final candidateCode =
+          index < candidate.length ? candidate.codeUnitAt(index) : 0;
+      final expectedCode =
+          index < expected.length ? expected.codeUnitAt(index) : 0;
+      difference |= candidateCode ^ expectedCode;
+    }
+
+    return difference == 0;
+  }
+
+  String generateSalt() {
+    final random = Random.secure();
+    final values = List<int>.generate(16, (_) => random.nextInt(256));
+    return base64UrlEncode(values);
+  }
+}
+);
+  }
+
+  Future<bool> verifyPasswordVerifier(
+    String password,
+    String verifier,
+  ) async {
+    try {
+      final parts = verifier.split(r'
+    final key = utf8.encode(password + salt);
+    final digest = sha256.convert(key);
+    return digest.toString();
+  }
+
+  /// Compares fixed-format password verifiers without returning early on the
+  /// first mismatching character. This is a best-effort constant-time compare
+  /// at the Dart source level; it does not replace a slow password KDF.
+  bool constantTimeEquals(String candidate, String expected) {
+    final length = max(candidate.length, expected.length);
+    var difference = candidate.length ^ expected.length;
+
+    for (var index = 0; index < length; index++) {
+      final candidateCode =
+          index < candidate.length ? candidate.codeUnitAt(index) : 0;
+      final expectedCode =
+          index < expected.length ? expected.codeUnitAt(index) : 0;
+      difference |= candidateCode ^ expectedCode;
+    }
+
+    return difference == 0;
+  }
+
+  String generateSalt() {
+    final random = Random.secure();
+    final values = List<int>.generate(16, (_) => random.nextInt(256));
+    return base64UrlEncode(values);
+  }
+}
+);
+      if (parts.length != 5 ||
+          parts[0] != 'argon2id' ||
+          parts[1] != 'v=1' ||
+          parts[2] !=
+              'm=$_argonMemoryKiB,t=$_argonIterations,p=$_argonParallelism') {
+        return false;
+      }
+      final salt = base64Url.decode(parts[3]);
+      final expected = base64Url.decode(parts[4]);
+      if (salt.length != 16 || expected.length != _argonHashLength) {
+        return false;
+      }
+      final algorithm = Argon2id(
+        memory: _argonMemoryKiB,
+        iterations: _argonIterations,
+        parallelism: _argonParallelism,
+        hashLength: _argonHashLength,
+      );
+      final key = await algorithm.deriveKeyFromPassword(
+        password: password,
+        nonce: salt,
+      );
+      return _constantTimeBytesEqual(await key.extractBytes(), expected);
+    } on FormatException {
+      return false;
+    }
+  }
+
+  bool _constantTimeBytesEqual(List<int> candidate, List<int> expected) {
+    final length = max(candidate.length, expected.length);
+    var difference = candidate.length ^ expected.length;
+    for (var index = 0; index < length; index++) {
+      final left = index < candidate.length ? candidate[index] : 0;
+      final right = index < expected.length ? expected[index] : 0;
+      difference |= left ^ right;
+    }
+    return difference == 0;
   }
 
   String hashPassword(String password, String salt) {
