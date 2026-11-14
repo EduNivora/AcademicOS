@@ -2,7 +2,7 @@ name: Flutter quality gate
 
 on:
   pull_request:
-    branches: [main, 'ci/**']
+    branches: [main, chore/edunivora-phase0-execution, 'ci/**']
   push:
     branches: [main, 'ci/**']
 
