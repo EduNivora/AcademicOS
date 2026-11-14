@@ -69,19 +69,14 @@ class BackupPayloadValidator {
         ? null
         : rows('materials', isRequired: true);
 
+    for (final row in courseRows) {
+      _validateCourse(row);
+    }
     for (final row in taskRows) {
-      _validateEnum(row['type'], const {
-        'homework', 'project', 'exam', 'review', 'attendance',
-        'academicActivity', 'other',
-      }, 'task.type');
-      _validateEnum(row['priority'], const {
-        'low', 'medium', 'high', 'urgent',
-      }, 'task.priority');
-      _validateEnum(row['recurrence'], const {
-        'once', 'daily', 'weekly', 'monthly',
-      }, 'task.recurrence');
-      _validateFlag(row['is_completed'], 'task.is_completed');
-      _validateFlag(row['reminder_enabled'], 'task.reminder_enabled');
+      _validateTask(row);
+    }
+    for (final row in examRows) {
+      _validateExam(row);
     }
 
     final courses = courseRows.map(CourseModel.fromMap).toList(growable: false);
@@ -122,6 +117,161 @@ class BackupPayloadValidator {
       schedule: schedule,
       materials: materials,
     );
+  }
+
+  void _validateCourse(Map<String, dynamic> row) {
+    for (final key in ['name', 'instructor', 'code']) {
+      if (row[key] is! String) {
+        throw FormatException('Course "$key" must be a string.');
+      }
+    }
+    if ((row['name'] as String).trim().isEmpty ||
+        (row['code'] as String).trim().isEmpty) {
+      throw const FormatException('Course name and code are required.');
+    }
+    _validateOptionalDate(row['lecture_date'], 'course.lecture_date');
+    _validateOptionalFlag(
+      row,
+      'lecture_reminder_enabled',
+      'course.lecture_reminder_enabled',
+    );
+    _validateOptionalInteger(
+      row,
+      'credits',
+      'course.credits',
+      min: 0,
+      max: 1000,
+    );
+    _validateOptionalInteger(
+      row,
+      'credit_hours',
+      'course.credit_hours',
+      min: 1,
+      max: 1000,
+    );
+    _validateOptionalInteger(
+      row,
+      'lecture_reminder_offset_minutes',
+      'course.lecture_reminder_offset_minutes',
+      min: 0,
+      max: 10080,
+    );
+    for (final key in ['semester', 'notes', 'color_hex']) {
+      _validateOptionalString(row[key], 'course.$key');
+    }
+    for (final key in ['mid_grade', 'practical_grade', 'final_grade']) {
+      final value = row[key];
+      if (value != null &&
+          (value is! num || !value.isFinite || value < 0)) {
+        throw FormatException('Course "$key" must be a finite non-negative number.');
+      }
+    }
+  }
+
+  void _validateTask(Map<String, dynamic> row) {
+    if (row['title'] is! String ||
+        (row['title'] as String).trim().isEmpty ||
+        row['description'] is! String) {
+      throw const FormatException('Task title and description are required.');
+    }
+    if (row.containsKey('type')) {
+      _validateEnum(row['type'], const {
+        'homework', 'project', 'exam', 'review', 'attendance',
+        'academicActivity', 'other',
+      }, 'task.type');
+    }
+    if (row.containsKey('priority')) {
+      _validateEnum(row['priority'], const {
+        'low', 'medium', 'high', 'urgent',
+      }, 'task.priority');
+    }
+    if (row.containsKey('recurrence')) {
+      _validateEnum(row['recurrence'], const {
+        'once', 'daily', 'weekly', 'monthly',
+      }, 'task.recurrence');
+    }
+    _validateOptionalFlag(row, 'is_completed', 'task.is_completed');
+    _validateOptionalFlag(row, 'reminder_enabled', 'task.reminder_enabled');
+    for (final key in ['due_date', 'start_date_time', 'end_date_time', 'reminder_date']) {
+      _validateOptionalDate(row[key], 'task.$key');
+    }
+    final start = row['start_date_time'];
+    final end = row['end_date_time'];
+    if (start != null && end != null &&
+        DateTime.parse(end as String).isBefore(DateTime.parse(start as String))) {
+      throw const FormatException('Task end_date_time precedes start_date_time.');
+    }
+    _validateOptionalInteger(
+      row,
+      'reminder_offset_minutes',
+      'task.reminder_offset_minutes',
+      min: 0,
+      max: 10080,
+    );
+    _validateOptionalInteger(
+      row,
+      'course_id',
+      'task.course_id',
+      min: 1,
+    );
+    _validateOptionalString(row['course_name'], 'task.course_name');
+    _validateOptionalString(row['notes'], 'task.notes');
+  }
+
+  void _validateExam(Map<String, dynamic> row) {
+    if (row['title'] is! String || (row['title'] as String).trim().isEmpty) {
+      throw const FormatException('Exam title is required.');
+    }
+    _validateOptionalDate(row['exam_date'], 'exam.exam_date', required: true);
+    _validateOptionalInteger(row, 'course_id', 'exam.course_id', min: 1);
+    for (final key in ['location', 'notes', 'course_name', 'color_hex']) {
+      _validateOptionalString(row[key], 'exam.$key');
+    }
+  }
+
+  void _validateOptionalString(Object? value, String field) {
+    if (value != null && value is! String) {
+      throw FormatException('"$field" must be a string or null.');
+    }
+  }
+
+  void _validateOptionalDate(
+    Object? value,
+    String field, {
+    bool required = false,
+  }) {
+    if (value == null) {
+      if (required) throw FormatException('"$field" is required.');
+      return;
+    }
+    if (value is! String || DateTime.tryParse(value) == null) {
+      throw FormatException('"$field" must be a valid ISO date string.');
+    }
+  }
+
+  void _validateOptionalInteger(
+    Map<String, dynamic> row,
+    String key,
+    String field, {
+    int? min,
+    int? max,
+  }) {
+    if (!row.containsKey(key) || row[key] == null) return;
+    final value = row[key];
+    if (value is! int ||
+        (min != null && value < min) ||
+        (max != null && value > max)) {
+      throw FormatException('"$field" is outside its valid integer range.');
+    }
+  }
+
+  void _validateOptionalFlag(
+    Map<String, dynamic> row,
+    String key,
+    String field,
+  ) {
+    if (!row.containsKey(key)) return;
+    _validateFlag(row[key], field);
   }
 
   void _validateIds(List<Map<String, dynamic>> rows, String section) {
