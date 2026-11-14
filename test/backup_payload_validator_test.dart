@@ -81,7 +81,22 @@ void main() {
     (payload['tasks'] as List).first['course_id'] = 99;
     expect(() => validator.validate(payload), throwsFormatException);
     (payload['tasks'] as List).first['course_id'] = 1;
+    (payload['exams'] as List).first['course_id'] = 99;
+    expect(() => validator.validate(payload), throwsFormatException);
+    (payload['exams'] as List).first['course_id'] = 1;
     (payload['schedule'] as List).first['course_id'] = 99;
+    expect(() => validator.validate(payload), throwsFormatException);
+  });
+
+  test('rejects duplicate course ids and non-object rows', () {
+    final payload = _validPayload();
+    payload['courses'] = [
+      ...(payload['courses'] as List),
+      (payload['courses'] as List).first,
+    ];
+    expect(() => validator.validate(payload), throwsFormatException);
+
+    payload['courses'] = ['not-a-row'];
     expect(() => validator.validate(payload), throwsFormatException);
   });
 
