@@ -1,5 +1,7 @@
+
 import 'dart:convert';
 import 'dart:math';
+
 import 'package:crypto/crypto.dart';
 import 'package:cryptography/cryptography.dart' show Argon2id;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -10,17 +12,19 @@ class AuthSecureStorageService {
   static const String _authPasswordHashKey = 'academic_os_auth_password_hash';
   static const String _authPasswordSaltKey = 'academic_os_auth_password_salt';
   static const String _googleAccountIdKey = 'academic_os_google_account_id';
-  static const String _googleAccountEmailKey =
-      'academic_os_google_account_email';
+  static const String _googleAccountEmailKey = 'academic_os_google_account_email';
   static const String _googleAccountNameKey = 'academic_os_google_account_name';
   static const String _authSessionActiveKey = 'academic_os_auth_session_active';
   static const String _appLockPinHashKey = 'academic_os_app_lock_pin_hash';
   static const String _appLockPinSaltKey = 'academic_os_app_lock_pin_salt';
-  static const String _appLockBiometricEnabledKey =
-      'academic_os_app_lock_biometric_enabled';
+  static const String _appLockBiometricEnabledKey = 'academic_os_app_lock_biometric_enabled';
   static const String _appLockTimeoutKey = 'academic_os_app_lock_timeout';
-  static const String _appLockLastActiveAtKey =
-      'academic_os_app_lock_last_active_at';
+  static const String _appLockLastActiveAtKey = 'academic_os_app_lock_last_active_at';
+
+  static const int _argonMemoryKiB = 19456;
+  static const int _argonIterations = 2;
+  static const int _argonParallelism = 1;
+  static const int _argonHashLength = 32;
 
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
@@ -29,7 +33,6 @@ class AuthSecureStorageService {
     if (existingPassword != null && existingPassword.isNotEmpty) {
       return existingPassword;
     }
-
     final newPassword = _generateSecurePassword();
     await _secureStorage.write(key: _dbPasswordKey, value: newPassword);
     return newPassword;
@@ -43,25 +46,22 @@ class AuthSecureStorageService {
     await _secureStorage.write(key: _authUsernameKey, value: username);
   }
 
-  Future<String?> getAuthUsername() async {
-    return await _secureStorage.read(key: _authUsernameKey);
-  }
+  Future<String?> getAuthUsername() async =>
+      _secureStorage.read(key: _authUsernameKey);
 
   Future<void> savePasswordHash(String hash) async {
     await _secureStorage.write(key: _authPasswordHashKey, value: hash);
   }
 
-  Future<String?> getPasswordHash() async {
-    return await _secureStorage.read(key: _authPasswordHashKey);
-  }
+  Future<String?> getPasswordHash() async =>
+      _secureStorage.read(key: _authPasswordHashKey);
 
   Future<void> savePasswordSalt(String salt) async {
     await _secureStorage.write(key: _authPasswordSaltKey, value: salt);
   }
 
-  Future<String?> getPasswordSalt() async {
-    return await _secureStorage.read(key: _authPasswordSaltKey);
-  }
+  Future<String?> getPasswordSalt() async =>
+      _secureStorage.read(key: _authPasswordSaltKey);
 
   Future<void> saveGoogleAccountData({
     required String id,
@@ -110,17 +110,15 @@ class AuthSecureStorageService {
     await _secureStorage.write(key: _appLockPinHashKey, value: pinHash);
   }
 
-  Future<String?> getAppLockPinHash() async {
-    return await _secureStorage.read(key: _appLockPinHashKey);
-  }
+  Future<String?> getAppLockPinHash() async =>
+      _secureStorage.read(key: _appLockPinHashKey);
 
   Future<void> saveAppLockPinSalt(String salt) async {
     await _secureStorage.write(key: _appLockPinSaltKey, value: salt);
   }
 
-  Future<String?> getAppLockPinSalt() async {
-    return await _secureStorage.read(key: _appLockPinSaltKey);
-  }
+  Future<String?> getAppLockPinSalt() async =>
+      _secureStorage.read(key: _appLockPinSaltKey);
 
   Future<void> deleteAppLockPin() async {
     await _secureStorage.delete(key: _appLockPinHashKey);
@@ -153,9 +151,8 @@ class AuthSecureStorageService {
     );
   }
 
-  Future<String?> getAppLockLastActiveAt() async {
-    return await _secureStorage.read(key: _appLockLastActiveAtKey);
-  }
+  Future<String?> getAppLockLastActiveAt() async =>
+      _secureStorage.read(key: _appLockLastActiveAtKey);
 
   Future<int> getAppLockTimeout() async {
     final value = await _secureStorage.read(key: _appLockTimeoutKey);
@@ -167,12 +164,6 @@ class AuthSecureStorageService {
     final bytes = List<int>.generate(32, (_) => random.nextInt(256));
     return base64UrlEncode(bytes);
   }
-
-
-  static const int _argonMemoryKiB = 19456;
-  static const int _argonIterations = 2;
-  static const int _argonParallelism = 1;
-  static const int _argonHashLength = 32;
 
   Future<String> createPasswordVerifier(String password) async {
     final salt = generateSalt();
@@ -194,37 +185,7 @@ class AuthSecureStorageService {
       'm=$_argonMemoryKiB,t=$_argonIterations,p=$_argonParallelism',
       salt,
       hash,
-    ].join(r'
-    final key = utf8.encode(password + salt);
-    final digest = sha256.convert(key);
-    return digest.toString();
-  }
-
-  /// Compares fixed-format password verifiers without returning early on the
-  /// first mismatching character. This is a best-effort constant-time compare
-  /// at the Dart source level; it does not replace a slow password KDF.
-  bool constantTimeEquals(String candidate, String expected) {
-    final length = max(candidate.length, expected.length);
-    var difference = candidate.length ^ expected.length;
-
-    for (var index = 0; index < length; index++) {
-      final candidateCode =
-          index < candidate.length ? candidate.codeUnitAt(index) : 0;
-      final expectedCode =
-          index < expected.length ? expected.codeUnitAt(index) : 0;
-      difference |= candidateCode ^ expectedCode;
-    }
-
-    return difference == 0;
-  }
-
-  String generateSalt() {
-    final random = Random.secure();
-    final values = List<int>.generate(16, (_) => random.nextInt(256));
-    return base64UrlEncode(values);
-  }
-}
-);
+    ].join(r'$');
   }
 
   Future<bool> verifyPasswordVerifier(
@@ -232,37 +193,7 @@ class AuthSecureStorageService {
     String verifier,
   ) async {
     try {
-      final parts = verifier.split(r'
-    final key = utf8.encode(password + salt);
-    final digest = sha256.convert(key);
-    return digest.toString();
-  }
-
-  /// Compares fixed-format password verifiers without returning early on the
-  /// first mismatching character. This is a best-effort constant-time compare
-  /// at the Dart source level; it does not replace a slow password KDF.
-  bool constantTimeEquals(String candidate, String expected) {
-    final length = max(candidate.length, expected.length);
-    var difference = candidate.length ^ expected.length;
-
-    for (var index = 0; index < length; index++) {
-      final candidateCode =
-          index < candidate.length ? candidate.codeUnitAt(index) : 0;
-      final expectedCode =
-          index < expected.length ? expected.codeUnitAt(index) : 0;
-      difference |= candidateCode ^ expectedCode;
-    }
-
-    return difference == 0;
-  }
-
-  String generateSalt() {
-    final random = Random.secure();
-    final values = List<int>.generate(16, (_) => random.nextInt(256));
-    return base64UrlEncode(values);
-  }
-}
-);
+      final parts = verifier.split(r'$');
       if (parts.length != 5 ||
           parts[0] != 'argon2id' ||
           parts[1] != 'v=1' ||
@@ -302,27 +233,20 @@ class AuthSecureStorageService {
     return difference == 0;
   }
 
+  /// Legacy SHA-256 verifier retained only for PIN compatibility and migration.
   String hashPassword(String password, String salt) {
     final key = utf8.encode(password + salt);
-    final digest = sha256.convert(key);
-    return digest.toString();
+    return sha256.convert(key).toString();
   }
 
-  /// Compares fixed-format password verifiers without returning early on the
-  /// first mismatching character. This is a best-effort constant-time compare
-  /// at the Dart source level; it does not replace a slow password KDF.
   bool constantTimeEquals(String candidate, String expected) {
     final length = max(candidate.length, expected.length);
     var difference = candidate.length ^ expected.length;
-
     for (var index = 0; index < length; index++) {
-      final candidateCode =
-          index < candidate.length ? candidate.codeUnitAt(index) : 0;
-      final expectedCode =
-          index < expected.length ? expected.codeUnitAt(index) : 0;
-      difference |= candidateCode ^ expectedCode;
+      final left = index < candidate.length ? candidate.codeUnitAt(index) : 0;
+      final right = index < expected.length ? expected.codeUnitAt(index) : 0;
+      difference |= left ^ right;
     }
-
     return difference == 0;
   }
 
