@@ -34,6 +34,31 @@ void main() {
       expect(hash, startsWith('argon2id'));
     });
 
+    test('locks PIN verification after five failed attempts', () async {
+      await service.setPin('4826');
+      for (var attempt = 0; attempt < 5; attempt++) {
+        expect(await service.verifyPin('1111'), isFalse);
+      }
+
+      final remaining = await service.getPinLockoutRemaining();
+      expect(remaining, isNotNull);
+      expect(remaining!.inSeconds, greaterThan(0));
+      expect(await service.verifyPin('4826'), isFalse);
+    });
+
+    test('persists lockout across service recreation and clears it on PIN reset', () async {
+      await service.setPin('4826');
+      for (var attempt = 0; attempt < 5; attempt++) {
+        await service.verifyPin('1111');
+      }
+
+      final recreated = AppLockService(storage, LocalAuthService());
+      expect(await recreated.getPinLockoutRemaining(), isNotNull);
+      await recreated.setPin('7391');
+      expect(await recreated.getPinLockoutRemaining(), isNull);
+      expect(await recreated.verifyPin('7391'), isTrue);
+    });
+
     test('upgrades legacy SHA-256 PINs after successful verification', () async {
       const pin = '4826';
       final salt = storage.generateSalt();
