@@ -9,10 +9,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality:
     name: Analyze, test, and build
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -81,28 +86,48 @@ jobs:
 
           for error in errors:
               print(error)
+          for warning in warnings:
+              print(warning)
 
           print(
               f"Analyzer summary: {len(errors)} errors, "
               f"{len(warnings)} warnings, {len(infos)} infos."
           )
-          if errors:
+          if errors or warnings:
               sys.exit(1)
           PY
           if [ "$analyze_status" -ne 0 ]; then
-            echo "::warning::Analyzer reported warnings or infos; no analyzer errors were found."
+            echo "::notice::Analyzer reported infos only; no errors or warnings were found."
           fi
 
       - name: Run tests
         run: flutter test --no-pub
 
+      - name: Free unused runner disk space
+        run: |
+          echo "Disk space before cleanup:"
+          df -h /
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf /usr/local/share/chromium
+          sudo rm -rf /usr/local/lib/android/sdk/emulator
+          sudo rm -rf /usr/local/lib/android/sdk/system-images
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          if [ -d /usr/local/lib/android/sdk/ndk ]; then
+            find /usr/local/lib/android/sdk/ndk -mindepth 1 -maxdepth 1 \
+              ! -name '27.0.12077973' -exec sudo rm -rf {} +
+          fi
+          sudo docker image prune -af || true
+          echo "Disk space after cleanup:"
+          df -h /
+
       - name: Build Android debug APK
-        run: flutter build apk --debug --split-per-abi --no-pub
+        run: flutter build apk --debug --no-pub
 
       - name: Upload Android debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: academicos-android-debug-split-apks
+          name: academicos-android-debug-apk
           path: build/app/outputs/flutter-apk/*.apk
           if-no-files-found: error
           retention-days: 14

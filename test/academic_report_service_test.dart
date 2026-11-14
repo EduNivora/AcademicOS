@@ -54,6 +54,32 @@ void main() {
       expect(payload['schedule'], hasLength(1));
     });
 
+
+    test('excludes past exams from the upcoming exam section', () {
+      final service = AcademicReportService();
+      final now = DateTime.now();
+      final report = service.generateAcademicReport(
+        courses: const [],
+        tasks: const [],
+        exams: [
+          ExamModel(
+            id: 1,
+            title: 'Past Exam',
+            examDate: now.subtract(const Duration(days: 1)),
+          ),
+          ExamModel(
+            id: 2,
+            title: 'Future Exam',
+            examDate: now.add(const Duration(days: 1)),
+          ),
+        ],
+        schedule: const [],
+      );
+
+      expect(report, contains('Future Exam'));
+      expect(report, isNot(contains('Past Exam')));
+    });
+
     test('generates a readable academic report', () {
       final service = AcademicReportService();
 

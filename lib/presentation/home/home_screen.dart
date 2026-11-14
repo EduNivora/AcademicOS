@@ -798,33 +798,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     }
   }
 
-  List<TaskEntity> _searchTasks(List<TaskEntity> tasks) {
-    if (_searchQuery.trim().isEmpty) return tasks;
-    final query = _searchQuery.trim().toLowerCase();
-    return tasks.where((task) {
-      return task.title.toLowerCase().contains(query) ||
-          task.description.toLowerCase().contains(query) ||
-          (task.courseName?.toLowerCase().contains(query) ?? false);
-    }).toList();
-  }
-
-  List<TaskEntity> _filterByStatus(List<TaskEntity> tasks) {
-    switch (_statusFilter) {
-      case TaskSearchStatus.completed:
-        return tasks.where((task) => task.isCompleted).toList();
-      case TaskSearchStatus.pending:
-        return tasks.where((task) => !task.isCompleted).toList();
-      case TaskSearchStatus.overdue:
-        return tasks.where((task) {
-          return task.dueDate != null &&
-              task.dueDate!.isBefore(DateTime.now()) &&
-              !task.isCompleted;
-        }).toList();
-      case TaskSearchStatus.all:
-        return tasks;
-    }
-  }
-
   Future<void> _openCourseDetailFromTask(TaskEntity task) async {
     if (task.courseId == null) {
       if (!mounted) return;
@@ -2374,6 +2347,16 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                           debugPrint(
                             'HomeScreen.logout error: $error\n$stackTrace',
                           );
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'تعذّر تسجيل الخروج لأن التخزين الآمن غير متاح. '
+                                'لم نغلق الجلسة؛ حاول مرة أخرى.',
+                              ),
+                            ),
+                          );
+                          return;
                         }
                         if (!mounted) return;
                         Navigator.of(context).pushAndRemoveUntil(

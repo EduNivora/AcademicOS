@@ -79,14 +79,6 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final inputDecoration = InputDecorationTheme(
-      filled: true,
-      fillColor: Theme.of(context).cardColor,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-    );
-
     return Scaffold(
       appBar: AppBar(title: const Text('إضافة مادة'), centerTitle: true),
       body: SafeArea(
