@@ -15,6 +15,8 @@ class AuthSecureStorageService {
   static const String _googleAccountEmailKey = 'academic_os_google_account_email';
   static const String _googleAccountNameKey = 'academic_os_google_account_name';
   static const String _authSessionActiveKey = 'academic_os_auth_session_active';
+  static const String _authLogoutRequiredKey =
+      'academic_os_auth_logout_required';
   static const String _appLockPinHashKey = 'academic_os_app_lock_pin_hash';
   static const String _appLockPinSaltKey = 'academic_os_app_lock_pin_salt';
   static const String _appLockBiometricEnabledKey = 'academic_os_app_lock_biometric_enabled';
@@ -91,14 +93,32 @@ class AuthSecureStorageService {
       key: _authSessionActiveKey,
       value: isActive ? 'true' : 'false',
     );
+    if (isActive) {
+      await clearAuthLogoutRequired();
+    }
   }
 
   Future<void> clearSessionData() async {
-    await _secureStorage.delete(key: _authUsernameKey);
-    await _secureStorage.delete(key: _authPasswordHashKey);
-    await _secureStorage.delete(key: _authPasswordSaltKey);
-    await clearGoogleAccountData();
+    // Persist logout intent before clearing cached identity state. Local
+    // credentials remain available for an explicit username/password login.
+    await _secureStorage.write(key: _authLogoutRequiredKey, value: 'true');
     await saveAuthSessionActive(false);
+    await clearGoogleAccountData();
+  }
+
+  /// Ends any previous session before allowing guest mode.
+  Future<void> continueAsGuest() async {
+    await clearSessionData();
+    await clearAuthLogoutRequired();
+  }
+
+  Future<bool> isAuthLogoutRequired() async {
+    final value = await _secureStorage.read(key: _authLogoutRequiredKey);
+    return value == 'true';
+  }
+
+  Future<void> clearAuthLogoutRequired() async {
+    await _secureStorage.delete(key: _authLogoutRequiredKey);
   }
 
   Future<bool> isAuthSessionActive() async {
