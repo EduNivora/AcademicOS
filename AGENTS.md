@@ -26,7 +26,7 @@ This guide helps AI agents understand Academic OS and make safe, architecture-re
 
 ## Important files
 - `lib/main.dart` — dependency composition and app bootstrap.
-- `lib/core/security/secure_storage_service.dart` — secure DB password management.
+- `lib/core/security/secure_storage_service.dart` — secure storage helpers and a stored DB key that is not currently connected to an encrypted SQLite engine.
 - `lib/data/database/database_helper.dart` — SQLite database helper and schema migrations (not SQLCipher).
 - `lib/data/datasources/task_local_data_source.dart` — task local datasource.
 - `lib/data/repositories/task_repository_impl.dart` — task repository implementation.
