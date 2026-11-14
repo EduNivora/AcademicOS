@@ -69,6 +69,21 @@ class BackupPayloadValidator {
         ? null
         : rows('materials', required: true);
 
+    for (final row in taskRows) {
+      _validateEnum(row['type'], const {
+        'homework', 'project', 'exam', 'review', 'attendance',
+        'academicActivity', 'other',
+      }, 'task.type');
+      _validateEnum(row['priority'], const {
+        'low', 'medium', 'high', 'urgent',
+      }, 'task.priority');
+      _validateEnum(row['recurrence'], const {
+        'once', 'daily', 'weekly', 'monthly',
+      }, 'task.recurrence');
+      _validateFlag(row['is_completed'], 'task.is_completed');
+      _validateFlag(row['reminder_enabled'], 'task.reminder_enabled');
+    }
+
     final courses = courseRows.map(CourseModel.fromMap).toList(growable: false);
     final tasks = taskRows.map(TaskModel.fromMap).toList(growable: false);
     final exams = examRows.map(ExamModel.fromMap).toList(growable: false);
@@ -85,6 +100,9 @@ class BackupPayloadValidator {
     }
 
     final schedule = scheduleRows.map(_validateSchedule).toList(growable: false);
+    for (final row in schedule) {
+      _validateOptionalForeignKey(row['course_id'], courseIds, 'schedule.course_id');
+    }
     final materials = materialRows
         ?.map(_validateMaterial)
         .toList(growable: false);
@@ -126,6 +144,18 @@ class BackupPayloadValidator {
     if (value == null) return;
     if (value is! int || value <= 0 || !validIds.contains(value)) {
       throw FormatException('Invalid or orphaned "$field" reference.');
+    }
+  }
+
+  void _validateEnum(Object? value, Set<String> allowed, String field) {
+    if (value is! String || !allowed.contains(value)) {
+      throw FormatException('Invalid or missing enum value for "$field".');
+    }
+  }
+
+  void _validateFlag(Object? value, String field) {
+    if (value != 0 && value != 1 && value != false && value != true) {
+      throw FormatException('Invalid boolean flag "$field".');
     }
   }
 
