@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main, chore/edunivora-phase0-execution]
   push:
-    branches: [main]
+    branches: [main, 'ci/**']
 
 permissions:
   contents: read
@@ -58,6 +58,9 @@ jobs:
 
       - name: Resolve dependencies
         run: flutter pub get --enforce-lockfile
+
+      - name: Prepare SQLite WebAssembly runtime
+        run: dart run sqflite_common_ffi_web:setup --force --verbose
 
       - name: Analyze Dart sources
         shell: bash
@@ -124,10 +127,22 @@ jobs:
       - name: Build Android debug APK
         run: flutter build apk --debug --no-pub
 
+
+      - name: Build Web release
+        run: flutter build web --release --no-pub
+
       - name: Upload Android debug APK
         uses: actions/upload-artifact@v4
         with:
           name: academicos-android-debug-apk
           path: build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Web release
+        uses: actions/upload-artifact@v4
+        with:
+          name: academicos-web-release
+          path: build/web/
           if-no-files-found: error
           retention-days: 14
