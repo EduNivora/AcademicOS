@@ -2345,8 +2345,18 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                           await widget.authUseCases.logout.call();
                         } catch (error, stackTrace) {
                           debugPrint(
-                            'HomeScreen.logout error: $error\n$stackTrace',
+                            'HomeScreen.logout error: $error\\n$stackTrace',
                           );
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'تعذّر تسجيل الخروج لأن التخزين الآمن غير متاح. '
+                                'لم نغلق الجلسة؛ حاول مرة أخرى.',
+                              ),
+                            ),
+                          );
+                          return;
                         }
                         if (!mounted) return;
                         Navigator.of(context).pushAndRemoveUntil(
