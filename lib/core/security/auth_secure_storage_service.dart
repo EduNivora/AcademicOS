@@ -173,6 +173,24 @@ class AuthSecureStorageService {
     return digest.toString();
   }
 
+  /// Compares fixed-format password verifiers without returning early on the
+  /// first mismatching character. This is a best-effort constant-time compare
+  /// at the Dart source level; it does not replace a slow password KDF.
+  bool constantTimeEquals(String candidate, String expected) {
+    final length = max(candidate.length, expected.length);
+    var difference = candidate.length ^ expected.length;
+
+    for (var index = 0; index < length; index++) {
+      final candidateCode =
+          index < candidate.length ? candidate.codeUnitAt(index) : 0;
+      final expectedCode =
+          index < expected.length ? expected.codeUnitAt(index) : 0;
+      difference |= candidateCode ^ expectedCode;
+    }
+
+    return difference == 0;
+  }
+
   String generateSalt() {
     final random = Random.secure();
     final values = List<int>.generate(16, (_) => random.nextInt(256));
