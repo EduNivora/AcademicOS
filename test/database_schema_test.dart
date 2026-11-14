@@ -46,6 +46,54 @@ void main() {
       }
     });
 
+    test('successful backup restore replaces academic records completely',
+        () async {
+      final helper = DatabaseHelper.instance;
+      await helper.close();
+
+      const oldCourseId = 987653;
+      const restoredCourseId = 987655;
+      await helper.deleteCourse(oldCourseId);
+      await helper.deleteCourse(restoredCourseId);
+
+      try {
+        await helper.insertCourse(
+          const CourseModel(
+            id: oldCourseId,
+            name: 'Old course',
+            instructor: 'Old instructor',
+            code: 'OLD-1',
+            credits: 3,
+          ),
+        );
+
+        await helper.replaceAcademicData(
+          courses: const [
+            CourseModel(
+              id: restoredCourseId,
+              name: 'Restored course',
+              instructor: 'New instructor',
+              code: 'NEW-1',
+              credits: 4,
+            ),
+          ],
+          tasks: const [],
+          exams: const [],
+          schedules: const [],
+        );
+
+        expect(await helper.getCourseById(oldCourseId), isNull);
+        expect(
+          (await helper.getCourseById(restoredCourseId))?.name,
+          'Restored course',
+        );
+      } finally {
+        await helper.deleteCourse(oldCourseId);
+        await helper.deleteCourse(restoredCourseId);
+        await helper.close();
+      }
+    });
+
     test(
         'initial database creation should not add duplicate course grade columns',
         () async {
