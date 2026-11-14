@@ -19,6 +19,8 @@ class AuthSecureStorageService {
       'academic_os_auth_logout_required';
   static const String _appLockPinHashKey = 'academic_os_app_lock_pin_hash';
   static const String _appLockPinSaltKey = 'academic_os_app_lock_pin_salt';
+  static const String _appLockPinAttemptStateKey =
+      'academic_os_app_lock_pin_attempt_state';
   static const String _appLockBiometricEnabledKey = 'academic_os_app_lock_biometric_enabled';
   static const String _appLockTimeoutKey = 'academic_os_app_lock_timeout';
   static const String _appLockLastActiveAtKey = 'academic_os_app_lock_last_active_at';
@@ -143,6 +145,61 @@ class AuthSecureStorageService {
   Future<void> deleteAppLockPin() async {
     await _secureStorage.delete(key: _appLockPinHashKey);
     await _secureStorage.delete(key: _appLockPinSaltKey);
+    await resetAppLockPinAttempts();
+  }
+
+  Future<Duration?> getAppLockPinLockoutRemaining() async {
+    final state = await _readAppLockPinAttemptState();
+    final blockedUntil = state['blockedUntil'] as int;
+    final remaining = blockedUntil - DateTime.now().millisecondsSinceEpoch;
+    return remaining > 0 ? Duration(milliseconds: remaining) : null;
+  }
+
+  Future<void> recordFailedAppLockPinAttempt() async {
+    final state = await _readAppLockPinAttemptState();
+    final attempts = (state['attempts'] as int) + 1;
+    final exponent = (attempts - 5).clamp(0, 5);
+    final delaySeconds = attempts < 5
+        ? 0
+        : min(900, 30 * (1 << exponent));
+    final blockedUntil = delaySeconds == 0
+        ? 0
+        : DateTime.now()
+            .add(Duration(seconds: delaySeconds))
+            .millisecondsSinceEpoch;
+    await _secureStorage.write(
+      key: _appLockPinAttemptStateKey,
+      value: jsonEncode({
+        'attempts': attempts,
+        'blockedUntil': blockedUntil,
+      }),
+    );
+  }
+
+  Future<void> resetAppLockPinAttempts() async {
+    await _secureStorage.delete(key: _appLockPinAttemptStateKey);
+  }
+
+  Future<Map<String, int>> _readAppLockPinAttemptState() async {
+    final raw = await _secureStorage.read(key: _appLockPinAttemptStateKey);
+    if (raw == null) return {'attempts': 0, 'blockedUntil': 0};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map ||
+          decoded['attempts'] is! int ||
+          decoded['blockedUntil'] is! int ||
+          decoded['attempts'] < 0 ||
+          decoded['blockedUntil'] < 0) {
+        throw const FormatException('Invalid PIN attempt state.');
+      }
+      return {
+        'attempts': decoded['attempts'] as int,
+        'blockedUntil': decoded['blockedUntil'] as int,
+      };
+    } on FormatException {
+      // Corrupt lockout state must fail closed, not reset the attempt counter.
+      throw StateError('App-lock PIN attempt state is corrupted.');
+    }
   }
 
   Future<void> saveAppLockBiometricEnabled(bool enabled) async {
