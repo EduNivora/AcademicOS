@@ -2,7 +2,7 @@ name: Flutter quality gate
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, 'ci/**']
   push:
     branches: [main, 'ci/**', 'fix/**']
 
