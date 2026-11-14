@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 
 import '../../data/database/database_helper.dart';
+import '../platform/app_platform.dart';
+import '../security/secure_storage_service.dart';
 
 /// Initializes the durable storage required by the application.
 ///
@@ -10,10 +12,22 @@ import '../../data/database/database_helper.dart';
 class AppInitializer {
   AppInitializer({
     Future<void> Function()? initializeDatabase,
-  }) : _initializeDatabase =
-            initializeDatabase ?? _initializePersistentDatabase;
+    Future<void> Function()? initializeSecurity,
+  })  : _initializeDatabase =
+            initializeDatabase ?? _initializePersistentDatabase,
+        _initializeSecurity =
+            initializeSecurity ?? _initializeSecureStorage;
 
   final Future<void> Function() _initializeDatabase;
+  final Future<void> Function() _initializeSecurity;
+
+  static Future<void> _initializeSecureStorage() async {
+    if (AppPlatform.shouldUseNativeSecurity()) {
+      await SecureStorageService().getDatabasePassword();
+    } else {
+      debugPrint('Web mode detected: skipping native secure storage initialization.');
+    }
+  }
 
   static Future<void> _initializePersistentDatabase() async {
     await DatabaseHelper.instance.database;
@@ -21,6 +35,7 @@ class AppInitializer {
 
   Future<void> initialize() async {
     try {
+      await _initializeSecurity();
       await _initializeDatabase();
       debugPrint('Application storage initialized successfully.');
     } catch (error, stackTrace) {
