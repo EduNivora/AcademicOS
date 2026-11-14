@@ -158,10 +158,10 @@ class AuthSecureStorageService {
   Future<void> recordFailedAppLockPinAttempt() async {
     final state = await _readAppLockPinAttemptState();
     final attempts = (state['attempts'] as int) + 1;
-    final exponent = (attempts - 5).clamp(0, 5);
+    final exponent = (attempts - 5).clamp(0, 5).toInt();
     final delaySeconds = attempts < 5
         ? 0
-        : min(900, 30 * (1 << exponent));
+        : min(900, 30 * (1 << exponent)).toInt();
     final blockedUntil = delaySeconds == 0
         ? 0
         : DateTime.now()
