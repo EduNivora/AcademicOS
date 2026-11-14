@@ -20,12 +20,30 @@ class CourseModel extends CourseEntity {
   });
 
   factory CourseModel.fromMap(Map<String, dynamic> map) {
+    for (final key in ['name', 'instructor', 'code']) {
+      if (map[key] is! String) {
+        throw FormatException('Invalid course backup: "$key" must be a string.');
+      }
+    }
+    if ((map['name'] as String).trim().isEmpty ||
+        (map['code'] as String).trim().isEmpty) {
+      throw const FormatException('Invalid course backup: name and code are required.');
+    }
+
     final idValue = map['id'];
+    final lectureDateValue = map['lecture_date'];
+    final lectureDate = lectureDateValue == null
+        ? null
+        : DateTime.tryParse(lectureDateValue.toString());
+    if (lectureDateValue != null && lectureDate == null) {
+      throw const FormatException('Invalid course backup: lecture_date is not a valid date.');
+    }
+
     return CourseModel(
       id: idValue is int ? idValue : int.tryParse(idValue.toString()),
-      name: map['name']?.toString() ?? '',
-      instructor: map['instructor']?.toString() ?? '',
-      code: map['code']?.toString() ?? '',
+      name: map['name'] as String,
+      instructor: map['instructor'] as String,
+      code: map['code'] as String,
       credits: map['credits'] is int
           ? map['credits'] as int
           : int.tryParse(map['credits']?.toString() ?? '') ?? 0,
@@ -35,9 +53,7 @@ class CourseModel extends CourseEntity {
       lectureReminderEnabled:
           map['lecture_reminder_enabled'] == 1 ||
           map['lecture_reminder_enabled'] == true,
-      lectureDate: map['lecture_date'] != null
-          ? DateTime.tryParse(map['lecture_date'].toString())
-          : null,
+      lectureDate: lectureDate,
       lectureReminderOffsetMinutes:
           map['lecture_reminder_offset_minutes'] is int
           ? map['lecture_reminder_offset_minutes'] as int
