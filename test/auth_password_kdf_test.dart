@@ -76,6 +76,25 @@ void main() {
       expect(await service.isAuthSessionActive(), isTrue);
     });
 
+    test('local credentials remain usable after logout and require explicit login', () async {
+      final service = AuthSecureStorageService();
+      final source = AuthLocalDataSourceImpl(service);
+      await source.persistLocalUser('student-after-logout', 'password-123');
+      expect(await source.verifyCredentials('student-after-logout', 'password-123'), isTrue);
+
+      await source.clearSession();
+      expect(await service.getAuthUsername(), 'student-after-logout');
+      expect(await service.getPasswordHash(), startsWith('argon2id'));
+      expect(await service.isAuthSessionActive(), isFalse);
+      expect(await service.isAuthLogoutRequired(), isTrue);
+
+      expect(await source.isSessionActive(), isFalse);
+      expect(await source.verifyCredentials('student-after-logout', 'wrong'), isFalse);
+      expect(await service.isAuthSessionActive(), isFalse);
+      expect(await source.verifyCredentials('student-after-logout', 'password-123'), isTrue);
+      expect(await service.isAuthLogoutRequired(), isFalse);
+    });
+
     test('does not activate a session if legacy migration persistence fails', () async {
       final service = AuthSecureStorageService();
       const username = 'legacy-student';
