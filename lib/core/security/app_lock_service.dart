@@ -26,7 +26,7 @@ class AppLockService {
       return false;
     }
     final computedHash = _secureStorageService.hashPassword(pin, salt);
-    return computedHash == storedHash;
+    return _secureStorageService.constantTimeEquals(computedHash, storedHash);
   }
 
   Future<void> removePin() async {
