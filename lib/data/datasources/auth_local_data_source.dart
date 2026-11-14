@@ -29,7 +29,7 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
     }
 
     var success = false;
-    if (storedHash.startsWith('argon2id\\$')) {
+    if (storedHash.startsWith('argon2id' + r'$')) {
       success = await _secureStorageService.verifyPasswordVerifier(
         password,
         storedHash,
@@ -37,15 +37,17 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
     } else {
       final legacySalt = await _secureStorageService.getPasswordSalt();
       if (legacySalt == null) return false;
-      final legacyHash = _secureStorageService.hashPassword(password, legacySalt);
+      final legacyHash =
+          _secureStorageService.hashPassword(password, legacySalt);
       success = _secureStorageService.constantTimeEquals(
         legacyHash,
         storedHash,
       );
       if (success) {
-        // Persist the upgraded verifier before activating the session. If this
-        // write fails, the legacy verifier remains usable and no session starts.
-        final upgraded = await _secureStorageService.createPasswordVerifier(password);
+        // Upgrade before activating the session. If persistence fails, the
+        // legacy verifier remains stored and no authenticated session starts.
+        final upgraded =
+            await _secureStorageService.createPasswordVerifier(password);
         await _secureStorageService.savePasswordHash(upgraded);
       }
     }
