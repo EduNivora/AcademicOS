@@ -76,6 +76,18 @@ void main() {
       expect(await service.isAuthSessionActive(), isTrue);
     });
 
+    test('credential replacement failure cannot leave an old session active', () async {
+      final service = AuthSecureStorageService();
+      await service.saveAuthSessionActive(true);
+      final source = AuthLocalDataSourceImpl(_FailingMigrationStorage());
+
+      await expectLater(
+        source.persistLocalUser('replacement-user', 'new-password'),
+        throwsA(isA<StateError>()),
+      );
+      expect(await service.isAuthSessionActive(), isFalse);
+    });
+
     test('local credentials remain usable after logout and require explicit login', () async {
       final service = AuthSecureStorageService();
       final source = AuthLocalDataSourceImpl(service);
