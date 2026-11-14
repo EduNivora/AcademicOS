@@ -13,20 +13,31 @@ class AppLockService {
   }
 
   Future<void> setPin(String pin) async {
-    final salt = _secureStorageService.generateSalt();
-    final pinHash = _secureStorageService.hashPassword(pin, salt);
-    await _secureStorageService.saveAppLockPinHash(pinHash);
-    await _secureStorageService.saveAppLockPinSalt(salt);
+    final verifier = await _secureStorageService.createPasswordVerifier(pin);
+    await _secureStorageService.saveAppLockPinHash(verifier);
   }
 
   Future<bool> verifyPin(String pin) async {
     final storedHash = await _secureStorageService.getAppLockPinHash();
-    final salt = await _secureStorageService.getAppLockPinSalt();
-    if (storedHash == null || salt == null) {
-      return false;
+    if (storedHash == null || storedHash.isEmpty) return false;
+
+    if (storedHash.startsWith('argon2id' + r'$')) {
+      return _secureStorageService.verifyPasswordVerifier(pin, storedHash);
     }
-    final computedHash = _secureStorageService.hashPassword(pin, salt);
-    return _secureStorageService.constantTimeEquals(computedHash, storedHash);
+
+    final legacySalt = await _secureStorageService.getAppLockPinSalt();
+    if (legacySalt == null) return false;
+    final legacyHash = _secureStorageService.hashPassword(pin, legacySalt);
+    final verified = _secureStorageService.constantTimeEquals(
+      legacyHash,
+      storedHash,
+    );
+    if (!verified) return false;
+
+    // Upgrade the legacy PIN verifier before granting access.
+    final upgraded = await _secureStorageService.createPasswordVerifier(pin);
+    await _secureStorageService.saveAppLockPinHash(upgraded);
+    return true;
   }
 
   Future<void> removePin() async {
