@@ -17,9 +17,7 @@ void main() {
         lectureDate: DateTime(2026, 1, 5, 9),
         lectureReminderOffsetMinutes: 20,
       );
-
       final map = course.toMap();
-
       expect(map['id'], 10);
       expect(map['name'], 'Physics');
       expect(map['instructor'], 'Prof. Samir');
@@ -31,7 +29,6 @@ void main() {
       expect(map['lecture_reminder_enabled'], 1);
       expect(map['lecture_date'], '2026-01-05T09:00:00.000');
       expect(map['lecture_reminder_offset_minutes'], 20);
-
       final parsed = CourseModel.fromMap(map);
       expect(parsed.id, 10);
       expect(parsed.name, 'Physics');
@@ -47,15 +44,13 @@ void main() {
     });
 
     test('fromMap handles missing optional fields', () {
-      final map = {
+      final parsed = CourseModel.fromMap({
         'id': 2,
         'name': 'Chemistry',
         'instructor': 'Dr. Lana',
         'code': 'CHM101',
         'credits': '3',
-      };
-
-      final parsed = CourseModel.fromMap(map);
+      });
       expect(parsed.id, 2);
       expect(parsed.name, 'Chemistry');
       expect(parsed.instructor, 'Dr. Lana');
@@ -66,6 +61,26 @@ void main() {
       expect(parsed.colorHex, '#2196F3');
       expect(parsed.lectureReminderEnabled, isFalse);
       expect(parsed.lectureReminderOffsetMinutes, 30);
+    });
+
+    test('rejects missing required identity fields', () {
+      expect(
+        () => CourseModel.fromMap({'id': 1, 'name': 'Math'}),
+        throwsFormatException,
+      );
+    });
+
+    test('rejects invalid optional lecture dates', () {
+      expect(
+        () => CourseModel.fromMap({
+          'id': 1,
+          'name': 'Math',
+          'instructor': '',
+          'code': 'MTH',
+          'lecture_date': 'not-a-date',
+        }),
+        throwsFormatException,
+      );
     });
   });
 }
