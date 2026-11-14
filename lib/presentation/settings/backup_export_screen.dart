@@ -153,6 +153,36 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
               .toList(growable: false)
           : null;
 
+      // Reject broken references before starting the destructive transaction.
+      final courseIds = courses.map((course) => course.id).whereType<int>().toSet();
+      if (tasks.any(
+            (task) =>
+                task.courseId != null && !courseIds.contains(task.courseId),
+          ) ||
+          exams.any(
+            (exam) =>
+                exam.courseId != null && !courseIds.contains(exam.courseId),
+          ) ||
+          (materials != null &&
+              materials.any((material) => !courseIds.contains(material.courseId)))) {
+        throw const FormatException(
+          'تحتوي النسخة الاحتياطية على سجلات مرتبطة بمقررات غير موجودة.',
+        );
+      }
+
+      for (final item in schedule) {
+        final rawCourseId = item['course_id'];
+        if (rawCourseId == null) continue;
+        final courseId = rawCourseId is int
+            ? rawCourseId
+            : int.tryParse(rawCourseId.toString());
+        if (courseId == null || !courseIds.contains(courseId)) {
+          throw const FormatException(
+            'يحتوي الجدول على مرجع إلى مقرر غير موجود.',
+          );
+        }
+      }
+
       await _databaseHelper.replaceAcademicData(
         courses: courses,
         tasks: tasks,
