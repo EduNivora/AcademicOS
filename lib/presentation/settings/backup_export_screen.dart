@@ -1,6 +1,8 @@
 import 'dart:convert';
-import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -61,20 +63,37 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
       };
       final jsonBackupText = const JsonEncoder.withIndent('  ').convert(boxed);
 
-      final tempDir = Directory.systemTemp;
-      final backupFile = File(
-        '${tempDir.path}/academic_os_backup_${DateTime.now().millisecondsSinceEpoch}.json',
+      final fileName =
+          'academic_os_backup_${DateTime.now().millisecondsSinceEpoch}.json';
+      final savedPath = await FilePicker.platform.saveFile(
+        fileName: fileName,
+        bytes: Uint8List.fromList(utf8.encode(jsonBackupText)),
+        type: FileType.custom,
+        allowedExtensions: const ['json'],
+        dialogTitle: 'حفظ النسخة الاحتياطية',
       );
-      await backupFile.writeAsString(jsonBackupText, flush: true);
+      if (savedPath == null && !kIsWeb) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم إلغاء حفظ النسخة الاحتياطية.')),
+        );
+        return;
+      }
 
-      _lastBackupPath = backupFile.path;
+      _lastBackupPath = savedPath ?? fileName;
       _restoreController.text = jsonBackupText;
 
       if (!mounted) return;
-      await _showShareOptions(jsonBackupText, backupFile.path);
+      await _showShareOptions(jsonBackupText, _lastBackupPath!);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text('تم حفظ النسخة الاحتياطية في ${backupFile.path}')),
+          content: Text(
+            kIsWeb
+                ? 'تم إرسال النسخة الاحتياطية إلى تنزيلات المتصفح.'
+                : 'تم حفظ النسخة الاحتياطية في $savedPath',
+          ),
+        ),
       );
     } catch (error) {
       if (!mounted) return;
@@ -85,6 +104,45 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
       if (mounted) {
         setState(() => _isBusy = false);
       }
+    }
+  }
+
+  Future<void> _pickBackupFile() async {
+    if (_isBusy) return;
+    setState(() => _isBusy = true);
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['json'],
+        allowMultiple: false,
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+
+      final bytes = result.files.single.bytes;
+      if (bytes == null) {
+        throw const FormatException(
+          'تعذر قراءة محتوى الملف. اختر ملف JSON صالحاً.',
+        );
+      }
+      if (bytes.length > 50 * 1024 * 1024) {
+        throw const FormatException(
+          'حجم النسخة الاحتياطية يتجاوز الحد المسموح (50 MB).',
+        );
+      }
+
+      _restoreController.text = utf8.decode(bytes, allowMalformed: false);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم تحميل ملف النسخة. راجعه ثم اضغط استرجاع البيانات.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر فتح ملف النسخة: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _isBusy = false);
     }
   }
 
@@ -205,23 +263,33 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
       await _generateAcademicReport();
     }
 
-    final reportFile = File(
-      '${Directory.systemTemp.path}/academic_os_report_${DateTime.now().millisecondsSinceEpoch}.txt',
+    if (_reportText.trim().isEmpty) return;
+    final fileName =
+        'academic_os_report_${DateTime.now().millisecondsSinceEpoch}.txt';
+    final savedPath = await FilePicker.platform.saveFile(
+      fileName: fileName,
+      bytes: Uint8List.fromList(utf8.encode(_reportText)),
+      type: FileType.custom,
+      allowedExtensions: const ['txt'],
+      dialogTitle: 'حفظ التقرير الأكاديمي',
     );
-    await reportFile.writeAsString(_reportText, flush: true);
     await Clipboard.setData(ClipboardData(text: _reportText));
 
     if (!mounted) return;
+    final saveMessage = savedPath == null
+        ? (kIsWeb
+            ? 'تم إرسال التقرير إلى تنزيلات المتصفح ونسخه إلى الحافظة.'
+            : 'تم إلغاء حفظ الملف؛ نُسخ التقرير إلى الحافظة.')
+        : 'تم حفظ التقرير في $savedPath ونسخه إلى الحافظة.';
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-          content:
-              Text('تم حفظ تقريرك في ${reportFile.path} ونسخه إلى الحافظة.')),
+      SnackBar(content: Text(saveMessage)),
     );
   }
 
-  Future<void> _showShareOptions(String backupJson, String backupPath) async {
-    final hasText = backupJson.trim().isNotEmpty;
-
+  Future<void> _showShareOptions(
+    String backupJson,
+    String backupPath,
+  ) async {
     await showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -232,37 +300,20 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
           child: Wrap(
             children: [
               ListTile(
-                leading: const Icon(Icons.save_alt_rounded),
-                title: const Text('حفظ ملف النسخة الاحتياطية'),
-                subtitle: Text(backupPath),
-                onTap: () async {
-                  Navigator.pop(context);
-                  final file = File(backupPath);
-                  if (await file.exists()) {
-                    await Clipboard.setData(ClipboardData(text: backupJson));
-                  }
-                },
-              ),
-              ListTile(
                 leading: const Icon(Icons.copy_rounded),
                 title: const Text('نسخ نص JSON إلى الحافظة'),
                 onTap: () async {
                   Navigator.pop(context);
-                  if (hasText) {
-                    await Clipboard.setData(ClipboardData(text: backupJson));
-                  }
+                  await Clipboard.setData(ClipboardData(text: backupJson));
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.share_rounded),
-                title: const Text('مشاركة عبر تطبيقات التواصل'),
-                subtitle: const Text(
-                    'اختر WhatsApp أو Telegram أو أي تطبيق بعد النسخ.'),
+                leading: const Icon(Icons.copy_all_rounded),
+                title: const Text('نسخ مسار ملف النسخة'),
+                subtitle: Text(backupPath),
                 onTap: () async {
                   Navigator.pop(context);
-                  if (hasText) {
-                    await Clipboard.setData(ClipboardData(text: backupJson));
-                  }
+                  await Clipboard.setData(ClipboardData(text: backupPath));
                 },
               ),
             ],
@@ -271,6 +322,7 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
       },
     );
   }
+
 
   Widget _buildActionCard(
     String title,
@@ -370,6 +422,11 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
                 ),
               ),
               const SizedBox(width: 8),
+              IconButton(
+                onPressed: _isBusy ? null : _pickBackupFile,
+                icon: const Icon(Icons.folder_open_rounded),
+                tooltip: 'اختيار ملف نسخة احتياطية',
+              ),
               IconButton(
                 onPressed: () async {
                   final result = await Clipboard.getData('text/plain');
