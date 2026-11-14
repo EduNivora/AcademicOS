@@ -1,11 +1,48 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:academic_os/data/database/database_helper.dart';
+import 'package:academic_os/data/models/course_model.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Database schema', () {
+    test('failed backup restore rolls back and preserves existing courses',
+        () async {
+      final helper = DatabaseHelper.instance;
+      await helper.close();
+
+      const existingCourseId = 987654;
+      await helper.insertCourse(
+        const CourseModel(
+          id: existingCourseId,
+          name: 'Existing course',
+          instructor: 'Existing instructor',
+          code: 'EXIST-1',
+          credits: 3,
+        ),
+      );
+
+      await expectLater(
+        helper.replaceAcademicData(
+          courses: const [],
+          tasks: const [],
+          exams: const [],
+          schedules: const [
+            {'column_that_does_not_exist': 'force transaction failure'},
+          ],
+        ),
+        throwsA(isA<Exception>()),
+      );
+
+      final preservedCourse = await helper.getCourseById(existingCourseId);
+      expect(preservedCourse, isNotNull);
+      expect(preservedCourse!.name, 'Existing course');
+
+      await helper.deleteCourse(existingCourseId);
+      await helper.close();
+    });
+
     test(
         'initial database creation should not add duplicate course grade columns',
         () async {
