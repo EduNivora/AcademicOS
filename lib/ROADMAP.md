@@ -2,7 +2,7 @@
 
 ## نظرة عامة
 
-Academic OS هو تطبيق Flutter مبني وفق Clean Architecture ليدعم إدارة المهام والمقررات الدراسية مع تخزين محلي مشفر.
+Academic OS هو تطبيق Flutter مبني وفق Clean Architecture لإدارة الحياة الأكاديمية محلياً. قاعدة SQLite الحالية غير مشفرة؛ تشفير SQLCipher بند أمني مخطط وغير منفذ.
 
 ## الهدف
 
@@ -62,7 +62,7 @@ lib/
   - `lib/data/models`
   - `lib/data/datasources`
   - `lib/data/repositories`
-- كلمة مرور قاعدة البيانات تُخزن آمنًا في `flutter_secure_storage` عبر `SecureStorageService`.
+- توجد قيمة مفتاح محفوظة في `flutter_secure_storage`، لكنها غير موصولة حالياً بمحرك SQLite؛ لذلك لا يعني وجودها أن ملف قاعدة البيانات مشفر.
 
 ## ملفات المرحلة الأولى الأساسية
 
