@@ -31,7 +31,9 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.38.0'
+          # Dart 3.10's AOT builder compilation rejects sqlite3 v3 build hooks.
+          # Flutter 3.41.8 bundles Dart 3.11.5, which fixes that build_runner path.
+          flutter-version: '3.41.8'
           cache: true
 
       - name: Set up Android SDK and required NDK
@@ -126,7 +128,6 @@ jobs:
 
       - name: Build Android debug APK
         run: flutter build apk --debug --no-pub
-
 
       - name: Build Web release
         run: flutter build web --release --no-pub
