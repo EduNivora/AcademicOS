@@ -38,7 +38,7 @@ void main() async {
   try {
     await appInitializer.initialize();
   } catch (error, stackTrace) {
-    debugPrint('Fatal startup initialization failure: $error\\n$stackTrace');
+    debugPrint('Fatal startup initialization failure: $error\n$stackTrace');
     runApp(const StartupFailureApp());
     return;
   }
