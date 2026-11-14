@@ -85,6 +85,7 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
   }
 
   Future<void> _restoreBackup() async {
+    if (_isBusy) return;
     setState(() => _isBusy = true);
     try {
       final rawText = _restoreController.text.trim();
@@ -97,39 +98,53 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
         throw const FormatException('صيغة النسخة الاحتياطية غير صالحة.');
       }
 
-      final db = await _databaseHelper.database;
-      await db.delete('courses');
-      await db.delete('tasks');
-      await db.delete('exams');
-      await db.delete('schedule');
+      // Validate and deserialize every row before touching the live database.
+      final rawCourses = decoded['courses'];
+      final rawTasks = decoded['tasks'];
+      final rawExams = decoded['exams'];
+      final rawSchedule = decoded['schedule'];
+      if (rawCourses is! List ||
+          rawTasks is! List ||
+          rawExams is! List ||
+          rawSchedule is! List) {
+        throw const FormatException(
+          'النسخة الاحتياطية لا تحتوي على جميع أقسام البيانات المطلوبة.',
+        );
+      }
 
-      final courses = (decoded['courses'] as List?) ?? const [];
-      final tasks = (decoded['tasks'] as List?) ?? const [];
-      final exams = (decoded['exams'] as List?) ?? const [];
-      final schedule = (decoded['schedule'] as List?) ?? const [];
+      final courses = rawCourses
+          .map((item) => CourseModel.fromMap(
+                Map<String, dynamic>.from(item as Map),
+              ))
+          .toList(growable: false);
+      final tasks = rawTasks
+          .map((item) => TaskModel.fromMap(
+                Map<String, dynamic>.from(item as Map),
+              ))
+          .toList(growable: false);
+      final exams = rawExams
+          .map((item) => ExamModel.fromMap(
+                Map<String, dynamic>.from(item as Map),
+              ))
+          .toList(growable: false);
+      final schedule = rawSchedule
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList(growable: false);
 
-      for (final item in courses) {
-        final map = Map<String, dynamic>.from(item as Map);
-        await _databaseHelper.insertCourse(CourseModel.fromMap(map));
-      }
-      for (final item in tasks) {
-        final map = Map<String, dynamic>.from(item as Map);
-        await _databaseHelper.insertTask(TaskModel.fromMap(map));
-      }
-      for (final item in exams) {
-        final map = Map<String, dynamic>.from(item as Map);
-        await _databaseHelper.insertExam(ExamModel.fromMap(map));
-      }
-      for (final item in schedule) {
-        final map = Map<String, dynamic>.from(item as Map);
-        await _databaseHelper.insertSchedule(map);
-      }
+      await _databaseHelper.replaceAcademicData(
+        courses: courses,
+        tasks: tasks,
+        exams: exams,
+        schedules: schedule,
+      );
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'تمت استعادة البيانات بنجاح: ${courses.length} مادة، ${tasks.length} مهمة، ${exams.length} اختبار، ${schedule.length} حصة.',
+            'تمت استعادة البيانات بنجاح: ${courses.length} مادة، '
+            '${tasks.length} مهمة، ${exams.length} اختبار، '
+            '${schedule.length} حصة.',
           ),
         ),
       );
@@ -137,7 +152,12 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('فشل الاستعادة: $error')),
+        SnackBar(
+          content: Text(
+            'فشل الاستعادة. لم تُعتمد أي تغييرات جزئية، '
+            'وتم الاحتفاظ بالبيانات السابقة إن فشلت المعاملة: $error',
+          ),
+        ),
       );
     } finally {
       if (mounted) {
