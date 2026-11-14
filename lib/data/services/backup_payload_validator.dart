@@ -190,7 +190,7 @@ class BackupPayloadValidator {
   }
 
   int _parseTime(Object? value, String field) {
-    if (value is! String || !RegExp(r'^([01]\\d|2[0-3]):[0-5]\\d$').hasMatch(value)) {
+    if (value is! String || !RegExp(r'^([01]\d|2[0-3]):[0-5]\d$').hasMatch(value)) {
       throw FormatException('Schedule "$field" must use HH:mm format.');
     }
     final parts = value.split(':');
