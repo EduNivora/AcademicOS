@@ -5,6 +5,7 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
+import '../models/course_material_model.dart';
 import '../models/course_model.dart';
 import '../models/exam_model.dart';
 import '../models/task_model.dart';
@@ -370,10 +371,14 @@ class DatabaseHelper {
     required List<TaskModel> tasks,
     required List<ExamModel> exams,
     required List<Map<String, dynamic>> schedules,
+    List<CourseMaterialModel>? materials,
   }) async {
     final db = await database;
     await db.transaction((txn) async {
       // Delete dependent records before their parent courses.
+      if (materials != null) {
+        await txn.delete(_materialsTable);
+      }
       await txn.delete(scheduleTable);
       await txn.delete(_examTable);
       await txn.delete(_taskTable);
@@ -407,7 +412,21 @@ class DatabaseHelper {
           conflictAlgorithm: ConflictAlgorithm.replace,
         );
       }
+      if (materials != null) {
+        for (final material in materials) {
+          await txn.insert(
+            _materialsTable,
+            material.toMap(),
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        }
+      }
     });
+  }
+
+  Future<List<Map<String, dynamic>>> getAllMaterials() async {
+    final db = await database;
+    return db.query(_materialsTable, orderBy: 'created_at DESC');
   }
 
   Future<void> close() async {
