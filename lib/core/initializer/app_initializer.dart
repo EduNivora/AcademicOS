@@ -25,7 +25,7 @@ class AppInitializer {
       debugPrint('Application storage initialized successfully.');
     } catch (error, stackTrace) {
       debugPrint(
-        'Application storage initialization failed: $error\\n$stackTrace',
+        'Application storage initialization failed: $error\n$stackTrace',
       );
       Error.throwWithStackTrace(
         AppInitializationException(
