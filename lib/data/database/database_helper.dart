@@ -360,6 +360,56 @@ class DatabaseHelper {
     );
   }
 
+  /// Replaces all student academic records as one atomic database operation.
+  ///
+  /// Every model is parsed before this method is called. If any delete or
+  /// insert fails, SQLite rolls the whole transaction back and the previous
+  /// academic data remains intact.
+  Future<void> replaceAcademicData({
+    required List<CourseModel> courses,
+    required List<TaskModel> tasks,
+    required List<ExamModel> exams,
+    required List<Map<String, dynamic>> schedules,
+  }) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      // Delete dependent records before their parent courses.
+      await txn.delete(scheduleTable);
+      await txn.delete(_examTable);
+      await txn.delete(_taskTable);
+      await txn.delete(_courseTable);
+
+      for (final course in courses) {
+        await txn.insert(
+          _courseTable,
+          course.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+      for (final task in tasks) {
+        await txn.insert(
+          _taskTable,
+          task.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+      for (final exam in exams) {
+        await txn.insert(
+          _examTable,
+          exam.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+      for (final schedule in schedules) {
+        await txn.insert(
+          scheduleTable,
+          schedule,
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+    });
+  }
+
   Future<void> close() async {
     if (_database != null && _database!.isOpen) {
       await _database!.close();
