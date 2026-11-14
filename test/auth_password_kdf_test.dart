@@ -61,6 +61,21 @@ void main() {
       expect(await source.verifyCredentials(username, 'wrong'), isFalse);
     });
 
+    test('registration stores credentials without activating a session', () async {
+      final service = AuthSecureStorageService();
+      final source = AuthLocalDataSourceImpl(service);
+
+      await source.persistLocalUser('new-student', 'strong-password');
+
+      expect(await service.getPasswordHash(), startsWith('argon2id'));
+      expect(await service.isAuthSessionActive(), isFalse);
+      expect(
+        await source.verifyCredentials('new-student', 'strong-password'),
+        isTrue,
+      );
+      expect(await service.isAuthSessionActive(), isTrue);
+    });
+
     test('does not activate a session if legacy migration persistence fails', () async {
       final service = AuthSecureStorageService();
       const username = 'legacy-student';
