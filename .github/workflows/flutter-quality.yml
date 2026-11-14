@@ -59,6 +59,27 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get --enforce-lockfile
 
+      - name: Verify pinned Web SQLite toolchain
+        run: |
+          dart pub deps --json > pub-deps.json
+          python3 - <<'PY'
+          import json
+
+          with open("pub-deps.json", encoding="utf-8") as source:
+              packages = {item["name"]: item["version"] for item in json.load(source)["packages"]}
+
+          expected = {
+              "sqflite_common_ffi_web": "1.0.2",
+              "sqflite_common_ffi": "2.3.6",
+              "sqlite3": "2.9.4",
+          }
+          for name, version in expected.items():
+              actual = packages.get(name)
+              print(f"{name}: {actual}")
+              if actual != version:
+                  raise SystemExit(f"Expected {name} {version}, got {actual}")
+          PY
+
       - name: Prepare SQLite WebAssembly runtime
         run: dart run sqflite_common_ffi_web:setup --force --verbose
 
