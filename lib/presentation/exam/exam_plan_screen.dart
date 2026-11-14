@@ -312,7 +312,7 @@ class _ExamPlanScreenState extends ConsumerState<ExamPlanScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.add_circle_outline),
-            onPressed: () => _openExamEditor(),
+            onPressed: _isLoadingCourses ? null : () => _openExamEditor(),
           ),
         ],
       ),

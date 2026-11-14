@@ -44,7 +44,6 @@ class _StudentProfileSetupScreenState extends State<StudentProfileSetupScreen> {
 
   String _selectedAvatar = 'student';
   bool _isLoading = false;
-  bool _profileExists = false;
   bool _isHoveringAction = false;
 
   static const String _storageKey = 'academic_os_student_profile';
@@ -81,7 +80,6 @@ class _StudentProfileSetupScreenState extends State<StudentProfileSetupScreen> {
         }
       }
     }
-    setState(() => _profileExists = false);
   }
 
   Future<void> _saveProfile() async {

@@ -43,7 +43,10 @@ class AcademicReportService {
         return aTime.compareTo(bTime);
       });
 
+    final now = DateTime.now();
     final upcomingExams = [...exams]
+      .where((exam) => exam.examDate.isAfter(now))
+      .toList()
       ..sort((a, b) => a.examDate.compareTo(b.examDate));
 
     final totalCredits = courses.fold<int>(0, (sum, course) {

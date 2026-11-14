@@ -19,11 +19,6 @@ class _GradeDistributionScreenState extends State<GradeDistributionScreen> {
   // scores for components
   List<double> _scores = [0, 0, 0, 0];
 
-  double get _totalPercent => _scores
-      .asMap()
-      .entries
-      .fold(0.0, (p, e) => p + (e.value / schemas[_selectedSchema]![e.key]));
-
   void _setScore(int idx, double val) {
     setState(() =>
         _scores[idx] = val.clamp(0, schemas[_selectedSchema]![idx].toDouble()));
