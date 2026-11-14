@@ -30,7 +30,7 @@ class AppLockService {
     if (storedHash == null || storedHash.isEmpty) return false;
 
     var verified = false;
-    if (storedHash.startsWith('argon2id\
+    if (storedHash.startsWith('argon2id')) {
       verified = await _secureStorageService.verifyPasswordVerifier(
         pin,
         storedHash,
