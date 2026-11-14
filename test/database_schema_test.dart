@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:academic_os/data/database/database_helper.dart';
+import 'package:academic_os/data/models/course_material_model.dart';
 import 'package:academic_os/data/models/course_model.dart';
 
 void main() {
@@ -53,8 +54,10 @@ void main() {
 
       const oldCourseId = 987653;
       const restoredCourseId = 987655;
+      const restoredMaterialId = 987656;
       await helper.deleteCourse(oldCourseId);
       await helper.deleteCourse(restoredCourseId);
+      await helper.deleteMaterial(restoredMaterialId);
 
       try {
         await helper.insertCourse(
@@ -80,6 +83,15 @@ void main() {
           tasks: const [],
           exams: const [],
           schedules: const [],
+          materials: [
+            CourseMaterialModel(
+              id: restoredMaterialId,
+              courseId: restoredCourseId,
+              title: 'Restored notes',
+              filePath: '/tmp/restored-notes.pdf',
+              fileType: 'pdf',
+            ),
+          ],
         );
 
         expect(await helper.getCourseById(oldCourseId), isNull);
@@ -87,7 +99,16 @@ void main() {
           (await helper.getCourseById(restoredCourseId))?.name,
           'Restored course',
         );
+        final restoredMaterials = await helper.getAllMaterials();
+        expect(
+          restoredMaterials.any(
+            (material) => material['id'] == restoredMaterialId &&
+                material['title'] == 'Restored notes',
+          ),
+          isTrue,
+        );
       } finally {
+        await helper.deleteMaterial(restoredMaterialId);
         await helper.deleteCourse(oldCourseId);
         await helper.deleteCourse(restoredCourseId);
         await helper.close();
