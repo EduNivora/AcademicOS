@@ -111,7 +111,8 @@ Academic OS هو نظام إدارة أكاديمية مبني على Flutter و
 #### Local storage and security
 - `sqflite: ^2.3.3`
 - `sqflite_common_ffi: ^2.3.3`
-- `sqflite_common_ffi_web: ^1.0.0`
+- `sqlite3: ^2.9.4` (pinned to the SQLite 2 toolchain required by the current Web worker setup)
+- `sqflite_common_ffi_web: ^1.0.2`
 - `shared_preferences: ^2.3.0`
 - `flutter_secure_storage: ^9.0.0`
 - `crypto: ^3.0.6` (legacy verifier migration and cryptographic utilities)
@@ -247,7 +248,7 @@ flutter pub get
 dart run sqflite_common_ffi_web:setup --force
 ```
 
-ينشئ الأمر `web/sqlite3.wasm` و`web/sqflite_sw.js`. يقوم CI بتجهيز هذه الملفات ثم بناء نسخة Web. دعم SQLite على Web ما زال تجريبياً؛ نجاح البناء لا يثبت وحده سلامة التخزين في المتصفح أو استمراريته، ويلزم اختبار المتصفح وإعادة التحميل والتعامل مع التبويبات قبل إعلان Web مدعوماً بالكامل.
+ينشئ الأمر `web/sqlite3.wasm` و`web/sqflite_sw.js`. يقوم CI بتجهيز هذه الملفات ثم بناء نسخة Web. إصدارات Web مثبتة عمداً على `sqflite_common_ffi_web 1.0.2` و`sqlite3 2.9.4` لتجنب انتقال محلّل تبعيات أداة Worker إلى SQLite 3 Build Hooks غير المتوافقة مع أداة التجهيز الحالية. يتحقق CI من الإصدارات الفعلية قبل بناء الـWorker. دعم SQLite على Web ما زال تجريبياً؛ نجاح البناء لا يثبت وحده سلامة التخزين في المتصفح أو استمراريته، ويلزم اختبار المتصفح وإعادة التحميل والتعامل مع التبويبات قبل إعلان Web مدعوماً بالكامل.
 
 إذا فشل تجهيز الـ Worker محلياً، أعد الأمر مع `--verbose` لعرض تفاصيل بناءه:
 
