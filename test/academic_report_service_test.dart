@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:academic_os/core/academic/academic_report_service.dart';
+import 'package:academic_os/data/models/course_material_model.dart';
 import 'package:academic_os/data/models/course_model.dart';
 import 'package:academic_os/data/models/exam_model.dart';
 import 'package:academic_os/data/models/task_model.dart';
@@ -45,13 +46,24 @@ void main() {
             'location': 'Room 1'
           },
         ],
+        materials: [
+          CourseMaterialModel(
+            id: 7,
+            courseId: 1,
+            title: 'Lecture notes',
+            filePath: '/student/files/notes.pdf',
+            fileType: 'pdf',
+          ).toMap(),
+        ],
       );
 
-      expect(payload['schema'], 'academic_os_backup_v1');
+      expect(payload['schema'], 'academic_os_backup_v2');
       expect(payload['courses'], isA<List>());
       expect(payload['tasks'], hasLength(1));
       expect(payload['exams'], hasLength(1));
       expect(payload['schedule'], hasLength(1));
+      expect(payload['materials'], hasLength(1));
+      expect(payload['materials'].first['title'], 'Lecture notes');
     });
 
 
