@@ -96,27 +96,21 @@ jobs:
       - name: Run tests
         run: flutter test --no-pub
 
-      - name: Free unused runner disk space before Android build
+      - name: Free unused runner disk space
         run: |
-          df -h
+          echo "Disk space before cleanup:"
+          df -h /
           sudo rm -rf /usr/local/share/boost
           sudo rm -rf /usr/local/share/chromium
           sudo rm -rf /usr/local/lib/android/sdk/emulator
           sudo rm -rf /usr/local/lib/android/sdk/system-images
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
           if [ -d /usr/local/lib/android/sdk/ndk ]; then
             find /usr/local/lib/android/sdk/ndk -mindepth 1 -maxdepth 1 \
               ! -name '27.0.12077973' -exec sudo rm -rf {} +
           fi
           sudo docker image prune -af || true
-          df -h
-
-      - name: Free unused runner disk space
-        run: |
-          echo "Disk space before cleanup:"
-          df -h /
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android/sdk/system-images
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
           echo "Disk space after cleanup:"
           df -h /
 
@@ -126,7 +120,7 @@ jobs:
       - name: Upload Android debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: academicos-android-debug-split-apks
+          name: academicos-android-debug-apk
           path: build/app/outputs/flutter-apk/*.apk
           if-no-files-found: error
           retention-days: 14
