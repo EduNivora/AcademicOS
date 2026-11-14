@@ -45,10 +45,22 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    final success = await widget.authUseCases.loginWithUsername.call(
-      username,
-      password,
-    );
+    bool success;
+    try {
+      success = await widget.authUseCases.loginWithUsername.call(
+        username,
+        password,
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Local login failed: $error\\n$stackTrace');
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage =
+            'تعذر إكمال تسجيل الدخول بسبب مشكلة في التخزين الآمن. لم يتم فتح الجلسة.';
+      });
+      return;
+    }
     if (!mounted) return;
 
     setState(() {
