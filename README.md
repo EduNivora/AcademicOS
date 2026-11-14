@@ -239,6 +239,16 @@ cd AcademicOS
 flutter pub get
 ```
 
+### تجهيز تشغيل Web
+
+يحتاج تنفيذ SQLite على Web إلى ملفات WebAssembly وShared Worker التي يوفرها `sqflite_common_ffi_web`. بعد تثبيت الحزم، نفّذ الأمر التالي من جذر المشروع (وأعده بعد تحديث حزم SQLite):
+
+```bash
+dart run sqflite_common_ffi_web:setup --force
+```
+
+ينشئ الأمر `web/sqlite3.wasm` و`web/sqflite_sw.js`. يقوم CI بتجهيز هذه الملفات ثم بناء نسخة Web. دعم SQLite على Web ما زال تجريبياً؛ نجاح البناء لا يثبت وحده سلامة التخزين في المتصفح أو استمراريته، ويلزم اختبار المتصفح وإعادة التحميل والتعامل مع التبويبات قبل إعلان Web مدعوماً بالكامل.
+
 ### 3. تشغيل التطبيق
 
 ```bash
