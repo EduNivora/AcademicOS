@@ -10,6 +10,7 @@ import '../../data/models/course_material_model.dart';
 import '../../data/models/course_model.dart';
 import '../../data/models/exam_model.dart';
 import '../../data/models/task_model.dart';
+import '../../data/services/backup_payload_validator.dart';
 
 class BackupExportScreen extends StatefulWidget {
   const BackupExportScreen({super.key});
@@ -101,106 +102,27 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
         throw const FormatException('صيغة النسخة الاحتياطية غير صالحة.');
       }
 
-      // Validate and deserialize every row before touching the live database.
-      final schema = decoded['schema'];
-      if (schema != null &&
-          schema != 'academic_os_backup_v1' &&
-          schema != 'academic_os_backup_v2') {
-        throw const FormatException(
-          'إصدار النسخة الاحتياطية غير مدعوم.',
-        );
-      }
-
-      final rawCourses = decoded['courses'];
-      final rawTasks = decoded['tasks'];
-      final rawExams = decoded['exams'];
-      final rawSchedule = decoded['schedule'];
-      final rawMaterials = decoded['materials'];
-      if (rawCourses is! List ||
-          rawTasks is! List ||
-          rawExams is! List ||
-          rawSchedule is! List ||
-          (schema == 'academic_os_backup_v2' && rawMaterials is! List) ||
-          (rawMaterials != null && rawMaterials is! List)) {
-        throw const FormatException(
-          'النسخة الاحتياطية لا تحتوي على أقسام البيانات المطلوبة أو أن بنيتها غير صالحة.',
-        );
-      }
-
-      final courses = rawCourses
-          .map((item) => CourseModel.fromMap(
-                Map<String, dynamic>.from(item as Map),
-              ))
-          .toList(growable: false);
-      final tasks = rawTasks
-          .map((item) => TaskModel.fromMap(
-                Map<String, dynamic>.from(item as Map),
-              ))
-          .toList(growable: false);
-      final exams = rawExams
-          .map((item) => ExamModel.fromMap(
-                Map<String, dynamic>.from(item as Map),
-              ))
-          .toList(growable: false);
-      final schedule = rawSchedule
-          .map((item) => Map<String, dynamic>.from(item as Map))
-          .toList(growable: false);
-      final materials = rawMaterials is List
-          ? rawMaterials
-              .map((item) => CourseMaterialModel.fromMap(
-                    Map<String, dynamic>.from(item as Map),
-                  ))
-              .toList(growable: false)
-          : null;
-
-      // Reject broken references before starting the destructive transaction.
-      final courseIds = courses.map((course) => course.id).whereType<int>().toSet();
-      if (tasks.any(
-            (task) =>
-                task.courseId != null && !courseIds.contains(task.courseId),
-          ) ||
-          exams.any(
-            (exam) =>
-                exam.courseId != null && !courseIds.contains(exam.courseId),
-          ) ||
-          (materials != null &&
-              materials.any((material) => !courseIds.contains(material.courseId)))) {
-        throw const FormatException(
-          'تحتوي النسخة الاحتياطية على سجلات مرتبطة بمقررات غير موجودة.',
-        );
-      }
-
-      for (final item in schedule) {
-        final rawCourseId = item['course_id'];
-        if (rawCourseId == null) continue;
-        final courseId = rawCourseId is int
-            ? rawCourseId
-            : int.tryParse(rawCourseId.toString());
-        if (courseId == null || !courseIds.contains(courseId)) {
-          throw const FormatException(
-            'يحتوي الجدول على مرجع إلى مقرر غير موجود.',
-          );
-        }
-      }
+      // Validate and deserialize every section before touching live storage.
+      final validated = const BackupPayloadValidator().validate(decoded);
 
       await _databaseHelper.replaceAcademicData(
-        courses: courses,
-        tasks: tasks,
-        exams: exams,
-        schedules: schedule,
-        materials: materials,
+        courses: validated.courses,
+        tasks: validated.tasks,
+        exams: validated.exams,
+        schedules: validated.schedule,
+        materials: validated.materials,
       );
 
       if (!mounted) return;
-      final materialsSummary = materials == null
+      final materialsSummary = validated.materials == null
           ? 'لم تتغير بيانات المرفقات'
-          : '${materials.length} مرفقاً';
+          : '${validated.materials!.length} مرفقاً';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'تمت استعادة البيانات بنجاح: ${courses.length} مادة، '
-            '${tasks.length} مهمة، ${exams.length} اختبار، '
-            '${schedule.length} حصة، $materialsSummary.',
+            'تمت استعادة البيانات بنجاح: ${validated.courses.length} مادة، '
+            '${validated.tasks.length} مهمة، ${validated.exams.length} اختبار، '
+            '${validated.schedule.length} حصة، $materialsSummary.',
           ),
         ),
       );
