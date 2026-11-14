@@ -38,7 +38,9 @@ void main() async {
   try {
     await appInitializer.initialize();
   } catch (error, stackTrace) {
-    debugPrint('AppInitializer failed during startup: $error\n$stackTrace');
+    debugPrint('Fatal startup initialization failure: $error\\n$stackTrace');
+    runApp(const StartupFailureApp());
+    return;
   }
 
   final authSecureStorageService = AuthSecureStorageService();
@@ -145,6 +147,46 @@ class _MyAppState extends State<MyApp> {
         isArabic: _isArabic,
         onThemeChanged: (value) => setState(() => _isDarkMode = value),
         onLanguageChanged: (value) => setState(() => _isArabic = value),
+      ),
+    );
+  }
+}
+
+
+class StartupFailureApp extends StatelessWidget {
+  const StartupFailureApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Academic OS',
+      home: Scaffold(
+        body: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(Icons.storage_rounded, size: 48),
+                  SizedBox(height: 16),
+                  Text(
+                    'تعذر تشغيل التطبيق بأمان',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'لم نتمكن من فتح قاعدة البيانات الدائمة. لم يتم تشغيل التطبيق حتى لا تُحفظ بياناتك في تخزين مؤقت أو تفقد بعد إغلاق الصفحة. تحقق من الاتصال أو أعد المحاولة لاحقاً.',
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
