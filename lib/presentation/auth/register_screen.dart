@@ -71,44 +71,50 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    final success = await widget.authUseCases.registerLocalUser.call(
-      username,
-      password,
-      email: email.isEmpty ? null : email,
-      displayName: displayName.isEmpty ? null : displayName,
-    );
+    try {
+      final success = await widget.authUseCases.registerLocalUser.call(
+        username,
+        password,
+        email: email.isEmpty ? null : email,
+        displayName: displayName.isEmpty ? null : displayName,
+      );
 
-    if (!mounted) return;
+      if (!mounted) return;
+      if (!success) {
+        setState(() {
+          _errorMessage = 'حدث خطأ أثناء التسجيل. يرجى المحاولة مرة أخرى.';
+          _isLoading = false;
+        });
+        return;
+      }
 
-    if (!success) {
+      final loginSuccessful = await widget.authUseCases.loginWithUsername.call(
+        username,
+        password,
+      );
+      if (!mounted) return;
+
+      setState(() => _isLoading = false);
+      if (loginSuccessful) {
+        await widget.onRegistrationSuccess();
+        if (!mounted) return;
+        Navigator.of(context).pop();
+        return;
+      }
+
       setState(() {
-        _errorMessage = 'حدث خطأ أثناء التسجيل. يرجى المحاولة مرة أخرى.';
+        _errorMessage =
+            'تم التسجيل، لكن فشل تسجيل الدخول تلقائياً. حاول تسجيل الدخول يدوياً.';
+      });
+    } catch (error, stackTrace) {
+      debugPrint('Local registration failed: $error\\n$stackTrace');
+      if (!mounted) return;
+      setState(() {
+        _errorMessage =
+            'تعذر إكمال التسجيل بسبب مشكلة في التخزين الآمن. لم يتم فتح الجلسة.';
         _isLoading = false;
       });
-      return;
     }
-
-    final loginSuccessful = await widget.authUseCases.loginWithUsername.call(
-      username,
-      password,
-    );
-    if (!mounted) return;
-
-    setState(() {
-      _isLoading = false;
-    });
-
-    if (loginSuccessful) {
-      await widget.onRegistrationSuccess();
-      if (!mounted) return;
-      Navigator.of(context).pop();
-      return;
-    }
-
-    setState(() {
-      _errorMessage =
-          'تم التسجيل، لكن فشل تسجيل الدخول تلقائياً. حاول تسجيل الدخول يدوياً.';
-    });
   }
 
   @override
