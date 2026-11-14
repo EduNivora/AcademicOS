@@ -162,13 +162,15 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
       );
 
       if (!mounted) return;
+      final materialsSummary = materials == null
+          ? 'لم تتغير بيانات المرفقات'
+          : '${materials.length} مرفقاً';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             'تمت استعادة البيانات بنجاح: ${courses.length} مادة، '
             '${tasks.length} مهمة، ${exams.length} اختبار، '
-            '${schedule.length} حصة، '
-            '${materials?.length ?? 0} مرفقاً.',
+            '${schedule.length} حصة، $materialsSummary.',
           ),
         ),
       );
