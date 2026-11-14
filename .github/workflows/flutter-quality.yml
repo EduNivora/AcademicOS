@@ -110,8 +110,18 @@ jobs:
           sudo docker image prune -af || true
           df -h
 
+      - name: Free unused runner disk space
+        run: |
+          echo "Disk space before cleanup:"
+          df -h /
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android/sdk/system-images
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          echo "Disk space after cleanup:"
+          df -h /
+
       - name: Build Android debug APK
-        run: flutter build apk --debug --split-per-abi --no-pub
+        run: flutter build apk --debug --no-pub
 
       - name: Upload Android debug APK
         uses: actions/upload-artifact@v4
