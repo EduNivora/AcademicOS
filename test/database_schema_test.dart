@@ -8,12 +8,14 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Database schema', () {
-    test('failed backup restore rolls back and preserves existing courses',
+    test('failed backup restore rolls back and preserves existing data',
         () async {
       final helper = DatabaseHelper.instance;
       await helper.close();
 
       const existingCourseId = 987654;
+      const existingMaterialId = 987659;
+      await helper.deleteMaterial(existingMaterialId);
       await helper.deleteCourse(existingCourseId);
       try {
         await helper.insertCourse(
@@ -25,6 +27,13 @@ void main() {
             credits: 3,
           ),
         );
+        await helper.insertMaterial({
+          'id': existingMaterialId,
+          'course_id': existingCourseId,
+          'title': 'Existing notes',
+          'file_path': '/tmp/existing-notes.pdf',
+          'file_type': 'pdf',
+        });
 
         await expectLater(
           helper.replaceAcademicData(
@@ -34,6 +43,7 @@ void main() {
             schedules: const [
               {'column_that_does_not_exist': 'force transaction failure'},
             ],
+            materials: const [],
           ),
           throwsA(isA<Exception>()),
         );
@@ -41,7 +51,16 @@ void main() {
         final preservedCourse = await helper.getCourseById(existingCourseId);
         expect(preservedCourse, isNotNull);
         expect(preservedCourse!.name, 'Existing course');
+        expect(
+          (await helper.getAllMaterials()).any(
+            (material) =>
+                material['id'] == existingMaterialId &&
+                material['title'] == 'Existing notes',
+          ),
+          isTrue,
+        );
       } finally {
+        await helper.deleteMaterial(existingMaterialId);
         await helper.deleteCourse(existingCourseId);
         await helper.close();
       }
