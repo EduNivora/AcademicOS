@@ -69,6 +69,7 @@ class _AuthGateScreenState extends State<AuthGateScreen> {
       }
 
       final active = await widget.authUseCases.isLoggedIn.call();
+      if (!mounted) return;
 
       if (!AppPlatform.shouldUseNativeSecurity()) {
         setState(() {
@@ -81,6 +82,7 @@ class _AuthGateScreenState extends State<AuthGateScreen> {
 
       if (active) {
         final locked = await _appLockService?.shouldLockApp() ?? false;
+        if (!mounted) return;
         setState(() {
           _isAppLocked = locked;
           _isLoggedIn = true;
@@ -91,9 +93,11 @@ class _AuthGateScreenState extends State<AuthGateScreen> {
 
       final cachedGoogle =
           await widget.authUseCases.loginWithCachedGoogleAccount.call();
+      if (!mounted) return;
       final locked = cachedGoogle
           ? (await _appLockService?.shouldLockApp() ?? false)
           : false;
+      if (!mounted) return;
       setState(() {
         _isLoggedIn = cachedGoogle;
         _isAppLocked = locked;
@@ -137,6 +141,7 @@ class _AuthGateScreenState extends State<AuthGateScreen> {
     if (!mounted) return;
     setState(() {
       _requiresLogin = false;
+      _authStateUnavailable = false;
       _isLoggedIn = false;
       _isAppLocked = false;
     });
