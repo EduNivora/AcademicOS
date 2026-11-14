@@ -167,7 +167,8 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
           content: Text(
             'تمت استعادة البيانات بنجاح: ${courses.length} مادة، '
             '${tasks.length} مهمة، ${exams.length} اختبار، '
-            '${schedule.length} حصة.',
+            '${schedule.length} حصة، '
+            '${materials?.length ?? 0} مرفقاً.',
           ),
         ),
       );
@@ -379,7 +380,7 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
         children: [
           _buildActionCard(
             'نسخ احتياطي فوري',
-            'تصدير جميع المواد والمهام والاختبارات والجدول في ملف JSON واحد.',
+            'تصدير المقررات والمهام والاختبارات والجدول وبيانات المرفقات؛ ملفات المرفقات نفسها لا تُضمَّن في JSON.',
             Icons.backup_rounded,
             _exportBackup,
           ),
