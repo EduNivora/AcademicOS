@@ -1,0 +1,188 @@
+import '../models/course_material_model.dart';
+import '../models/course_model.dart';
+import '../models/exam_model.dart';
+import '../models/task_model.dart';
+
+class ValidatedBackup {
+  const ValidatedBackup({
+    required this.courses,
+    required this.tasks,
+    required this.exams,
+    required this.schedule,
+    required this.materials,
+  });
+
+  final List<CourseModel> courses;
+  final List<TaskModel> tasks;
+  final List<ExamModel> exams;
+  final List<Map<String, dynamic>> schedule;
+  final List<CourseMaterialModel>? materials;
+}
+
+class BackupPayloadValidator {
+  const BackupPayloadValidator();
+
+  static const _schemas = {
+    'academic_os_backup_v1',
+    'academic_os_backup_v2',
+  };
+  static const _days = {
+    'السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة',
+  };
+
+  ValidatedBackup validate(Map<String, dynamic> payload) {
+    final schema = payload['schema'];
+    if (schema != null && (schema is! String || !_schemas.contains(schema))) {
+      throw const FormatException('Unsupported backup schema version.');
+    }
+
+    List<Map<String, dynamic>> rows(String key, {required bool required}) {
+      final value = payload[key];
+      if (value == null && !required) return <Map<String, dynamic>>[];
+      if (value is! List) {
+        throw FormatException('Backup section "$key" must be a list.');
+      }
+      return value.map((item) {
+        if (item is! Map) {
+          throw FormatException('Backup section "$key" contains a non-object row.');
+        }
+        try {
+          return Map<String, dynamic>.from(item);
+        } catch (_) {
+          throw FormatException('Backup section "$key" contains invalid keys.');
+        }
+      }).toList(growable: false);
+    }
+
+    final courseRows = rows('courses', required: true);
+    final taskRows = rows('tasks', required: true);
+    final examRows = rows('exams', required: true);
+    final scheduleRows = rows('schedule', required: true);
+    final materialValue = payload['materials'];
+    if (schema == 'academic_os_backup_v2' && materialValue is! List) {
+      throw const FormatException('Backup v2 must contain materials as a list.');
+    }
+    if (materialValue != null && materialValue is! List) {
+      throw const FormatException('Backup materials must be a list.');
+    }
+    final materialRows = materialValue == null
+        ? null
+        : rows('materials', required: true);
+
+    final courses = courseRows.map(CourseModel.fromMap).toList(growable: false);
+    final tasks = taskRows.map(TaskModel.fromMap).toList(growable: false);
+    final exams = examRows.map(ExamModel.fromMap).toList(growable: false);
+
+    _validateIds(courseRows, 'courses');
+    _validateIds(taskRows, 'tasks');
+    _validateIds(examRows, 'exams');
+    _validateIds(scheduleRows, 'schedule');
+    if (materialRows != null) _validateIds(materialRows, 'materials');
+
+    final courseIds = courses.map((item) => item.id!).toSet();
+    for (final row in [...taskRows, ...examRows]) {
+      _validateOptionalForeignKey(row['course_id'], courseIds, 'course_id');
+    }
+
+    final schedule = scheduleRows.map(_validateSchedule).toList(growable: false);
+    final materials = materialRows
+        ?.map(_validateMaterial)
+        .toList(growable: false);
+
+    if (materials != null) {
+      for (final material in materials) {
+        if (!courseIds.contains(material.courseId)) {
+          throw const FormatException('A material references a missing course.');
+        }
+      }
+    }
+
+    return ValidatedBackup(
+      courses: courses,
+      tasks: tasks,
+      exams: exams,
+      schedule: schedule,
+      materials: materials,
+    );
+  }
+
+  void _validateIds(List<Map<String, dynamic>> rows, String section) {
+    final seen = <int>{};
+    for (final row in rows) {
+      final id = row['id'];
+      if (id is! int || id <= 0 || !seen.add(id)) {
+        throw FormatException(
+          'Section "$section" contains a missing, invalid, or duplicate id.',
+        );
+      }
+    }
+  }
+
+  void _validateOptionalForeignKey(
+    Object? value,
+    Set<int> validIds,
+    String field,
+  ) {
+    if (value == null) return;
+    if (value is! int || value <= 0 || !validIds.contains(value)) {
+      throw FormatException('Invalid or orphaned "$field" reference.');
+    }
+  }
+
+  Map<String, dynamic> _validateSchedule(Map<String, dynamic> row) {
+    final day = row['day_of_week'];
+    final start = row['start_time'];
+    final end = row['end_time'];
+    if (day is! String || !_days.contains(day)) {
+      throw const FormatException('Schedule row has an invalid day_of_week.');
+    }
+    final startMinutes = _parseTime(start, 'start_time');
+    final endMinutes = _parseTime(end, 'end_time');
+    if (endMinutes <= startMinutes) {
+      throw const FormatException('Schedule end_time must be after start_time.');
+    }
+    final location = row['location'];
+    if (location != null && location is! String) {
+      throw const FormatException('Schedule location must be a string.');
+    }
+    final reminder = row['reminder_enabled'];
+    if (reminder != null && reminder != 0 && reminder != 1) {
+      throw const FormatException('Schedule reminder_enabled must be 0 or 1.');
+    }
+    final offset = row['reminder_offset_minutes'];
+    if (offset != null && (offset is! int || offset < 0 || offset > 10080)) {
+      throw const FormatException('Schedule reminder offset is out of range.');
+    }
+    if (row['course_id'] != null && row['course_id'] is! int) {
+      throw const FormatException('Schedule course_id must be an integer or null.');
+    }
+    return row;
+  }
+
+  int _parseTime(Object? value, String field) {
+    if (value is! String || !RegExp(r'^([01]\\d|2[0-3]):[0-5]\\d$').hasMatch(value)) {
+      throw FormatException('Schedule "$field" must use HH:mm format.');
+    }
+    final parts = value.split(':');
+    return int.parse(parts[0]) * 60 + int.parse(parts[1]);
+  }
+
+  CourseMaterialModel _validateMaterial(Map<String, dynamic> row) {
+    final courseId = row['course_id'];
+    final title = row['title'];
+    final path = row['file_path'];
+    final type = row['file_type'];
+    final createdAt = row['created_at'];
+    if (courseId is! int || courseId <= 0 ||
+        title is! String || title.trim().isEmpty ||
+        path is! String || path.trim().isEmpty ||
+        type is! String || type.trim().isEmpty) {
+      throw const FormatException('Material row has invalid required fields.');
+    }
+    if (createdAt != null &&
+        (createdAt is! String || DateTime.tryParse(createdAt) == null)) {
+      throw const FormatException('Material created_at is invalid.');
+    }
+    return CourseMaterialModel.fromMap(row);
+  }
+}
