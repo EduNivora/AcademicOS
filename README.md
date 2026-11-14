@@ -151,9 +151,6 @@ Academic OS هو نظام إدارة أكاديمية مبني على Flutter و
 ```text
 AcademicOS/
 ├─ android/
-├─ ios/
-├─ linux/
-├─ macos/
 ├─ windows/
 ├─ web/
 ├─ test/
@@ -263,15 +260,7 @@ flutter run -d chrome
 flutter run -d windows
 ```
 
-#### macOS
-```bash
-flutter run -d macos
-```
-
-#### Linux
-```bash
-flutter run -d linux
-```
+المنصات المهيأة حالياً داخل المستودع هي Android وWeb وWindows. مجلدات iOS وmacOS وLinux غير موجودة حالياً، فلا تُعد هذه المنصات مدعومة في إعدادات المستودع الحالية.
 
 ### 5. التحقق من الجودة
 
