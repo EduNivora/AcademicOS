@@ -104,7 +104,7 @@ jobs:
           sudo rm -rf /usr/local/lib/android/sdk/emulator
           sudo rm -rf /usr/local/lib/android/sdk/system-images
           if [ -d /usr/local/lib/android/sdk/ndk ]; then
-            find /usr/local/lib/android/sdk/ndk -mindepth 1 -maxdepth 1 \\
+            find /usr/local/lib/android/sdk/ndk -mindepth 1 -maxdepth 1 \
               ! -name '27.0.12077973' -exec sudo rm -rf {} +
           fi
           sudo docker image prune -af || true
