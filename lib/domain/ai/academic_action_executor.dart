@@ -1,8 +1,6 @@
 import 'dart:math' as math;
 
 import '../../data/database/database_helper.dart';
-import '../../domain/entities/course_entity.dart';
-import '../../domain/entities/task_entity.dart';
 
 class AcademicActionExecutor {
   final DatabaseHelper _databaseHelper;

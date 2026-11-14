@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqflite/sqflite.dart';
 
 import 'package:academic_os/data/database/database_helper.dart';
 

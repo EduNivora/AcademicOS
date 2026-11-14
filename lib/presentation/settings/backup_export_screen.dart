@@ -50,7 +50,6 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
         schedule: List<Map<String, dynamic>>.from(schedule),
       );
 
-      final compactJson = const JsonEncoder.withIndent('  ').convert(payload);
       final encodedBackup = _academicReportService.encodeBackupJson(payload);
       final boxed = <String, dynamic>{
         'format': 'academic_os_backup',
@@ -176,33 +175,6 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
       final tasks = await _databaseHelper.getTasks();
       final exams = await _databaseHelper.getExams();
       final schedule = await _databaseHelper.getSchedules();
-
-      final sortedSchedule = List<Map<String, dynamic>>.from(schedule)
-        ..sort((a, b) {
-          final aTime = a['start_time']?.toString() ?? '00:00';
-          final bTime = b['start_time']?.toString() ?? '00:00';
-          return aTime.compareTo(bTime);
-        });
-
-      final upcomingExams = exams
-          .where((exam) => exam.examDate.isAfter(DateTime.now()))
-          .toList()
-        ..sort((a, b) => a.examDate.compareTo(b.examDate));
-
-      double totalWeighted = 0;
-      int totalCredits = 0;
-
-      for (final course in courses) {
-        final credit = course.creditHours ?? 3;
-        final average = ((course.midGrade ?? 0) +
-                (course.practicalGrade ?? 0) +
-                (course.finalGrade ?? 0)) /
-            3;
-        totalWeighted += average * credit;
-        totalCredits += credit;
-      }
-
-      final gpa = totalCredits == 0 ? 0.0 : totalWeighted / totalCredits;
 
       _reportText = _academicReportService.generateAcademicReport(
         courses: courses,
