@@ -40,7 +40,7 @@ void main() {
   test('rejects duplicate primary keys in every section', () {
     final payload = _validPayload();
     payload['schedule'] = [
-      ...payload['schedule'] as List,
+      ...(payload['schedule'] as List),
       (payload['schedule'] as List).first,
     ];
     expect(() => validator.validate(payload), throwsFormatException);
