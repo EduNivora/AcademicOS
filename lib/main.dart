@@ -101,7 +101,7 @@ void main() async {
 class _StartupFailureApp extends StatelessWidget {
   const _StartupFailureApp({required this.onRetry});
 
-  final Future<void> Function() onRetry;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -140,7 +140,7 @@ class _StartupFailureApp extends StatelessWidget {
                     ),
                     const SizedBox(height: 24),
                     FilledButton.icon(
-                      onPressed: () => onRetry(),
+                      onPressed: onRetry,
                       icon: const Icon(Icons.refresh_rounded),
                       label: const Text('إعادة المحاولة'),
                     ),
