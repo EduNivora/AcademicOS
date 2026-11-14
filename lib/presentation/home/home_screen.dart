@@ -2345,7 +2345,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                           await widget.authUseCases.logout.call();
                         } catch (error, stackTrace) {
                           debugPrint(
-                            'HomeScreen.logout error: $error\\n$stackTrace',
+                            'HomeScreen.logout error: $error\n$stackTrace',
                           );
                           if (!mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
