@@ -38,7 +38,9 @@ void main() async {
   try {
     await appInitializer.initialize();
   } catch (error, stackTrace) {
-    debugPrint('AppInitializer failed during startup: $error\n$stackTrace');
+    debugPrint('AppInitializer failed during startup: $error\\n$stackTrace');
+    runApp(_StartupFailureApp(onRetry: main));
+    return;
   }
 
   final authSecureStorageService = AuthSecureStorageService();
@@ -94,6 +96,63 @@ void main() async {
       ),
     ),
   );
+}
+
+class _StartupFailureApp extends StatelessWidget {
+  const _StartupFailureApp({required this.onRetry});
+
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.storage_rounded,
+                      size: 52,
+                      color: Colors.orange,
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'تعذّر تجهيز التخزين الأكاديمي',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'لم نتمكن من فتح قاعدة البيانات الدائمة. أوقفنا تشغيل '
+                      'التطبيق لحماية بياناتك من الحفظ المؤقت أو الفقدان. '
+                      'تحقق من مساحة التخزين ثم أعد المحاولة.',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    FilledButton.icon(
+                      onPressed: () => onRetry(),
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('إعادة المحاولة'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class MyApp extends StatefulWidget {
