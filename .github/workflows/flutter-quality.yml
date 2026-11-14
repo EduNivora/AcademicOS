@@ -40,6 +40,13 @@ jobs:
           accept-android-sdk-licenses: true
           packages: 'ndk;27.0.12077973'
 
+      - name: Install required CMake
+        run: |
+          set -euo pipefail
+          sdkmanager --install "cmake;3.22.1"
+          test -d "$ANDROID_HOME/cmake/3.22.1"
+          echo "Verified Android CMake 3.22.1."
+
       - name: Show toolchain
         run: |
           flutter --version
