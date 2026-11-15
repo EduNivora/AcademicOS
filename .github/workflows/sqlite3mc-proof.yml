@@ -2,6 +2,7 @@ name: SQLite3MC isolated native proof
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited]
     branches: [chore/edunivora-phase0-execution]
     paths:
       - '.github/workflows/sqlite3mc-proof.yml'
