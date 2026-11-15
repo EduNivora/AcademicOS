@@ -10,8 +10,9 @@ permissions:
   contents: read
 
 concurrency:
+  # A newer commit supersedes stale PR checks; only the latest SHA should occupy the runner.
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   quality:
