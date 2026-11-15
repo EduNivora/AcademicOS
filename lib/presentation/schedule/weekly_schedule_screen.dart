@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/academic/schedule_conflict_validator.dart';
 import '../../core/notifications/notification_service.dart';
 import '../../data/database/database_helper.dart';
 import '../../data/models/course_model.dart';
@@ -235,6 +236,35 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     };
 
     try {
+      final existingSchedules = await _databaseHelper.getSchedules();
+      final currentId = lecture?['id'];
+      final validation = ScheduleConflictValidator.validate(
+        day: selectedDay,
+        startTime: selectedStart,
+        endTime: selectedEnd,
+        existingSchedules: existingSchedules,
+        excludingScheduleId: currentId is int ? currentId : null,
+      );
+      if (!validation.isValid) {
+        final message = switch (validation.issue) {
+          ScheduleValidationIssue.invalidTimeFormat =>
+            'صيغة الوقت غير صحيحة. اختر وقتاً صالحاً.',
+          ScheduleValidationIssue.invalidTimeRange =>
+            'يجب أن يكون وقت النهاية بعد وقت البداية.',
+          ScheduleValidationIssue.invalidStoredEntry =>
+            'يوجد موعد محفوظ بوقت غير صالح في اليوم نفسه. صححه قبل إضافة موعد آخر.',
+          ScheduleValidationIssue.overlap =>
+            'هذا الموعد يتداخل مع موعد آخر في اليوم نفسه.',
+          null => 'تعذر التحقق من تعارض المواعيد.',
+        };
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(message)),
+          );
+        }
+        return;
+      }
+
       int? savedId;
       if (lecture == null) {
         savedId = await _databaseHelper.insertSchedule(scheduleEntry);
