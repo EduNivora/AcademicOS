@@ -82,8 +82,16 @@ class ScheduleConflictValidator {
     return const ScheduleValidationResult();
   }
 
-  static int? _parseMinutes(String value) {
-    final match = RegExp(r'^([01]\\d|2[0-3]):([0-5]\\d)$')
+  static int? _parseMinutes(String? value) {
+    if (value == null) return null;
+    final match = RegExp(r'^([01]\\d|2[0-3]):([0-5]\\d)
+    if (match == null) return null;
+    final hour = int.parse(match.group(1)!);
+    final minute = int.parse(match.group(2)!);
+    return hour * 60 + minute;
+  }
+}
+)
         .firstMatch(value);
     if (match == null) return null;
     final hour = int.parse(match.group(1)!);
