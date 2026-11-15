@@ -455,4 +455,53 @@ void main() {
   },
   );
 
+
+  test('schema v11 upgrades to v12 without losing existing course data', () async {
+    final helper = DatabaseHelper.instance;
+    await helper.close();
+    const courseId = 987672;
+    await helper.deleteCourse(courseId);
+    await helper.insertCourse(
+      const CourseModel(
+        id: courseId,
+        name: 'Migration preservation',
+        instructor: 'Instructor',
+        code: 'MIG-12',
+        credits: 3,
+      ),
+    );
+
+    try {
+      final db = await helper.database;
+      await db.execute('DROP TABLE IF EXISTS academic_terms');
+      await db.execute('PRAGMA user_version = 11');
+      await helper.close();
+
+      final upgradedDb = await helper.database;
+      final version = await upgradedDb.rawQuery('PRAGMA user_version');
+      expect(version.single['user_version'], 12);
+
+      final termColumns =
+          await upgradedDb.rawQuery('PRAGMA table_info(academic_terms)');
+      expect(
+        termColumns.map((row) => row['name']),
+        containsAll(['name', 'start_date', 'end_date', 'is_active']),
+      );
+      final indexes =
+          await upgradedDb.rawQuery('PRAGMA index_list(academic_terms)');
+      expect(
+        indexes.map((row) => row['name']),
+        containsAll([
+          'idx_academic_terms_name',
+          'idx_academic_terms_single_active',
+        ]),
+      );
+      expect((await helper.getCourseById(courseId))?.name,
+          'Migration preservation');
+    } finally {
+      await helper.deleteCourse(courseId);
+      await helper.close();
+    }
+  });
+
 }
