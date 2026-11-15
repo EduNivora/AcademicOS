@@ -12,6 +12,9 @@ typedef AnnouncementPost = Future<void> Function(Uri uri);
 
 class AnnouncementRepository {
   static const String _cacheKey = 'edunivora_public_announcements_v1';
+  static const String _guestDeliveredIdsKey =
+      'edunivora_guest_delivered_ids_v1';
+  static const int _maxRememberedGuestDeliveries = 500;
 
   final AnnouncementGet _get;
   final AnnouncementPost _post;
@@ -47,7 +50,7 @@ class AnnouncementRepository {
           .toList(growable: false);
 
       await _writeCache(announcements);
-      _recordGuestDeliveries(announcements);
+      await _recordGuestDeliveries(announcements);
       return announcements;
     } catch (_) {
       final cached = await _readCache();
@@ -62,17 +65,50 @@ class AnnouncementRepository {
     ).timeout(const Duration(seconds: 12));
   }
 
-  void _recordGuestDeliveries(List<Announcement> announcements) {
+  Future<void> _recordGuestDeliveries(
+    List<Announcement> announcements,
+  ) async {
+    Set<String> persistedIds;
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      persistedIds = (preferences.getStringList(_guestDeliveredIdsKey) ??
+              const <String>[])
+          .toSet();
+    } catch (_) {
+      // Continue with in-memory deduplication if local preferences are unavailable.
+      persistedIds = <String>{};
+    }
+
     for (final announcement in announcements) {
-      if (_deliveredInSession.add(announcement.id)) {
-        unawaited(
-          _post(
-            _endpoint(
-              '/v1/announcements/${announcement.id}/guest-delivered',
-            ),
-          ).timeout(const Duration(seconds: 12)).catchError((_) {}),
-        );
+      final id = announcement.id;
+      if (persistedIds.contains(id) || !_deliveredInSession.add(id)) {
+        continue;
       }
+      unawaited(_sendGuestDelivery(announcement, persistedIds));
+    }
+  }
+
+  Future<void> _sendGuestDelivery(
+    Announcement announcement,
+    Set<String> persistedIds,
+  ) async {
+    try {
+      await _post(
+        _endpoint(
+          '/v1/announcements/${announcement.id}/guest-delivered',
+        ),
+      ).timeout(const Duration(seconds: 12));
+
+      persistedIds.add(announcement.id);
+      final preferences = await SharedPreferences.getInstance();
+      final retained = persistedIds.toList(growable: false);
+      final bounded = retained.length > _maxRememberedGuestDeliveries
+          ? retained.sublist(retained.length - _maxRememberedGuestDeliveries)
+          : retained;
+      await preferences.setStringList(_guestDeliveredIdsKey, bounded);
+    } catch (_) {
+      // A failed acknowledgement remains eligible for retry on a later fetch.
+      _deliveredInSession.remove(announcement.id);
     }
   }
 
