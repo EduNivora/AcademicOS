@@ -10,6 +10,8 @@ import '../../core/academic/academic_report_service.dart';
 import '../../data/database/database_helper.dart';
 import '../../data/services/backup_payload_validator.dart';
 import '../../data/services/backup_archive_crypto_service.dart';
+import '../../data/services/google_drive_backup_service.dart';
+import '../../data/services/google_drive_oauth_service.dart';
 
 class BackupExportScreen extends StatefulWidget {
   const BackupExportScreen({super.key});
@@ -29,6 +31,7 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
   final TextEditingController _restorePasswordController = TextEditingController();
   final BackupArchiveCryptoService _backupCrypto =
       const BackupArchiveCryptoService();
+  final GoogleDriveOAuthService _driveOAuth = GoogleDriveOAuthService();
 
   bool _isBusy = false;
   String? _lastBackupPath;
@@ -44,56 +47,59 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
     super.dispose();
   }
 
+  Future<Uint8List> _createEncryptedArchive() async {
+    if (_backupPasswordController.text !=
+        _backupPasswordConfirmController.text) {
+      throw const FormatException('كلمتا مرور النسخة غير متطابقتين.');
+    }
+    final courses = await _databaseHelper.getCourses();
+    final tasks = await _databaseHelper.getTasks();
+    final exams = await _databaseHelper.getExams();
+    final schedule = await _databaseHelper.getSchedules();
+    final materials = await _databaseHelper.getAllMaterials();
+
+    final missingAttachments = materials.where((row) {
+      final bytes = row['file_bytes'];
+      return bytes is! List<int> || bytes.isEmpty;
+    }).length;
+    if (missingAttachments > 0) {
+      throw StateError(
+        'تعذر إنشاء نسخة كاملة: يوجد $missingAttachments مرفق قديم بلا محتوى محفوظ. أعد إرفاق الملفات المفقودة أولاً.',
+      );
+    }
+
+    final backupMaterials = materials.map((row) {
+      final copy = Map<String, dynamic>.from(row);
+      final bytes = copy.remove('file_bytes');
+      if (bytes is List<int>) {
+        copy['file_bytes_base64'] = base64.encode(bytes);
+      }
+      return copy;
+    }).toList(growable: false);
+
+    final payload = _academicReportService.buildBackupPayload(
+      courses: courses,
+      tasks: tasks,
+      exams: exams,
+      schedule: List<Map<String, dynamic>>.from(schedule),
+      materials: backupMaterials,
+    );
+    final encodedBackup = _academicReportService.encodeBackupJson(payload);
+    final boxed = <String, dynamic>{
+      'format': 'academic_os_backup',
+      'payload': encodedBackup,
+    };
+    final jsonBackupText = const JsonEncoder.withIndent('  ').convert(boxed);
+    return _backupCrypto.encrypt(
+      plaintext: utf8.encode(jsonBackupText),
+      password: _backupPasswordController.text,
+    );
+  }
+
   Future<void> _exportBackup() async {
     setState(() => _isBusy = true);
     try {
-      if (_backupPasswordController.text !=
-          _backupPasswordConfirmController.text) {
-        throw const FormatException('كلمتا مرور النسخة غير متطابقتين.');
-      }
-      final courses = await _databaseHelper.getCourses();
-      final tasks = await _databaseHelper.getTasks();
-      final exams = await _databaseHelper.getExams();
-      final schedule = await _databaseHelper.getSchedules();
-      final materials = await _databaseHelper.getAllMaterials();
-
-      final missingAttachments = materials.where((row) {
-        final bytes = row['file_bytes'];
-        return bytes is! List<int> || bytes.isEmpty;
-      }).length;
-      if (missingAttachments > 0) {
-        throw StateError(
-          'تعذر إنشاء نسخة كاملة: يوجد $missingAttachments مرفق قديم بلا محتوى محفوظ. أعد إرفاق الملفات المفقودة أولاً.',
-        );
-      }
-
-      final backupMaterials = materials.map((row) {
-        final copy = Map<String, dynamic>.from(row);
-        final bytes = copy.remove('file_bytes');
-        if (bytes is List<int>) {
-          copy['file_bytes_base64'] = base64.encode(bytes);
-        }
-        return copy;
-      }).toList(growable: false);
-
-      final payload = _academicReportService.buildBackupPayload(
-        courses: courses,
-        tasks: tasks,
-        exams: exams,
-        schedule: List<Map<String, dynamic>>.from(schedule),
-        materials: backupMaterials,
-      );
-
-      final encodedBackup = _academicReportService.encodeBackupJson(payload);
-      final boxed = <String, dynamic>{
-        'format': 'academic_os_backup',
-        'payload': encodedBackup,
-      };
-      final jsonBackupText = const JsonEncoder.withIndent('  ').convert(boxed);
-      final encryptedBytes = await _backupCrypto.encrypt(
-        plaintext: utf8.encode(jsonBackupText),
-        password: _backupPasswordController.text,
-      );
+      final encryptedBytes = await _createEncryptedArchive();
       final encryptedArchiveText = utf8.decode(encryptedBytes);
 
       final fileName =
@@ -137,6 +143,118 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
       if (mounted) {
         setState(() => _isBusy = false);
       }
+    }
+  }
+
+  Future<void> _uploadBackupToDrive() async {
+    if (_isBusy) return;
+    setState(() => _isBusy = true);
+    GoogleDriveBackupService? drive;
+    try {
+      final archive = await _createEncryptedArchive();
+      final token = await _driveOAuth.authorizeAndGetAccessToken();
+      if (token == null) {
+        throw const GoogleDriveAuthorizationException(
+          'لم يتم منح صلاحية الوصول إلى Google Drive.',
+        );
+      }
+      drive = GoogleDriveBackupService(
+        accessTokenProvider: () async => token,
+      );
+      final folderId = await drive.ensureBackupFolder();
+      final fileName =
+          'edunivora_backup_${DateTime.now().millisecondsSinceEpoch}.edunivora';
+      final fileId = await drive.uploadEncryptedArchive(
+        archive: archive,
+        fileName: fileName,
+        folderId: folderId,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تم رفع النسخة المشفرة إلى مجلد EduNivora. معرف الملف: $fileId')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر رفع النسخة إلى Google Drive: $error')),
+      );
+    } finally {
+      drive?.close();
+      if (mounted) setState(() => _isBusy = false);
+    }
+  }
+
+  Future<void> _loadBackupFromDrive() async {
+    if (_isBusy) return;
+    setState(() => _isBusy = true);
+    GoogleDriveBackupService? drive;
+    try {
+      final token = await _driveOAuth.authorizeAndGetAccessToken();
+      if (token == null) {
+        throw const GoogleDriveAuthorizationException(
+          'لم يتم منح صلاحية الوصول إلى Google Drive.',
+        );
+      }
+      drive = GoogleDriveBackupService(
+        accessTokenProvider: () async => token,
+      );
+      final folderId = await drive.ensureBackupFolder();
+      final backups = await drive.listBackups(folderId);
+      if (!mounted) return;
+      if (backups.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('لا توجد نسخ EduNivora في مجلد Google Drive.')),
+        );
+        return;
+      }
+      final selected = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('نسخ EduNivora في Google Drive'),
+          content: SizedBox(
+            width: 420,
+            child: ListView(
+              shrinkWrap: true,
+              children: backups.map((backup) {
+                final name = backup['name'] as String;
+                final createdAt = backup['createdTime'] as String?;
+                return ListTile(
+                  leading: const Icon(Icons.cloud_download_outlined),
+                  title: Text(name),
+                  subtitle: Text(createdAt ?? 'تاريخ غير متاح'),
+                  onTap: () => Navigator.of(dialogContext).pop(backup),
+                );
+              }).toList(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('إلغاء'),
+            ),
+          ],
+        ),
+      );
+      if (selected == null || !mounted) return;
+      final fileId = selected['id'] as String;
+      final bytes = await drive.downloadArchive(fileId);
+      final archiveText = utf8.decode(bytes, allowMalformed: false);
+      if (archiveText.length > 80 * 1024 * 1024) {
+        throw const FormatException('حجم النسخة يتجاوز الحد المسموح.');
+      }
+      _restoreController.text = archiveText;
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم تنزيل النسخة المشفرة. أدخل كلمة مرورها ثم اضغط استرجاع البيانات.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر تنزيل النسخة من Google Drive: $error')),
+      );
+    } finally {
+      drive?.close();
+      if (mounted) setState(() => _isBusy = false);
     }
   }
 
@@ -480,6 +598,20 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
             'تشفير بياناتك الأكاديمية ومحتوى المرفقات بكلمة مرور قبل حفظ ملف EduNivora.',
             Icons.backup_rounded,
             _exportBackup,
+          ),
+          const SizedBox(height: 8),
+          _buildActionCard(
+            'نسخ مشفر إلى Google Drive',
+            'يرفع النسخة المشفرة إلى مجلدك المرئي EduNivora باستخدام صلاحية drive.file فقط.',
+            Icons.cloud_upload_outlined,
+            _uploadBackupToDrive,
+          ),
+          const SizedBox(height: 8),
+          _buildActionCard(
+            'استعادة نسخة من Google Drive',
+            'يعرض النسخ الموجودة في مجلد EduNivora وينزّل النسخة المختارة قبل فك تشفيرها محلياً.',
+            Icons.cloud_download_outlined,
+            _loadBackupFromDrive,
           ),
           const SizedBox(height: 18),
           const Text(
