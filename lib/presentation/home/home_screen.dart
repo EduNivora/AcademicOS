@@ -29,6 +29,7 @@ import '../notifications/upcoming_notifications_screen.dart';
 import '../schedule/weekly_schedule_screen.dart';
 import '../focus/focus_timer_screen.dart';
 import '../reports/academic_reports_screen.dart';
+import '../terms/academic_terms_screen.dart';
 import '../study_plan/study_planner_screen.dart';
 import '../task/add_edit_task_screen.dart';
 import '../screens/grade_distribution_screen.dart';
@@ -2255,6 +2256,21 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                   title: 'أدوات الإنتاجية',
                   items: [
                     _DrawerItem(
+                      icon: Icons.calendar_month_outlined,
+                      label: widget.isArabic
+                          ? 'الفصول الدراسية'
+                          : 'Academic Terms',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AcademicTermsScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    _DrawerItem(
                       icon: Icons.book_online_rounded,
                       label: widget.isArabic
                           ? 'مخطط المذاكرة الذكي'
@@ -2653,6 +2669,20 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                                             tasks: widget.taskState.tasks,
                                             exams: const [],
                                           ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  _buildServiceCard(
+                                    icon: Icons.calendar_month_outlined,
+                                    title: 'الفصول الدراسية',
+                                    subtitle: 'إنشاء الفصول وتحديد الفصل النشط',
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              const AcademicTermsScreen(),
                                         ),
                                       );
                                     },
