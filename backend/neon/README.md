@@ -77,7 +77,7 @@ The Notices API is deployed to the Neon project's default branch.
 
 - Function slug: `notices`
 - Runtime: Node.js 24
-- Active deployment: version 4
+- Active deployment: version 5
 - Invocation URL: `https://br-late-bread-bajll3is-notices.compute.c-8.eu-central-1.aws.neon.tech`
 - Health check: `GET /health` returned HTTP 200 and confirmed a database query.
 - Public feed: `GET /v1/announcements` returned HTTP 200 with an empty feed.
