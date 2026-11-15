@@ -21,11 +21,7 @@ class ScheduleValidationResult {
 class ScheduleConflictValidator {
   const ScheduleConflictValidator._();
 
-  /// Returns a validation issue instead of allowing overlapping weekly entries.
-  ///
-  /// Adjacent slots are valid: an entry ending at 10:00 does not overlap one
-  /// starting at 10:00. Invalid existing entries on the selected day are
-  /// surfaced so they cannot silently undermine conflict detection.
+  /// Adjacent entries are valid; entries that overlap on the same weekday are not.
   static ScheduleValidationResult validate({
     required String day,
     required String startTime,
@@ -54,13 +50,11 @@ class ScheduleConflictValidator {
       final entryId = rawId is int
           ? rawId
           : int.tryParse(rawId?.toString() ?? '');
-      if (excludingScheduleId != null &&
-          entryId == excludingScheduleId) {
+      if (excludingScheduleId != null && entryId == excludingScheduleId) {
         continue;
       }
 
-      final existingStart =
-          _parseMinutes(entry['start_time']?.toString());
+      final existingStart = _parseMinutes(entry['start_time']?.toString());
       final existingEnd = _parseMinutes(entry['end_time']?.toString());
       if (existingStart == null ||
           existingEnd == null ||
@@ -84,16 +78,9 @@ class ScheduleConflictValidator {
 
   static int? _parseMinutes(String? value) {
     if (value == null) return null;
-    final match = RegExp(r'^([01]\\d|2[0-3]):([0-5]\\d)
+    final match = RegExp(r'^([01]\d|2[0-3]):([0-5]\d)$').firstMatch(value);
     if (match == null) return null;
-    final hour = int.parse(match.group(1)!);
-    final minute = int.parse(match.group(2)!);
-    return hour * 60 + minute;
-  }
-}
-)
-        .firstMatch(value);
-    if (match == null) return null;
+
     final hour = int.parse(match.group(1)!);
     final minute = int.parse(match.group(2)!);
     return hour * 60 + minute;
