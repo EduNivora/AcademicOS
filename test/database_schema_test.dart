@@ -109,8 +109,9 @@ void main() {
               id: restoredMaterialId,
               courseId: restoredCourseId,
               title: 'Restored notes',
-              filePath: '/tmp/restored-notes.pdf',
+              filePath: 'dbblob://restored-notes',
               fileType: 'pdf',
+              fileBytes: Uint8List.fromList([37, 80, 68, 70, 45, 49]),
             ),
           ],
         );
