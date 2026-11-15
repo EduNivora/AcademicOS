@@ -10,8 +10,12 @@ const _correctTestKey = 'edunivora-sqlite3mc-proof-correct-key';
 const _wrongTestKey = 'edunivora-sqlite3mc-proof-wrong-key';
 const _plaintextCanary = 'EDUNIVORA_SQLITE3MC_PLAINTEXT_CANARY_9F0D';
 
-Future<void> runSqlite3McProof({required String directoryPath}) async {
+Future<void> runSqlite3McProof({
+  required String directoryPath,
+  String? correctKey,
+}) async {
   final databasePath = p.join(directoryPath, 'sqlite3mc-proof.db');
+  final proofKey = correctKey ?? _correctTestKey;
 
   Future<Database> openWithKey(String key) {
     return databaseFactoryFfi.openDatabase(
@@ -24,7 +28,7 @@ Future<void> runSqlite3McProof({required String directoryPath}) async {
     );
   }
 
-  final database = await openWithKey(_correctTestKey);
+  final database = await openWithKey(proofKey);
   try {
     await database.execute('''
       CREATE TABLE secret_payload (
@@ -70,7 +74,7 @@ Future<void> runSqlite3McProof({required String directoryPath}) async {
     );
   }
 
-  final reopened = await openWithKey(_correctTestKey);
+  final reopened = await openWithKey(proofKey);
   try {
     final schemaRows =
         await reopened.rawQuery('SELECT name FROM sqlite_master');
