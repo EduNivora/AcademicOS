@@ -45,6 +45,37 @@ References:
 - https://pub.dev/packages/sqflite_common_ffi_web/changelog
 - https://pub.dev/packages/sqflite_common
 
+## Executed isolated-proof evidence — 2026-11-15
+
+Draft [PR #12](https://github.com/EduNivora/AcademicOS/pull/12) now contains the separate package at `tool/sqlite3mc_poc/`.
+
+- Exact proof dependencies: `sqlite3 3.1.7`, `sqflite_common_ffi 2.4.0+3`, `sqflite 2.4.2`, and `flutter_secure_storage 9.2.4`.
+- SQLite3MC is selected through the `sqlite3` build hook (`source: sqlite3mc`).
+- The probe uses `databaseFactoryFfi` and verifies the standard SQLite header and a plaintext canary are absent, a wrong key cannot read `sqlite_master`, and the correct key can reopen and read the schema/row.
+- Proof head `fb0e5d1333c3c75bb6a5e7aaa84cfe8c8c857d6a` passed Linux host and Android emulator encryption tests in [run #8](https://github.com/EduNivora/AcademicOS/actions/runs/43665384937).
+- Follow-up head `bacd1c0b7bd0d78506353081645a2c74caf1e4ea` adds same-process Android coexistence checks for the existing platform `sqflite` plugin, `flutter_secure_storage`, and the candidate FFI engine. Run #13 (`43667685824`) passed dependency resolution, analysis, host encryption, Android APK build and artifact upload; its Android emulator runtime test was still in progress at the time of this update.
+- Follow-up commit `0b71a102b13ec27460dbdbc8e880d89c61f92d8f` adds `PRAGMA integrity_check` after the wrong-key attempt and correct-key reopen. New proof run [`43669623653`](https://github.com/EduNivora/AcademicOS/actions/runs/43669623653) is in progress, as is the root Flutter quality run [`43669500715`](https://github.com/EduNivora/AcademicOS/actions/runs/43669500715).
+
+This proves only the isolated FFI candidate on the recorded host/Android paths. It does not prove that production Android's current `sqflite` factory is encrypted, nor that the full AcademicOS database helper can safely switch to FFI. No production dependency, factory, schema, key lifecycle or student database was changed.
+
+## Production integration and migration gates
+
+Before production adoption, the actual AcademicOS schema and database helper must be exercised through the proposed encrypted factory. At minimum:
+
+1. Keep the current production factory unchanged while validating a test-only integration path against all schema version 10 tables and CRUD operations.
+2. Prove Android FFI coexistence with the complete production plugin set, not only `sqflite` and secure storage; repeat on a physical device.
+3. Verify Windows runtime/packaging and any other app target independently. A Linux host proof is not a Windows app proof.
+4. Verify the exact `sqlite3mc.wasm` asset and worker integration, IndexedDB persistence, reload/reopen, offline and multi-tab behavior before any Web encryption claim.
+5. Generate one cryptographically random key per database and persist it using the target platform's secure-storage mechanism. A missing key for an existing encrypted database must fail closed; never generate a replacement and create an empty database.
+6. Apply the key before schema access. Verify wrong-key rejection at `sqlite_master`, on-disk ciphertext/canary absence, `PRAGMA integrity_check`, and `PRAGMA foreign_key_check`.
+7. Define key loss, rotation, export/recovery and cross-device restore. Do not place the raw database key in a plaintext backup.
+8. Migrate only a verified copy: close handles, checkpoint/resolve WAL safely, preserve a recoverable original, build an encrypted staging database using a documented engine-supported backup/export mechanism, compare schema and row counts, run integrity/foreign-key checks, reopen with the correct key and reject a wrong key.
+9. Switch only after verification using a durable migration marker and atomic file transition. Keep the original recoverable until a successful post-migration launch.
+10. Inject failures before and after every migration state transition, close, checkpoint, write and rename. Prove restart recovery selects either the intact original or the verified encrypted copy; never leave the user with neither.
+11. Test concurrent access, WAL recovery, process termination, corruption and insufficient disk space.
+
+Do not use a raw file copy of an active WAL database as the migration mechanism. Do not treat `PRAGMA key` success by itself as evidence of encryption.
+
 ## Isolated proof required before production selection
 
 The isolated proof must not alter the production `pubspec.yaml`, production database factory, database schema, or existing user data. It must use a separate package/branch and an explicit `sqlite3mc` build-hook selection.
