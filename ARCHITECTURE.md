@@ -86,12 +86,11 @@ Current flow:
 
 Current limitations and security boundaries:
 
-- Course-material records in the JSON backup are metadata only; attachment bytes are not packaged.
-- The current material UI copies files into `Directory.systemTemp/academic_os_materials`, not a durable app-owned documents/support directory. The OS or runtime may purge this temporary location.
-- Deleting a material currently removes its database row but does not remove the copied file, so orphaned files can accumulate.
-- The Web picker path currently rejects the bytes-only result instead of storing it in browser-owned persistent storage.
-- The backup validator currently checks `file_path` only as a non-empty string. The PDF viewer consumes the stored path directly; imported absolute or traversal paths are not yet constrained to an app-owned attachment root. Treat material paths from imported backups as untrusted metadata and do not open them until attachment ownership/path containment is implemented.
-- Checksummed attachment archives, safe generated names, canonical-path containment, staged file restoration, database/file rollback, and end-to-end failure-injection coverage remain unimplemented.
+- The current implementation branch adds a SQLite `file_bytes BLOB` column and stores imported attachment bytes in the local database, which is persistent on the configured SQLite backend and also accepts bytes-only picker results.
+- Existing native records are migrated on database open only when their canonical source path remains inside the legacy `systemTemp/academic_os_materials` directory; symlink escapes and unrelated absolute paths are rejected. Failed/missing legacy files remain metadata-only and are not silently treated as backed up.
+- New JSON backup schema v3 serializes attachment bytes as base64 and validates/decodes them before the database transaction. Export refuses to label a backup complete when any legacy attachment has no stored bytes.
+- PDF preview currently materializes a short-lived temporary copy from the persisted database bytes for the native viewer; that temporary preview is not the source of truth. Web document preview remains unsupported.
+- This branch has not yet passed CI. Google Drive folder creation/upload, password-based archive encryption, checksums/manifest, encrypted restore staging/rollback, and end-to-end platform/failure-injection coverage remain unimplemented.
 - Cross-device and real-browser file picker behavior still require platform validation.
 
 A JSON export must not be represented as a complete device backup until its referenced attachment files are included and verified.
