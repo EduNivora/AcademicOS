@@ -8,7 +8,7 @@
 
 EduNivora is a guest-first, local-first personal academic workspace. It helps an individual student organize their own academic life. It is not a university information system, institutional ERP, or student administration platform.
 
-**Core rule:** academic data belongs to the student and remains on the student's device. Network services are limited to optional account identity, public notices and their minimal delivery/read receipts, and student-initiated backup to that student's own Google Drive.
+**Core rule:** academic data belongs to the student and remains on the student's device. For Release 1, network services are limited to optional account identity and public notices with minimal delivery/read receipts. Personal Google Drive backup is deferred to Release 2.
 
 ## 2. Entry and identity
 
@@ -54,39 +54,19 @@ Accounts are optional, but public notices are available to all installations, in
 
 The operator interface is strictly for notices. It is not an administration portal and has no student management, lecturer management, attendance, finance, institutional messaging, or university operations.
 
-## 5. Personal Google Drive backup
+## 5. Release 2 — deferred personal backup
 
-### Approved destination and ownership
-- Destination is a normal, visible folder named `EduNivora` in the student's own Google Drive.
-- Each student connects and authorizes their own Google account.
-- Use the narrowest practical OAuth scope and only access files created/selected by this app as permitted by the chosen Drive integration.
-- Do not use a shared organizational Drive or central pooled storage.
-- Backup is explicitly initiated by the student. Scheduled/automatic backup is not a required approved behavior at this stage.
-- This feature is backup/restore only, not live sync.
+**Decision (2026-11-15): Google Drive backup and restore are explicitly excluded from Release 1 and deferred to Release 2.** This is a deliberate release-scope decision, not a claim that backup is complete.
 
-### Backup contents
-A complete backup includes:
-- A versioned SQLite database snapshot.
-- All attachment/document bytes referenced by local records.
-- Required app settings and backup metadata.
-- A manifest with schema version, file inventory, sizes and cryptographic checksums.
+The following approved product decisions remain the target for Release 2:
+- Destination: a normal, visible `EduNivora` folder in each student's own Google Drive.
+- Backup is student-initiated and is backup/restore only, never live sync.
+- A complete archive must include the database snapshot, attachment bytes, required settings, a versioned manifest and integrity checks.
+- Encrypt before upload using a student-chosen password, a memory-hard KDF such as Argon2id, a random data-encryption key and authenticated encryption. Never persist plaintext passwords or keys.
+- Restore must validate the archive and all content before mutation, stage files, support rollback/recovery, and require explicit overwrite confirmation.
+- Release 2 acceptance must include cross-device/reinstall restore, platform tests, interrupted transfer/corruption/wrong-password/no-space failure tests, and evidence tied to the release candidate.
 
-### Encryption and key protection
-- The student chooses a backup password.
-- Use a versioned memory-hard password KDF such as Argon2id with unique salt and documented parameters to derive a key-encryption key.
-- Generate a cryptographically random data-encryption key and protect/wrap it with the derived key.
-- Encrypt backup content with authenticated encryption such as AES-256-GCM, using unique nonces.
-- The backup may contain non-secret metadata required for recovery (format version, KDF parameters, salt, nonce, wrapped data key and checksums), but never the plaintext password or plaintext encryption keys.
-- EduNivora servers must never receive or store the backup password or plaintext encryption keys.
-- Clearly warn that forgetting the backup password makes the backup unrecoverable.
-- Reject incorrect passwords and tampered/corrupted archives before modifying local data.
-
-### Restore safety
-- Validate archive format, manifest, authentication tags, checksums, schema compatibility, record relationships and attachment paths.
-- Extract into a staging area; reject traversal, symlink escapes and unsafe paths.
-- Restore files and database as one recoverable operation. Use staging, atomic replacement where supported, rollback/recovery markers, and failure-injection tests.
-- Never silently overwrite the current workspace. Show the target account/device and backup timestamp and require confirmation.
-- Test restore after reinstall and on a different supported device/platform.
+Any backup-related code already present on feature branches is retained as unaccepted work-in-progress. It must not be merged into the Release 1 branch, surfaced as an available Release 1 feature, or represented as production-ready. Reassess and rebase it when Release 2 planning begins.
 
 ## 6. Explicit exclusions
 
