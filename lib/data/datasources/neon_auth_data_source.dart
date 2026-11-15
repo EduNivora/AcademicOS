@@ -103,22 +103,21 @@ class NeonAuthDataSource {
   }
 
   Future<String?> getAccessToken() async {
-    Map<String, dynamic>? session;
+    String? responseJwt;
     try {
-      session = await getSession();
-    } on NeonAuthException catch (error) {
-      if (error.statusCode == 401) {
-        await _sessionStore.clearCookie();
-        return null;
-      }
-      rethrow;
-    }
-    if (session == null) return null;
+      final session = await _sendNullable(
+        '/get-session',
+        method: 'GET',
+        onResponse: (response) {
+          responseJwt = response.headers['set-auth-jwt']?.first;
+        },
+      );
+      if (session == null || session['session'] is! Map) return null;
 
-    try {
-      final result = await _sendNullable('/token', method: 'GET');
-      final token = result?['token'];
-      return token is String && token.isNotEmpty ? token : null;
+      final sessionData = session['session'] as Map;
+      final bodyToken = sessionData['token'];
+      if (bodyToken is String && bodyToken.isNotEmpty) return bodyToken;
+      return responseJwt?.isNotEmpty == true ? responseJwt : null;
     } on NeonAuthException catch (error) {
       if (error.statusCode == 401) {
         await _sessionStore.clearCookie();
@@ -152,6 +151,7 @@ class NeonAuthDataSource {
     String path, {
     required String method,
     Map<String, dynamic>? body,
+    void Function(PlatformHttpResponse response)? onResponse,
   }) async {
     final headers = <String, String>{
       'Accept': 'application/json',
@@ -177,6 +177,7 @@ class NeonAuthDataSource {
     if (!_webMode) {
       await _captureSessionCookie(response.headers['set-cookie'] ?? const []);
     }
+    onResponse?.call(response);
 
     final decoded = _decodeBody(response.body);
     if (response.statusCode < 200 || response.statusCode >= 300) {

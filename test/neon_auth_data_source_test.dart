@@ -113,15 +113,9 @@ void main() {
     }) async {
       credentialsIncluded = withCredentials;
       cookieHeaderSent = headers.containsKey('Cookie');
-      if (uri.path.endsWith('/get-session')) {
-        return const PlatformHttpResponse(
-          statusCode: 200,
-          body: '{"session":{"id":"session-1"},"user":{"id":"user-1","email":"student@example.com"}}',
-        );
-      }
       return const PlatformHttpResponse(
         statusCode: 200,
-        body: '{"token":"jwt-token"}',
+        body: '{"session":{"id":"session-1","token":"jwt-token"},"user":{"id":"user-1","email":"student@example.com"}}',
       );
     }
 
@@ -189,5 +183,26 @@ void main() {
 
     expect(await auth.getAccessToken(), isNull);
     expect(requestedPaths, ['/auth/get-session']);
+  });
+
+  test('reads the Neon JWT from the get-session response header when present',
+      () async {
+    final auth = NeonAuthDataSource(
+      request: (_, {
+        required String method,
+        required Map<String, String> headers,
+        String? body,
+        required bool withCredentials,
+      }) async => const PlatformHttpResponse(
+        statusCode: 200,
+        body: '{"session":{"id":"session-1"},"user":{"id":"user-1"}}',
+        headers: {'set-auth-jwt': ['header-jwt']},
+      ),
+      sessionStore: _MemorySessionStore(),
+      baseUrl: 'https://auth.example.test/auth',
+      webMode: false,
+    );
+
+    expect(await auth.getAccessToken(), 'header-jwt');
   });
 }
