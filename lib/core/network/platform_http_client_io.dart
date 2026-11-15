@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'platform_http_client.dart';
+import 'platform_http_types.dart';
 
 Future<String> platformGet(Uri uri) async {
   final client = HttpClient()..connectionTimeout = const Duration(seconds: 12);

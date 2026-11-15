@@ -1,4 +1,4 @@
-import 'platform_http_client.dart';
+import 'platform_http_types.dart';
 
 Future<String> platformGet(Uri uri) {
   throw UnsupportedError('HTTP is not supported on this platform.');

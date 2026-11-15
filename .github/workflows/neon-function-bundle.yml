@@ -1,0 +1,67 @@
+name: Build Neon function bundle
+
+concurrency:
+  group: neon-function-bundle-${{ github.ref }}
+  cancel-in-progress: false
+
+on:
+  push:
+    branches:
+      - feat/neon-managed-auth-and-notices
+    paths:
+      - "backend/neon/functions/notices/**"
+      - "package.json"
+      - "!backend/neon/dist/**"
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install root build dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Build self-contained Node.js 24 bundle
+        run: npm run build:function
+      - name: Package deployable function with runtime dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          package_dir="$RUNNER_TEMP/notices-function"
+          mkdir -p "$package_dir"
+          cp backend/neon/dist/notices.mjs "$package_dir/index.mjs"
+          cat > "$package_dir/package.json" <<'JSON'
+          {
+            "type": "module",
+            "dependencies": {
+              "@neon/functions": "0.11.0",
+              "hono": "4.9.0",
+              "jose": "6.1.0",
+              "pg": "8.16.3"
+            }
+          }
+          JSON
+          npm install --prefix "$package_dir" --omit=dev --ignore-scripts --no-audit --no-fund
+          (cd "$package_dir" && zip -qr "$RUNNER_TEMP/notices-function.zip" .)
+          base64 -w0 "$RUNNER_TEMP/notices-function.zip" > backend/neon/dist/notices-function.zip.b64
+          printf '\n' >> backend/neon/dist/notices-function.zip.b64
+      - name: Commit generated deployment artifacts
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/neon/dist/notices.mjs backend/neon/dist/notices-function.zip.b64
+          if git diff --cached --quiet; then
+            echo "Deployment artifacts are already current."
+            exit 0
+          fi
+          git commit -m "build(neon): package notices function dependencies"
+          git pull --rebase origin ${{ github.ref_name }}
+          git push origin HEAD:${{ github.ref_name }}
