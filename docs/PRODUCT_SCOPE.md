@@ -124,8 +124,8 @@ academic records, attachments, and academic reports are not stored in the
 app-owned tables.
 
 Implementation status must be reported accurately: Neon Auth and the schema are
-provisioned; backend source and automated tests are in the implementation
-branch; the API is not yet deployed and the Flutter client is not yet connected
-to Managed Auth. Production Google OAuth credentials, production SMTP, trusted
-origins, administrator bootstrap, retention policy, and end-to-end platform
-verification remain open gates.
+provisioned, and the Notices API is deployed to the Neon default branch with
+health, public-feed and unauthenticated-admin smoke checks passing. The Flutter
+client is not yet connected to Managed Auth. Production Google OAuth
+credentials, production SMTP, trusted origins, administrator bootstrap,
+retention policy, and end-to-end platform verification remain open gates.
