@@ -96,14 +96,12 @@ The current scope excludes:
 2. Optional Google and email account flows work without uploading academic records.
 3. Central database inspection confirms only approved account and notice metadata exists.
 4. Attachments persist in durable app-owned storage across restart and upgrade.
-5. Complete backup includes database and all attachment bytes.
-6. Backup is written to the student's visible Google Drive `EduNivora` folder.
-7. Wrong password, tampering, truncated upload and insufficient Drive quota fail safely.
-8. Restore succeeds after reinstall and preserves relationships and file bytes; injected failures do not leave a mixed or corrupted state.
-9. Registered notice receipts are name-linked; guest reports are anonymous aggregates.
-10. Delivery, device receipt and view are measured separately; offline/permission-denied limitations are accurately shown.
-11. Operator interface is limited to notice publishing/reporting.
-12. Automated and platform-specific tests pass on the exact release candidate SHA.
+5. Registered notice receipts are name-linked; guest reports are anonymous aggregates.
+6. Delivery, device receipt and view are measured separately; offline/permission-denied limitations are accurately shown.
+7. Operator interface is limited to notice publishing/reporting.
+8. Automated and platform-specific tests pass on the exact release candidate SHA.
+
+Google Drive backup, encrypted archives, upload and restore are Release 2 acceptance gates only; they are not Release 1 blockers.
 
 ## 9. Authoritative related documents
 
