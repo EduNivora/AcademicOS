@@ -45,6 +45,7 @@ audit records. No academic data or files may be written there.
   retained.
 - A retention period and automated purge policy for receipts/audit records must
   be approved before production acceptance.
-- The Neon Function source is committed, but deployment remains pending the
-  Neon CLI/function-create capability and end-to-end verification.
+- The Neon Function is deployed to the default branch and its health route,
+  public feed, and unauthenticated admin guard have passed live smoke tests.
+  Authenticated JWT flows and end-to-end Flutter behavior remain unverified.
 - Google Drive backup remains Release 2 and is not part of this decision.
