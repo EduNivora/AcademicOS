@@ -44,6 +44,16 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
       final schedule = await _databaseHelper.getSchedules();
       final materials = await _databaseHelper.getAllMaterials();
 
+      final missingAttachments = materials.where((row) {
+        final bytes = row['file_bytes'];
+        return bytes is! List<int> || bytes.isEmpty;
+      }).length;
+      if (missingAttachments > 0) {
+        throw StateError(
+          'تعذر إنشاء نسخة كاملة: يوجد $missingAttachments مرفق قديم بلا محتوى محفوظ. أعد إرفاق الملفات المفقودة أولاً.',
+        );
+      }
+
       final backupMaterials = materials.map((row) {
         final copy = Map<String, dynamic>.from(row);
         final bytes = copy.remove('file_bytes');
