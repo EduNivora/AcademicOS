@@ -80,11 +80,11 @@ The following decisions are binding scope for future implementation and acceptan
 | App entry | Guest-first; no login required to open or use core academic features | Fresh install opens to usable app; guest CRUD works offline; account prompts are optional |
 | Accounts | Optional Google or email/password account | Central database contains only minimum account identity/profile fields; no academic records or files |
 | Academic data | Local-only | Terms, courses, schedule, tasks, exams, notes, settings, materials and reports remain on device; no remote academic sync |
-| Attachments | Durable app-owned local storage | File bytes persist across restart/upgrade and are included in a complete backup |
-| Google Drive | Student-owned, normal visible folder named `EduNivora` | OAuth uses least-privilege access; each student writes only to their own Drive; backup is not sync |
-| Backup trigger | Explicit user-initiated backup; automatic backup is not a committed requirement | User chooses account, confirms backup password, sees progress/result and backup metadata |
-| Backup cryptography | Student-chosen password plus additional key protection | Versioned memory-hard KDF, random data key, wrapped key, authenticated encryption, no plaintext password/key persistence, wrong-password rejection |
-| Backup completeness | Database + attachment bytes + required settings/manifest | Checksums, version compatibility, safe paths, staged restore, atomic/recoverable file+DB replacement, failure-injection tests |
+| Attachments | Durable app-owned local storage | File bytes persist across restart/upgrade; backup inclusion is a Release 2 gate |
+| Google Drive backup | Deferred to Release 2; excluded from Release 1 | Do not merge or expose backup UI in Release 1; Release 2 must meet full encryption, completeness, restore and platform acceptance |
+| Backup trigger | Release 2 only | Explicit user-initiated backup; no scheduled/automatic backup requirement unless separately approved |
+| Backup cryptography | Release 2 only | Student-chosen password, memory-hard KDF, wrapped random key, authenticated encryption, tamper/wrong-password rejection |
+| Backup completeness and restore | Release 2 only | Full database, attachments, settings, manifest/checksums, staged restore, rollback, cross-device recovery and failure-injection tests |
 | Notices | Public notices for all app installations, guests and accounts | Notice appears in app; online installations can acknowledge delivery and opening |
 | Notice analytics | Named receipts for registered accounts; anonymous aggregates for guests | No guest identity or stable guest profile; delivery and read events are distinct and timestamped |
 | Operator tooling | Minimal notice publishing/reporting only | Separate protected interface; no student/lecturer/attendance/finance/university administration |
@@ -98,3 +98,10 @@ Notice delivery is not guaranteed while a device is offline or notifications are
 - Artifact `academicos-android-debug-apk`: 97,515,795 bytes; SHA-256 `cb9dbc7a7ae803aff094abe6efea26a8664ae74d81be306d04610f99883d70d4`; expires 2026-11-29.
 - This CI run predates the documentation commit recording these approved decisions; rerun CI on the resulting documentation commit before claiming that new head is verified.
 - No PR merge is implied by this documentation update.
+
+
+## Release boundary decision — 2026-11-15
+
+Google Drive backup, encrypted archive export/import, upload/download and backup-specific UI are **deferred to Release 2**. They are not Release 1 acceptance gates and must not delay the core academic application, optional accounts, public notices, local persistence, security hardening or Release 1 validation.
+
+Existing PRs/branches for backup are parked as draft work. Do not merge them into the Release 1 integration branch. Reassess their code, dependencies and security assumptions during Release 2 planning; passing isolated tests does not change the release boundary.
