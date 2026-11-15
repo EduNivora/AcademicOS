@@ -69,3 +69,32 @@ A domain moves to **Accepted** only when:
 5. Evidence is linked to the exact commit/release candidate.
 
 Do not calculate an overall completion percentage from screen count or source-file presence. The matrix must be updated with test evidence, platform results and unresolved defects before any release-readiness claim.
+
+
+## Approved product decisions — 2026-11-15
+
+The following decisions are binding scope for future implementation and acceptance. They supersede any older wording in this matrix that implies mandatory login, academic cloud sync, or server-side academic data storage.
+
+| Area | Approved decision | Acceptance criteria |
+|---|---|---|
+| App entry | Guest-first; no login required to open or use core academic features | Fresh install opens to usable app; guest CRUD works offline; account prompts are optional |
+| Accounts | Optional Google or email/password account | Central database contains only minimum account identity/profile fields; no academic records or files |
+| Academic data | Local-only | Terms, courses, schedule, tasks, exams, notes, settings, materials and reports remain on device; no remote academic sync |
+| Attachments | Durable app-owned local storage | File bytes persist across restart/upgrade and are included in a complete backup |
+| Google Drive | Student-owned, normal visible folder named `EduNivora` | OAuth uses least-privilege access; each student writes only to their own Drive; backup is not sync |
+| Backup trigger | Explicit user-initiated backup; automatic backup is not a committed requirement | User chooses account, confirms backup password, sees progress/result and backup metadata |
+| Backup cryptography | Student-chosen password plus additional key protection | Versioned memory-hard KDF, random data key, wrapped key, authenticated encryption, no plaintext password/key persistence, wrong-password rejection |
+| Backup completeness | Database + attachment bytes + required settings/manifest | Checksums, version compatibility, safe paths, staged restore, atomic/recoverable file+DB replacement, failure-injection tests |
+| Notices | Public notices for all app installations, guests and accounts | Notice appears in app; online installations can acknowledge delivery and opening |
+| Notice analytics | Named receipts for registered accounts; anonymous aggregates for guests | No guest identity or stable guest profile; delivery and read events are distinct and timestamped |
+| Operator tooling | Minimal notice publishing/reporting only | Separate protected interface; no student/lecturer/attendance/finance/university administration |
+| Cloud sync | Excluded | No academic records/files replicated or synchronized to EduNivora servers |
+
+Notice delivery is not guaranteed while a device is offline or notifications are disabled. Anonymous guest analytics must remain aggregate and must not be used to reconstruct a guest identity. The encrypted Drive archive does not satisfy the separate production SQLite-at-rest encryption requirement.
+
+### Current CI baseline at decision adoption
+- PR #1 remains open and Draft; current head: `a3ba380e9e6bf52c36d5a3c55409c4331a1c200a`.
+- Workflow run #161 (`43733424952`) completed successfully on that exact SHA: dependency resolution, Dart analysis, Flutter tests, Android Debug APK build, and artifact upload all passed.
+- Artifact `academicos-android-debug-apk`: 97,515,795 bytes; SHA-256 `cb9dbc7a7ae803aff094abe6efea26a8664ae74d81be306d04610f99883d70d4`; expires 2026-11-29.
+- This CI run predates the documentation commit recording these approved decisions; rerun CI on the resulting documentation commit before claiming that new head is verified.
+- No PR merge is implied by this documentation update.
