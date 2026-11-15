@@ -257,4 +257,68 @@ void main() {
       }
     });
 
+
+    test('metadata-only backup cannot discard existing attachment bytes', () async {
+      final helper = DatabaseHelper.instance;
+      await helper.close();
+      const courseId = 987663;
+      const materialId = 987664;
+      await helper.deleteMaterial(materialId);
+      await helper.deleteCourse(courseId);
+      final bytes = Uint8List.fromList([37, 80, 68, 70]);
+      try {
+        await helper.insertCourse(
+          const CourseModel(
+            id: courseId,
+            name: 'Protected attachment',
+            instructor: 'Instructor',
+            code: 'SAFE-1',
+            credits: 3,
+          ),
+        );
+        await helper.insertMaterial({
+          'id': materialId,
+          'course_id': courseId,
+          'title': 'protected.pdf',
+          'file_path': 'dbblob://protected',
+          'file_type': 'pdf',
+          'file_bytes': bytes,
+        });
+
+        await expectLater(
+          helper.replaceAcademicData(
+            courses: const [
+              CourseModel(
+                id: courseId,
+                name: 'Protected attachment',
+                instructor: 'Instructor',
+                code: 'SAFE-1',
+                credits: 3,
+              ),
+            ],
+            tasks: const [],
+            exams: const [],
+            schedules: const [],
+            materials: [
+              CourseMaterialModel(
+                id: materialId,
+                courseId: courseId,
+                title: 'protected.pdf',
+                filePath: '/legacy/metadata-only.pdf',
+                fileType: 'pdf',
+              ),
+            ],
+          ),
+          throwsA(isA<StateError>()),
+        );
+
+        final row = await helper.getMaterialById(materialId);
+        expect(row?['file_bytes'], bytes);
+      } finally {
+        await helper.deleteMaterial(materialId);
+        await helper.deleteCourse(courseId);
+        await helper.close();
+      }
+    });
+
 }
