@@ -118,3 +118,45 @@ test("announcement input is bounded and validated", async () => {
   });
   assert.equal(response.status, 400);
 });
+
+test("guest delivery is recorded as an aggregate event without identity", async () => {
+  const pool = createPool();
+  const response = await makeApp({ pool }).request(
+    `/v1/announcements/${announcementId}/guest-delivered`,
+    { method: "POST" },
+  );
+  assert.equal(response.status, 204);
+  const metricCall = pool.calls.find((call) =>
+    call.sql.includes("announcement_guest_daily_metrics"),
+  );
+  assert.ok(metricCall);
+  assert.equal(metricCall.params.length, 1);
+});
+
+test("administrator can list drafts and filter by status", async () => {
+  const pool = createPool({ role: "admin" });
+  const app = createApp({
+    pool,
+    verifyIdentity: async () => ({ sub: userId }),
+  });
+  const response = await app.request("/v1/admin/announcements?status=draft", {
+    headers: { Authorization: "Bearer valid" },
+  });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { items: [] });
+});
+
+test("wildcard CORS echoes the requesting origin for public app access", async () => {
+  const app = createApp({
+    pool: createPool(),
+    verifyIdentity: async () => null,
+    allowedOrigins: ["*"],
+  });
+  const response = await app.request("/v1/announcements", {
+    headers: { Origin: "https://student.example.test" },
+  });
+  assert.equal(
+    response.headers.get("Access-Control-Allow-Origin"),
+    "https://student.example.test",
+  );
+});
