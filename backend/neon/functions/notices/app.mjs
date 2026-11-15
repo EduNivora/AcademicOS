@@ -260,6 +260,27 @@ export function createApp({ pool, verifyIdentity, allowedOrigins = [] }) {
 
   app.use("/v1/admin/*", requireAdmin);
 
+  app.get("/v1/admin/announcements", async (c) => {
+    const requestedLimit = Number.parseInt(c.req.query("limit") ?? "50", 10);
+    const limit = Number.isFinite(requestedLimit)
+      ? Math.min(Math.max(requestedLimit, 1), 100)
+      : 50;
+    const status = c.req.query("status") ?? null;
+    if (status !== null && !["draft", "published", "archived"].includes(status)) {
+      return jsonError(c, 400, "invalid_status", "Unsupported announcement status.");
+    }
+
+    const result = await pool.query(
+      `SELECT id, title, body, status, published_at, created_at, updated_at
+         FROM public.announcements
+        WHERE ($2::text IS NULL OR status = $2)
+        ORDER BY created_at DESC, id DESC
+        LIMIT $1`,
+      [limit, status],
+    );
+    return c.json({ items: result.rows });
+  });
+
   app.post("/v1/admin/announcements", async (c) => {
     const input = await c.req.json().catch(() => null);
     const title = typeof input?.title === "string" ? input.title.trim() : "";
