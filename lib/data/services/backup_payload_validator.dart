@@ -72,6 +72,10 @@ class BackupPayloadValidator {
     final materialRows = materialValue == null
         ? null
         : rows('materials', isRequired: true);
+    if (schema == 'academic_os_backup_v3' &&
+        materialRows!.any((row) => row['file_bytes_base64'] is! String)) {
+      throw const FormatException('Backup v3 must include bytes for every attachment.');
+    }
 
     for (final row in courseRows) {
       _validateCourse(row);
