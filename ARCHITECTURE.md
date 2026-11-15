@@ -193,8 +193,10 @@ pool). It verifies Managed Auth JWTs using the branch JWKS and performs
 server-side role checks. The database URL and Auth keys must never be shipped
 inside the Flutter client.
 
-Current implementation boundary: Neon Auth and database schema are provisioned;
-the API source and tests are on `feat/neon-managed-auth-and-notices`. Deployment,
+Current implementation boundary: Neon Auth and database schema are provisioned,
+and the Notices API is deployed to the Neon default branch. Health and public
+feed smoke tests pass; unauthenticated admin access is rejected. The API source,
+tests and deployment artifact are on `feat/neon-managed-auth-and-notices`.
 Flutter integration, production OAuth/SMTP setup, trusted origins, admin
 bootstrap, and receipt-retention policy are not yet accepted. Existing Flutter
 authentication remains local until the managed client is implemented and
