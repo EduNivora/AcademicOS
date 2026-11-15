@@ -17,6 +17,15 @@ function createPool({ role = "user" } = {}) {
       if (sql.includes("INSERT INTO public.app_users")) {
         return { rowCount: 1, rows: [{ id: userId, display_name: "Test User", email: "test@example.com", role }] };
       }
+      if (sql.includes("INSERT INTO public.announcement_deliveries")) {
+        return { rowCount: 1, rows: [{ announcement_id: announcementId }] };
+      }
+      if (sql.includes("INSERT INTO public.announcement_reads")) {
+        return { rowCount: 1, rows: [{ announcement_id: announcementId }] };
+      }
+      if (sql.includes("SELECT 1 FROM public.announcements")) {
+        return { rowCount: 1, rows: [{ "?column?": 1 }] };
+      }
       if (sql.includes("INSERT INTO public.announcement_guest_daily_metrics")) {
         return { rowCount: 1, rows: [{ views_count: "1", delivered_count: "1" }] };
       }
@@ -85,6 +94,40 @@ test("registered delivery endpoint rejects requests without bearer token", async
   );
   assert.equal(response.status, 401);
   assert.equal(pool.calls.length, 0);
+});
+
+
+test("registered delivery receipt is linked to the authenticated account", async () => {
+  const pool = createPool();
+  const response = await makeApp({ pool }).request(
+    `/v1/announcements/${announcementId}/delivered`,
+    {
+      method: "POST",
+      headers: { Authorization: "Bearer valid" },
+    },
+  );
+  assert.equal(response.status, 204);
+  assert.ok(pool.calls.some((call) =>
+    call.sql.includes("INSERT INTO public.announcement_deliveries"),
+  ));
+  assert.ok(pool.calls.some((call) =>
+    call.sql.includes('FROM neon_auth."user"'),
+  ));
+});
+
+test("registered read receipt is linked to the authenticated account", async () => {
+  const pool = createPool();
+  const response = await makeApp({ pool }).request(
+    `/v1/announcements/${announcementId}/read`,
+    {
+      method: "POST",
+      headers: { Authorization: "Bearer valid" },
+    },
+  );
+  assert.equal(response.status, 204);
+  assert.ok(pool.calls.some((call) =>
+    call.sql.includes("INSERT INTO public.announcement_reads"),
+  ));
 });
 
 test("non-admin accounts cannot create announcements", async () => {
