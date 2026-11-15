@@ -126,6 +126,10 @@ app-owned tables.
 Implementation status must be reported accurately: Neon Auth and the schema are
 provisioned, and the Notices API is deployed to the Neon default branch with
 health, public-feed and unauthenticated-admin smoke checks passing. The Flutter
-client is not yet connected to Managed Auth. Production Google OAuth
-credentials, production SMTP, trusted origins, administrator bootstrap,
-retention policy, and end-to-end platform verification remain open gates.
+client now contains the Neon email/password and OTP authentication adapter,
+native secure session-cookie storage, Web credential-cookie transport, and
+Bearer-token receipt integration. These client paths have automated unit tests,
+but real-account Android/Web end-to-end acceptance is still open. Production
+Google OAuth credentials, production SMTP, the final Web trusted origin,
+controlled first-admin bootstrap, retention policy, guest metric abuse controls,
+and end-to-end platform verification remain open gates.

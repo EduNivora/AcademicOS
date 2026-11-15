@@ -66,11 +66,15 @@ public release. Neon currently reports a shared Google OAuth provider for
 development. Production Google sign-in requires the project's own Google OAuth
 client ID and secret, plus verified redirect/trusted-origin configuration.
 
-The Flutter app still uses its existing local authentication implementation.
-Do not claim central account sign-in is integrated into Flutter until the
-mobile/web client, secure session lifecycle, offline behavior, and end-to-end
-flows have been implemented and tested. Guest academic use must remain available
-when the network is unavailable.
+The Flutter client now contains a Neon Managed Auth REST adapter for email
+sign-up/sign-in, email-verification OTP, session restoration, sign-out, and JWT
+retrieval. Native session cookies are persisted through Flutter Secure Storage;
+Web requests use browser-managed credential cookies. The login and registration
+screens use email/password and OTP verification, while guest access remains
+available without a network connection. This implementation has unit coverage,
+but real-account end-to-end flows on Android and Web are not yet accepted.
+Production Web authentication is blocked until the actual deployed origin is
+added to Neon trusted origins and credentialed CORS is verified.
 
 ## Deployment
 
@@ -96,14 +100,18 @@ readiness. Those remain explicit acceptance gates.
 Never commit `.env`, `.env.local`, `DATABASE_URL`, OAuth secrets, or Auth
 tokens. Never place database credentials in the Flutter client.
 
-## Flutter guest feed
+## Flutter announcements and receipts
 
-The Flutter implementation now includes a public announcements screen backed by
-`GET /v1/announcements`. It caches the latest feed in local SharedPreferences
-so previously fetched notices remain readable offline. Opening a notice records
-an aggregate guest-view event. A successful guest-delivery acknowledgement is
-deduplicated across app restarts using a bounded local list of up to 500 notice
-IDs; the list is never uploaded and contains no guest identity. These remain
-event counts, not unique guest counts, and clearing app/browser storage can cause
-an acknowledgement to be counted again. Flutter client CI and Web CORS
-verification remain pending.
+The Flutter client loads the public feed from `GET /v1/announcements` and
+caches it locally for offline reading. Registered users obtain a short-lived
+Neon Auth JWT from `GET /token`; the client sends it as a Bearer token to the
+registered delivery and read-receipt endpoints. Guest installations use only
+anonymous aggregate delivery/view counters. If token retrieval fails, the
+client skips metrics rather than misclassifying a signed-in account as a guest.
+
+Guest delivery acknowledgement is deduplicated across app restarts using a
+bounded local list of up to 500 notice IDs. That list is never uploaded and
+contains no guest identity. Clearing app/browser storage can cause a later
+acknowledgement to be counted again. Flutter unit tests cover the transport and
+routing decisions; exact-head Flutter CI and live JWT-backed database receipts
+remain acceptance gates.
