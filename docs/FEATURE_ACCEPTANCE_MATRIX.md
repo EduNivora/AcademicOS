@@ -14,7 +14,7 @@
 
 | Domain | Current status | Existing evidence | Acceptance still required |
 |---|---|---|---|
-| Student workspace and academic setup | Present / unverified | Local-first Flutter application; student data models and settings exist | First-run flow, create/edit/delete academic terms and student-defined structure, empty states, data ownership and reset behavior |
+| Student workspace and academic setup | Implemented / not fully verified | Local SQLite academic-term schema v12, validated term model, transactional create/edit/activate/delete operations, and student-facing semester screen on PR #1 head `2870c77449aa9eb0f929c5f6838c83dfa207da87` | Fresh-install and upgrade migration tests, duplicate-name and single-active-term constraints, linked-course rename/delete behavior, full UI workflow and platform acceptance |
 | Courses | Present / partially verified | Course model/use-case tests; database schema tests | Full CRUD UI integration, course relationships, validation, duplicate handling, migration coverage |
 | Tasks and deadlines | Present / partially verified | Task model and use-case tests; database tests | Recurrence, priorities, overdue transitions, reminders, course linkage, offline/error states |
 | Weekly schedule | Present / unverified | Schedule persistence and UI are present in source | Conflict detection, recurring events, timezone/DST behavior, notification scheduling and permission denial |
