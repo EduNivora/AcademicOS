@@ -95,7 +95,7 @@ Current limitations and security boundaries:
 
 A JSON export must not be represented as a complete device backup until its referenced attachment files are included and verified.
 
-## 8. Quality and verification
+**Release boundary:** Google Drive backup, password-protected backup archives and their upload/restore integrations are deferred to Release 2. Backup feature branches are parked and must not be merged into the Release 1 integration branch. Any existing backup UI must remain hidden/disabled in Release 1; do not claim that the current JSON export or in-progress integrations constitute a complete backup solution. The Release 1 team must still preserve durable local attachment storage because it is core local data persistence, not a backup feature.\n\n## 8. Quality and verification
 
 The GitHub Actions workflow `.github/workflows/flutter-quality.yml` runs:
 
@@ -131,7 +131,7 @@ The following are explicit engineering work items, not implemented capabilities:
 
 ## 11. Approved product scope — Local-first student application
 
-The approved product direction is **Local-First + Optional Account + Personal Google Drive Backup**. The application must open and remain useful without authentication or network access.
+The Release 1 product direction is **Local-First + Optional Account + Public Notices**. Personal Google Drive backup is deferred to Release 2. The application must open and remain useful without authentication or network access.
 
 ### Guest and account flows
 - A student may enter the application immediately as a guest; account creation is optional.
@@ -143,7 +143,7 @@ The approved product direction is **Local-First + Optional Account + Personal Go
 ### Local academic data
 Courses, terms, schedules, tasks, exams, notes, materials, attachments, preferences, and derived academic reports are local-only. Store attachments in durable app-owned storage, never a temporary directory. All routine academic CRUD must work offline.
 
-### Personal Google Drive backup (backup, not sync)
+### Release 2 — personal Google Drive backup (deferred; not part of Release 1)
 - Backup destination: a normal, user-visible folder named `EduNivora` in the student's own Google Drive.
 - Each student authorizes their own Google account; do not use a shared organization Drive or an application-owned pooled storage account.
 - Backup is explicitly initiated by the student. Automatic/scheduled backup is not approved as a required behavior in this scope.
