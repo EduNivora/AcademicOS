@@ -398,6 +398,24 @@ class DatabaseHelper {
         }
       }
 
+      if (materials != null && materials.any((material) => material.fileBytes == null)) {
+        final existingRows = await txn.query(
+          _materialsTable,
+          columns: ['file_bytes'],
+        );
+        final wouldDiscardStoredBytes = existingRows.any(
+          (row) => row['file_bytes'] is List<int> &&
+              (row['file_bytes'] as List<int>).isNotEmpty,
+        );
+        if (wouldDiscardStoredBytes) {
+          throw StateError(
+            'This metadata-only backup does not contain attachment bytes and '
+            'cannot replace the current workspace without losing stored files. '
+            'Use a complete v3 backup.',
+          );
+        }
+      }
+
       // Delete dependent records before their parent courses.
       if (materials != null) {
         await txn.delete(_materialsTable);
