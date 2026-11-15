@@ -26,6 +26,7 @@ import '../course/course_detail_screen.dart';
 import '../course/course_list_screen.dart';
 import '../../core/notifications/notification_service.dart';
 import '../notifications/upcoming_notifications_screen.dart';
+import '../announcements/announcements_screen.dart';
 import '../schedule/weekly_schedule_screen.dart';
 import '../focus/focus_timer_screen.dart';
 import '../reports/academic_reports_screen.dart';
@@ -2245,6 +2246,19 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                               tasks: widget.taskState.tasks,
                               exams: const [],
                             ),
+                          ),
+                        );
+                      },
+                    ),
+                    _DrawerItem(
+                      icon: Icons.campaign_outlined,
+                      label: widget.isArabic ? 'التعميمات' : 'Announcements',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AnnouncementsScreen(),
                           ),
                         );
                       },
