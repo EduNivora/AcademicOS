@@ -128,3 +128,43 @@ The following are explicit engineering work items, not implemented capabilities:
 - Keep secrets out of logs and source control.
 - Do not claim encryption, synchronization, platform support, or release readiness without reproducible evidence.
 - Add regression tests with every persistence, authentication, migration, or backup change.
+
+
+## 11. Approved product scope — Local-first student application
+
+The approved product direction is **Local-First + Optional Account + Personal Google Drive Backup**. The application must open and remain useful without authentication or network access.
+
+### Guest and account flows
+- A student may enter the application immediately as a guest; account creation is optional.
+- Students may create/sign in to an account using Google or email/password.
+- The central account database stores only the minimum identity/account fields required for authentication and account-linked notice receipts (for example, internal account ID, display name, email, provider identifier, and account timestamps/status).
+- Academic records and academic files remain on the student's device. They are not uploaded to an EduNivora-operated cloud database and are not synchronized between devices.
+- A guest can use local academic features and receive public notices without creating an account.
+
+### Local academic data
+Courses, terms, schedules, tasks, exams, notes, materials, attachments, preferences, and derived academic reports are local-only. Store attachments in durable app-owned storage, never a temporary directory. All routine academic CRUD must work offline.
+
+### Personal Google Drive backup (backup, not sync)
+- Backup destination: a normal, user-visible folder named `EduNivora` in the student's own Google Drive.
+- Each student authorizes their own Google account; do not use a shared organization Drive or an application-owned pooled storage account.
+- Backup is explicitly initiated by the student. Automatic/scheduled backup is not approved as a required behavior in this scope.
+- A complete backup includes the local database, attachment bytes, and required app settings/metadata, with a versioned manifest and integrity checks.
+- Encrypt the archive before upload. Use a student-chosen backup password and additional key protection (envelope/key-wrapping design); never store the password or plaintext encryption keys on the server or inside the backup.
+- Derive a key-encryption key using a memory-hard password KDF (Argon2id with versioned parameters), generate a random data-encryption key, and wrap that key. Encrypt backup content using an authenticated encryption mode such as AES-256-GCM. Record only non-secret KDF/encryption parameters, salts, nonces, wrapped key material, version, and checksums needed for restore.
+- A forgotten backup password means the encrypted backup cannot be recovered; explain this clearly before the first backup.
+- Restore must validate the manifest, authentication tag, checksums, schema version, attachment paths, and all payload data before committing. Stage files first and use a recoverable/atomic database-and-file replacement strategy. Never overwrite current data silently.
+- Google Drive is a personal backup destination only; it is not a live sync engine or a source of routine application reads/writes.
+
+### Public notices and minimal operator console
+- Notices are centrally authored and published to all application installations, including guests and registered accounts.
+- Delivery/read tracking is distinct: server acceptance, device delivery acknowledgement, and user opening the notice are separate events.
+- For registered accounts, the operator's notice report may show the student's account name and timestamps for delivery/read receipts.
+- For guests, retain anonymous aggregate delivery/read counts only; do not expose a guest identity or stable personal profile.
+- A minimal, separately protected operator interface may create/edit/publish notices and inspect notice reports only. It is not a university administration portal and must not grow into student, lecturer, attendance, finance, or institutional management.
+- Actual delivery depends on connectivity, notification permission, platform push capability, and the installation checking in; never claim guaranteed instantaneous delivery to offline devices.
+
+### Explicit exclusions
+No institutional portal, lecturer portal, student administration, official university attendance integration, institutional messaging/email, tuition/fees/payments, university dashboards, academic cloud sync, or server-side storage of student academic records/files.
+
+### Security distinction
+Encrypted Google Drive backups do not imply that the live SQLite database is encrypted at rest. Production database encryption remains a separate security/release gate and must not be claimed until implemented and tested.
