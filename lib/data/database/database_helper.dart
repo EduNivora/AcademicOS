@@ -5,6 +5,7 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
+import '../models/academic_term_model.dart';
 import '../models/course_material_model.dart';
 import '../models/course_model.dart';
 import '../models/exam_model.dart';
@@ -36,7 +37,7 @@ class DatabaseHelper {
   static bool _nativeFactoryInitialized = false;
 
   static const String _databaseName = 'academic_os.db';
-  static const int _databaseVersion = 11;
+  static const int _databaseVersion = 12;
   static const String _materialsTable = 'course_materials';
   static const String _taskTable = 'tasks';
   static const String _courseTable = 'courses';
@@ -248,6 +249,27 @@ class DatabaseHelper {
         created_at TEXT
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS academic_terms (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        start_date TEXT NOT NULL,
+        end_date TEXT NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        CHECK (length(trim(name)) BETWEEN 1 AND 80),
+        CHECK (start_date <= end_date)
+      )
+    ''');
+    await db.execute(
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_academic_terms_name '
+      'ON academic_terms(name COLLATE NOCASE)',
+    );
+    await db.execute(
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_academic_terms_single_active '
+      'ON academic_terms(is_active) WHERE is_active = 1',
+    );
   }
 
   Future<void> _onUpgradeDatabase(
@@ -269,6 +291,28 @@ class DatabaseHelper {
     }
     if (oldVersion < 11) {
       await _ensureColumn(db, _materialsTable, 'file_bytes', 'BLOB');
+    }
+    if (oldVersion < 12) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS academic_terms (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          start_date TEXT NOT NULL,
+          end_date TEXT NOT NULL,
+          is_active INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL,
+          CHECK (length(trim(name)) BETWEEN 1 AND 80),
+          CHECK (start_date <= end_date)
+        )
+      ''');
+      await db.execute(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_academic_terms_name '
+        'ON academic_terms(name COLLATE NOCASE)',
+      );
+      await db.execute(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_academic_terms_single_active '
+        'ON academic_terms(is_active) WHERE is_active = 1',
+      );
     }
     if (oldVersion < 2) {
       await _ensureColumn(
@@ -525,6 +569,137 @@ class DatabaseHelper {
   Future<List<Map<String, dynamic>>> getAllMaterials() async {
     final db = await database;
     return db.query(_materialsTable, orderBy: 'created_at DESC');
+  }
+
+
+  /// Returns all student-defined academic terms in chronological order.
+  Future<List<AcademicTermModel>> getAcademicTerms() async {
+    final db = await database;
+    final rows = await db.query(
+      'academic_terms',
+      orderBy: 'start_date DESC, id DESC',
+    );
+    return rows.map(AcademicTermModel.fromMap).toList(growable: false);
+  }
+
+  Future<AcademicTermModel?> getActiveAcademicTerm() async {
+    final db = await database;
+    final rows = await db.query(
+      'academic_terms',
+      where: 'is_active = 1',
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return AcademicTermModel.fromMap(rows.single);
+  }
+
+  Future<int> insertAcademicTerm(AcademicTermModel term) async {
+    term.validate();
+    final db = await database;
+    return db.transaction((txn) async {
+      if (term.isActive) {
+        await txn.update('academic_terms', {'is_active': 0});
+      }
+      return txn.insert('academic_terms', term.toMap());
+    });
+  }
+
+  Future<int> updateAcademicTerm(AcademicTermModel term) async {
+    term.validate();
+    final id = term.id;
+    if (id == null) {
+      throw ArgumentError('An academic term ID is required for updates.');
+    }
+    final db = await database;
+    return db.transaction((txn) async {
+      final existing = await txn.query(
+        'academic_terms',
+        columns: ['name'],
+        where: 'id = ?',
+        whereArgs: [id],
+        limit: 1,
+      );
+      if (existing.isEmpty) {
+        throw StateError('The academic term no longer exists.');
+      }
+
+      final previousName = existing.single['name'] as String;
+      if (previousName.trim().toLowerCase() != term.name.trim().toLowerCase()) {
+        // Course.semester is the existing relationship field. Keep that
+        // relationship intact when a student renames a term.
+        await txn.update(
+          _courseTable,
+          {'semester': term.name.trim()},
+          where: 'semester = ?',
+          whereArgs: [previousName],
+        );
+      }
+      if (term.isActive) {
+        await txn.update(
+          'academic_terms',
+          {'is_active': 0},
+          where: 'id != ?',
+          whereArgs: [id],
+        );
+      }
+      return txn.update(
+        'academic_terms',
+        term.toMap()..remove('id'),
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    });
+  }
+
+  Future<void> setActiveAcademicTerm(int id) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      final changed = await txn.update(
+        'academic_terms',
+        {'is_active': 0},
+      );
+      final selected = await txn.update(
+        'academic_terms',
+        {'is_active': 1},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      if (selected != 1) {
+        throw StateError('The selected academic term does not exist.');
+      }
+    });
+  }
+
+  Future<int> deleteAcademicTerm(int id) async {
+    final db = await database;
+    return db.transaction((txn) async {
+      final rows = await txn.query(
+        'academic_terms',
+        where: 'id = ?',
+        whereArgs: [id],
+        limit: 1,
+      );
+      if (rows.isEmpty) return 0;
+
+      final name = rows.single['name'] as String;
+      final linkedCourses = await txn.query(
+        _courseTable,
+        columns: ['id'],
+        where: 'semester = ?',
+        whereArgs: [name],
+        limit: 1,
+      );
+      if (linkedCourses.isNotEmpty) {
+        throw StateError(
+          'لا يمكن حذف هذا الفصل لأنه مرتبط بمقررات. انقل المقررات إلى فصل آخر أولاً.',
+        );
+      }
+      return txn.delete(
+        'academic_terms',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    });
   }
 
   Future<void> close() async {
