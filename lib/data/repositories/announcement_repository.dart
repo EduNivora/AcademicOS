@@ -98,8 +98,14 @@ class AnnouncementRepository {
           '/v1/announcements/${announcement.id}/guest-delivered',
         ),
       ).timeout(const Duration(seconds: 12));
+    } catch (_) {
+      // A failed acknowledgement remains eligible for retry on a later fetch.
+      _deliveredInSession.remove(announcement.id);
+      return;
+    }
 
-      persistedIds.add(announcement.id);
+    persistedIds.add(announcement.id);
+    try {
       final preferences = await SharedPreferences.getInstance();
       final retained = persistedIds.toList(growable: false);
       final bounded = retained.length > _maxRememberedGuestDeliveries
@@ -107,8 +113,7 @@ class AnnouncementRepository {
           : retained;
       await preferences.setStringList(_guestDeliveredIdsKey, bounded);
     } catch (_) {
-      // A failed acknowledgement remains eligible for retry on a later fetch.
-      _deliveredInSession.remove(announcement.id);
+      // Keep the in-memory marker even if durable preference storage fails.
     }
   }
 
