@@ -206,7 +206,20 @@ test("administrator can list drafts and filter by status", async () => {
   assert.deepEqual(await response.json(), { items: [] });
 });
 
-test("wildcard CORS echoes the requesting origin for public app access", async () => {
+test("CORS allows only an explicitly configured application origin", async () => {
+  const app = makeApp();
+  const allowed = await app.request("/v1/announcements", {
+    headers: { Origin: "https://app.example.test" },
+  });
+  assert.equal(allowed.headers.get("Access-Control-Allow-Origin"), "https://app.example.test");
+
+  const denied = await app.request("/v1/announcements", {
+    headers: { Origin: "https://untrusted.example.test" },
+  });
+  assert.equal(denied.headers.get("Access-Control-Allow-Origin"), null);
+});
+
+test("wildcard CORS configuration does not authorize arbitrary origins", async () => {
   const app = createApp({
     pool: createPool(),
     verifyIdentity: async () => null,
@@ -215,8 +228,5 @@ test("wildcard CORS echoes the requesting origin for public app access", async (
   const response = await app.request("/v1/announcements", {
     headers: { Origin: "https://student.example.test" },
   });
-  assert.equal(
-    response.headers.get("Access-Control-Allow-Origin"),
-    "https://student.example.test",
-  );
+  assert.equal(response.headers.get("Access-Control-Allow-Origin"), null);
 });
