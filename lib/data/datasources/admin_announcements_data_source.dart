@@ -99,7 +99,7 @@ class AdminAnnouncementsDataSource {
       accessToken: accessToken,
       body: {'title': title, 'body': body},
     );
-    return Map<String, dynamic>.from(response['announcement'] as Map);
+    return Map<String, dynamic>.from(response['item'] as Map);
   }
 
   Future<Map<String, dynamic>> update({
@@ -114,7 +114,7 @@ class AdminAnnouncementsDataSource {
       accessToken: accessToken,
       body: {'title': title, 'body': body},
     );
-    return Map<String, dynamic>.from(response['announcement'] as Map);
+    return Map<String, dynamic>.from(response['item'] as Map);
   }
 
   Future<void> publish({
