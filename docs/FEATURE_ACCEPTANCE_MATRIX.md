@@ -44,7 +44,7 @@
 
 | Target / gate | Current status | Acceptance evidence required |
 |---|---|---|
-| Android | CI build verified on commit `5b9935817cc0080ad9e8ee9b1037e1312b6c0a8d` | Workflow run `43646657252` completed successfully: Dart analysis, Flutter tests, Android debug APK build, and artifact upload. Physical-device install and smoke tests remain outstanding |
+| Android | CI Debug build verified on commit `5c119d427a9469c8e6fe8aa95b10bc5b284163f3` | Workflow run `43650825614` (#113) completed successfully on this exact SHA: dependency resolution, Dart analysis, Flutter tests, Android Debug APK build, and artifact upload. Physical-device install, runtime, upgrade, and release-signing tests remain outstanding |
 | Web | Configured in repository; runtime acceptance unverified | Production build, browser persistence, file picker, refresh/reopen, offline and supported-browser tests |
 | Windows | Configured in repository; runtime acceptance unverified | Windows release build, installer/runtime dependencies, database persistence and file access tests |
 | iOS | Not established by current repository configuration | Add/verify platform project, build, signing, secure storage, notifications and device tests before claiming support |
@@ -57,7 +57,7 @@
 
 The earlier run on commit `fc493b366c81f1cd6f47ac811a5209f310b442ff` failed at Android APK build because the runner lacked Android NDK `27.0.12077973`. The workflow was updated to provision the Android SDK/NDK and CMake.
 
-The subsequent run `43646657252` on commit `5b9935817cc0080ad9e8ee9b1037e1312b6c0a8d` completed successfully. Its recorded steps confirm successful dependency resolution, Dart analysis, Flutter tests, Android debug APK build, and APK artifact upload. This is CI build evidence only; it does not replace physical-device installation, runtime, upgrade, or release-signing tests. Results must remain tied to their exact commit SHA.
+The subsequent run `43646657252` on commit `5b9935817cc0080ad9e8ee9b1037e1312b6c0a8d` completed successfully. The latest run `43650825614` (#113) also completed successfully on commit `5c119d427a9469c8e6fe8aa95b10bc5b284163f3`; GitHub Actions records successful dependency resolution, Dart analysis, Flutter tests, Android Debug APK build, and artifact upload. The uploaded Debug APK artifact is 97,515,801 bytes and expires on 2026-11-28. This is CI build evidence only; it does not replace physical-device installation, runtime, upgrade, or release-signing tests. Results must remain tied to their exact commit SHA.
 
 ## Release acceptance rule
 
