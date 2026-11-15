@@ -2,7 +2,7 @@ name: Build Neon function bundle
 
 concurrency:
   group: neon-function-bundle-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 on:
   push:
