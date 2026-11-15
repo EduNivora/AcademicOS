@@ -315,7 +315,10 @@ void main() {
         );
 
         final row = await helper.getMaterialById(materialId);
-        expect(List<int>.from(row?['file_bytes'] as Uint8List), orderedEquals(bytes));
+        expect(
+          List<int>.from(row?['file_bytes'] as Uint8List),
+          orderedEquals(bytes),
+        );
       } finally {
         await helper.deleteMaterial(materialId);
         await helper.deleteCourse(courseId);
@@ -324,24 +327,29 @@ void main() {
     });
 
 
-  test('academic terms enforce uniqueness, active selection, rename links and delete protection', () async {
+  test(
+    'academic terms enforce uniqueness, active selection, rename links and delete protection',
+    () async {
     final helper = DatabaseHelper.instance;
     await helper.close();
 
-    final previousActive = await helper.getActiveAcademicTerm();
     final start = DateTime(2026, 9, 1);
     final end = DateTime(2026, 12, 20);
     const firstName = '__db_term_integration_first__';
     const secondName = '__db_term_integration_second__';
     const courseId = 987671;
 
+    await helper.deleteCourse(courseId);
     final existing = await helper.getAcademicTerms();
     for (final term in existing.where(
-      (term) => term.name == firstName || term.name == secondName || term.name == 'Renamed integration term',
+      (term) =>
+          term.name == firstName ||
+          term.name == secondName ||
+          term.name == 'Renamed integration term',
     )) {
       await helper.deleteAcademicTerm(term.id!);
     }
-    await helper.deleteCourse(courseId);
+    final previousActive = await helper.getActiveAcademicTerm();
 
     int? firstId;
     int? secondId;
@@ -420,7 +428,13 @@ void main() {
       final columnNames = columns.map((row) => row['name']).toSet();
       expect(
         columnNames,
-        containsAll(['name', 'start_date', 'end_date', 'is_active', 'created_at']),
+        containsAll([
+          'name',
+          'start_date',
+          'end_date',
+          'is_active',
+          'created_at',
+        ]),
       );
       final indexes = await db.rawQuery('PRAGMA index_list(academic_terms)');
       final indexNames = indexes.map((row) => row['name']).toSet();
@@ -438,6 +452,7 @@ void main() {
       }
       await helper.close();
     }
-  });
+  },
+  );
 
 }
