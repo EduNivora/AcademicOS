@@ -89,6 +89,12 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
   }
 
   Future<void> _openMaterial(CourseMaterialModel material) async {
+    if (material.fileBytes == null || material.fileBytes!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('محتوى هذا المرفق غير متاح أو لم تتم استعادته. أعد إرفاق الملف الأصلي.')),
+      );
+      return;
+    }
     if (material.fileType == 'pdf') {
       Navigator.push(
         context,
