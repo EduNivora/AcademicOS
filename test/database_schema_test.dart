@@ -248,7 +248,7 @@ void main() {
         final row = await helper.getMaterialById(materialId);
         expect(row, isNotNull);
         expect(row!['file_bytes'], isA<Uint8List>());
-        expect(row['file_bytes'], bytes);
+        expect(List<int>.from(row['file_bytes'] as Uint8List), orderedEquals(bytes));
         await helper.deleteMaterial(materialId);
         expect(await helper.getMaterialById(materialId), isNull);
       } finally {
@@ -314,7 +314,7 @@ void main() {
         );
 
         final row = await helper.getMaterialById(materialId);
-        expect(row?['file_bytes'], bytes);
+        expect(List<int>.from(row?['file_bytes'] as Uint8List), orderedEquals(bytes));
       } finally {
         await helper.deleteMaterial(materialId);
         await helper.deleteCourse(courseId);
