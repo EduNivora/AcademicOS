@@ -30,6 +30,10 @@ The Android integration test is intended to run on an emulator or physical Andro
 flutter test integration_test/sqlite3mc_android_test.dart -d <device-id>
 ```
 
+## CI status and resource note
+
+The first hosted Android emulator attempt reached the emulator provisioning step but the runner ran out of disk while installing the Android 35 x86_64 system image. The workflow now frees unused runner space before emulator setup. Do not count Android runtime compatibility as verified until a subsequent emulator test completes successfully.
+
 ## Explicit limitations
 
 - The fixed keys are test fixtures only; this package contains no production key lifecycle or secure-storage integration.
