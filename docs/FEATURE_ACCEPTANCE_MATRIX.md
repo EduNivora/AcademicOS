@@ -132,3 +132,23 @@ or email sign-in as production-ready until the Flutter flows and delivery are
 tested end to end.
 
 | Flutter public notices feed | **Implemented in branch** — public feed screen, offline cache, guest delivery/view aggregate events | Flutter analyze/tests, Android/Web builds, live CORS from actual Web origin, offline cache behavior and API error handling |
+
+## Execution addendum — 2026-11-15 21:54 UTC
+
+This addendum supersedes stale CI/PR references above where they conflict with the current Release 1 execution branch.
+
+- Repository: `EduNivora/AcademicOS`
+- PR: #21, base `chore/edunivora-phase0-execution`, head `feat/neon-managed-auth-and-notices`
+- Exact latest source SHA at this audit: `f0c9f9c11b6001e4366208080ac1210fef35d975`
+- PR state: open, Draft, not merged; 82 commits and 48 changed files at the time of inspection.
+- Backend quality on exact SHA: run `43765880243` completed successfully (dependency install, syntax check, backend tests).
+- Neon Function bundle on exact SHA: run `43765875238` completed successfully; artifact `notices-function-bundle-f0c9f9c11b6001e4366208080ac1210fef35d975` was produced.
+- Flutter quality on exact SHA: run `43765880248` was pending/queued at this audit. The preceding SHA `bd6f6f5a04ac31ae5ecdc98f5bfb43257be4c606` passed Dart analysis and Flutter tests, and had reached Android Debug APK build; Android and Web build completion were not yet observed.
+- Flutter workflow concurrency now uses `cancel-in-progress: false` so an active quality run is not terminated by a newer commit. This serializes runs and can delay the newest run until the active one finishes.
+- API source changes for explicit CORS allowlisting and normalized JWT verifier failures are in the exact SHA above. The live Neon Function remains deployment ID 7; this source bundle has not been deployed. Live `/v1/me`, real JWT, receipts, admin publishing, and production CORS are therefore not accepted.
+- Neon Auth config inspection confirms email/password with required email verification configured as OTP, but no production trusted origins, no project-owned Google OAuth credentials, and a shared development email sender. Flutter auth tests are adapter-level mocks, not real-account end-to-end tests.
+- The first-admin bootstrap SQL is an operator-only procedure and has not been executed. No admin account or app user records were present at the last database inspection.
+- Guest analytics remain aggregate event counters, not unique guest counts. Rate limiting/abuse controls and retention/purge policy remain incomplete.
+- Google Drive backup, encrypted archive, restore and scheduled backup remain deferred to Release 2 by approved scope. Production SQLite encryption is not accepted for Release 1.
+
+Do not mark Release 1 ready from the backend or bundle checks alone. The exact-head Flutter gate, real auth/JWT flows, deployed API verification, Web origin/CORS, first-admin bootstrap, and platform runtime acceptance remain release blockers.
