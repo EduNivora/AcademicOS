@@ -624,7 +624,7 @@ class DatabaseHelper {
       }
 
       final previousName = existing.single['name'] as String;
-      if (previousName.trim().toLowerCase() != term.name.trim().toLowerCase()) {
+      if (previousName != term.name.trim()) {
         // Course.semester is the existing relationship field. Keep that
         // relationship intact when a student renames a term.
         await txn.update(
