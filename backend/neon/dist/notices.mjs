@@ -3017,8 +3017,10 @@ var required = ["DATABASE_URL", "NEON_AUTH_BASE_URL", "NEON_AUTH_JWKS_URL"];
 for (const key of required) {
   if (!process.env[key]) throw new Error(`Missing required runtime variable: ${key}`);
 }
+var databaseUrl = new URL(process.env.DATABASE_URL);
+databaseUrl.searchParams.set("sslmode", "verify-full");
 var pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: databaseUrl.toString(),
   max: 5,
   idleTimeoutMillis: 1e4,
   connectionTimeoutMillis: 5e3
