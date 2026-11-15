@@ -42,7 +42,7 @@ Future<PlatformHttpResponse> platformRequest(
     withCredentials: withCredentials,
   ).timeout(const Duration(seconds: 15));
   final responseHeaders = <String, List<String>>{};
-  for (final line in (request.getAllResponseHeaders() ?? '').split('\r\n')) {
+  for (final line in (request.getAllResponseHeaders()).split('\r\n')) {
     final separator = line.indexOf(':');
     if (separator <= 0) continue;
     final name = line.substring(0, separator).trim().toLowerCase();
