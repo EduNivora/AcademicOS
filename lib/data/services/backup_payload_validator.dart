@@ -64,7 +64,7 @@ class BackupPayloadValidator {
     final scheduleRows = rows('schedule', isRequired: true);
     final materialValue = payload['materials'];
     if ((schema == 'academic_os_backup_v2' || schema == 'academic_os_backup_v3') && materialValue is! List) {
-      throw const FormatException('Backup v2 must contain materials as a list.');
+      throw FormatException('Backup $schema must contain materials as a list.');
     }
     if (materialValue != null && materialValue is! List) {
       throw const FormatException('Backup materials must be a list.');
