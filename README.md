@@ -71,9 +71,13 @@ Academic OS هو نظام إدارة أكاديمية مبني على Flutter و
 - تنبيهات لمحاضرات قريبة
 - دعم `flutter_local_notifications` و `timezone` لتحديد الوقت بدقة
 
-### 9. إعدادات التطبيق والنسخ الاحتياطي
+### 9. الفصول الدراسية والتقارير الأكاديمية
+- إنشاء الفصول الدراسية وتعديلها وتحديد الفصل النشط
+- تقارير أكاديمية تُنشأ من بيانات SQLite المحلية
+- حفظ التقرير النصي أو نسخه دون رفع السجلات الأكاديمية
+
+### 10. إعدادات التطبيق
 - إعدادات عامة للتطبيق
-- شاشة النسخ الاحتياطي والتصدير
 - دعم اللغة العربية/الإنجليزية
 - دعم الوضع الفاتح/الداكن
 
@@ -217,6 +221,8 @@ AcademicOS/
 - `lib/presentation/home/home_screen.dart` — الشاشة الرئيسية ولوحة التحكم
 - `lib/presentation/task/add_edit_task_screen.dart` — إضافة/تعديل المهام
 - `lib/presentation/course/course_list_screen.dart` — قائمة المقررات
+- `lib/presentation/terms/academic_terms_screen.dart` — إدارة الفصول الدراسية
+- `lib/presentation/reports/academic_reports_screen.dart` — التقارير الأكاديمية المحلية
 - `lib/presentation/ai_assistant/academic_ai_screen.dart` — شاشة المساعد الأكاديمي
 - `lib/data/database/database_helper.dart` — إعداد قاعدة البيانات المحلية
 - `lib/core/security/secure_storage_service.dart` — تخزين كلمات المرور بشكل آمن
