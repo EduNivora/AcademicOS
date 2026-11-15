@@ -109,3 +109,13 @@ The integration branch adds a password-protected local archive path in the backu
 - Unit tests in `test/backup_archive_crypto_service_test.dart` cover round-trip, weak passwords, wrong passwords, ciphertext tampering and malformed/unsupported envelopes.
 
 **Status: implemented on the integration branch; not yet CI-verified or accepted.** This is not yet the approved complete Google Drive backup: Google OAuth, the visible `EduNivora` Drive folder, resumable upload/download, manifest/checksums, full SQLite snapshot/settings, staged cross-device restore and failure-injection acceptance remain open. Live SQLite-at-rest encryption is a separate release gate. Do not claim the complete backup requirement is met.
+
+
+## Google Drive integration — pending acceptance
+
+| Area | Current status | Implementation evidence | Acceptance still required |
+|---|---|---|---|
+| Drive OAuth | Implemented in feature branch / unverified | Explicit Google authorization flow requests only `drive.file` at the time of the Drive operation | OAuth client IDs, consent configuration, Android and Web sign-in, scope grant/denial, expired/revoked token handling |
+| Visible backup folder | Implemented in feature branch / unverified | Drive v3 service finds or creates a normal folder named `EduNivora` in the student's own Drive | Real-account verification, duplicate-folder behavior, permission and account-switch tests |
+| Encrypted archive upload/download | Implemented in feature branch / unverified | Resumable 8 MiB chunk upload, list and download operations; mock HTTP tests cover folder, upload, resumed range, download and authorization failure | Exact-head CI, live Drive smoke tests, progress/cancel, retry and token expiry, quota/network/truncated upload injection, pagination and checksums |
+| Complete Drive backup and restore | **Incomplete** | Current payload is an encrypted JSON archive of the existing academic export; it is not a complete SQLite snapshot/settings package | Full DB snapshot, settings, manifest and SHA-256 inventory, authenticated verification, staged restore and rollback, cross-device/reinstall acceptance |

@@ -172,3 +172,12 @@ Encrypted Google Drive backups do not imply that the live SQLite database is enc
 The current integration adds a local encrypted archive envelope using Argon2id (versioned parameters) to derive a wrapping key, a random 256-bit data key wrapped with AES-256-GCM, and AES-256-GCM authenticated payload encryption with independent nonces. The screen exports the `.edunivora` archive and decrypts it before payload validation and database replacement. Plaintext legacy JSON import remains for backward compatibility; new exports are encrypted.
 
 This is only the archive cryptography and local export/import integration. It does not yet implement Google Drive OAuth/upload/download, a complete SQLite snapshot and settings manifest, checksums, staged file/database replacement, or production SQLite-at-rest encryption. CI and platform runtime acceptance must pass on the exact integration commit before this path is considered verified.
+
+
+## Google Drive backup transport — implementation in progress
+
+The feature branch `feat/google-drive-backup` adds a Drive v3 transport for encrypted `.edunivora` archives. It requests the narrow `drive.file` scope only when the student explicitly starts a Drive operation, creates or reuses a normal visible folder named `EduNivora`, uploads encrypted bytes through a resumable session in 8 MiB chunks, lists archive files, and downloads the selected archive for local decryption.
+
+The transport accepts an access-token provider and an injectable HTTP client. It does not receive a backup password or plaintext academic payload. The existing password-based archive encryption remains the boundary before Drive upload.
+
+**Not yet accepted:** real Google OAuth client configuration and consent-screen verification, Android/Web runtime checks, token-expiry recovery during long uploads, pagination, upload progress and cancellation, interrupted-session recovery, quota/network failure injection, server-side checksum/manifest verification, full SQLite snapshot and settings, and staged/atomic cross-device restore. This branch must pass exact-head CI and platform acceptance before release claims.
