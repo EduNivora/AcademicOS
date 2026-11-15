@@ -57,7 +57,7 @@ void main() {
         ],
       );
 
-      expect(payload['schema'], 'academic_os_backup_v2');
+      expect(payload['schema'], 'academic_os_backup_v3');
       expect(payload['courses'], isA<List>());
       expect(payload['tasks'], hasLength(1));
       expect(payload['exams'], hasLength(1));
