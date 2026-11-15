@@ -1,4 +1,5 @@
 import test from "node:test";
+import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 import { createApp } from "./app.mjs";
 
@@ -247,4 +248,20 @@ test("protected endpoints return 401 when token verification infrastructure fail
 
   const admin = await app.request("/v1/admin/announcements", { headers });
   assert.equal(admin.status, 401);
+});
+
+
+test("first-admin bootstrap SQL is guarded and uses a matching dollar-quote delimiter", async () => {
+  const sql = await readFile(
+    new URL("../../operations/bootstrap_first_admin.sql", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(sql, /LOCK TABLE public\\.app_users IN EXCLUSIVE MODE;/);
+  assert.match(sql, /DO \\$bootstrap\\$/);
+  assert.match(sql, /END\\s+\\$bootstrap\\$;/);
+  assert.match(sql, /position\\('replace_with_' in target_email\\) > 0/);
+  assert.match(sql, /"emailVerified" IS TRUE/);
+  assert.match(sql, /banned IS NOT TRUE/);
+  assert.match(sql, /WHERE role = 'admin'/);
 });
