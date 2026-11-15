@@ -94,3 +94,13 @@ readiness. Those remain explicit acceptance gates.
 
 Never commit `.env`, `.env.local`, `DATABASE_URL`, OAuth secrets, or Auth
 tokens. Never place database credentials in the Flutter client.
+
+## Flutter guest feed
+
+The Flutter implementation now includes a public announcements screen backed by
+`GET /v1/announcements`. It caches the latest feed in local SharedPreferences
+so previously fetched notices remain readable offline. Opening a notice records
+an aggregate guest-view event; the first successful delivery per notice in the
+current app session records an aggregate guest-delivery event. These are event
+counts, not unique guest counts. No stable guest ID or device identifier is
+sent. Flutter client CI and Web CORS verification remain pending.
