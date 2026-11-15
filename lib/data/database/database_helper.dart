@@ -36,7 +36,7 @@ class DatabaseHelper {
   static bool _nativeFactoryInitialized = false;
 
   static const String _databaseName = 'academic_os.db';
-  static const int _databaseVersion = 10;
+  static const int _databaseVersion = 11;
   static const String _materialsTable = 'course_materials';
   static const String _taskTable = 'tasks';
   static const String _courseTable = 'courses';
@@ -186,6 +186,7 @@ class DatabaseHelper {
         title TEXT NOT NULL,
         file_path TEXT NOT NULL,
         file_type TEXT NOT NULL,
+        file_bytes BLOB,
         created_at TEXT
       )
     ''');
@@ -207,6 +208,9 @@ class DatabaseHelper {
           created_at TEXT
         )
       ''');
+    }
+    if (oldVersion < 11) {
+      await _ensureColumn(db, _materialsTable, 'file_bytes', 'BLOB');
     }
     if (oldVersion < 2) {
       await _ensureColumn(
@@ -646,5 +650,16 @@ class DatabaseHelper {
   Future<int> deleteMaterial(int id) async {
     final db = await database;
     return await db.delete(_materialsTable, where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<Map<String, dynamic>?> getMaterialById(int id) async {
+    final db = await database;
+    final rows = await db.query(
+      _materialsTable,
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.first;
   }
 }
