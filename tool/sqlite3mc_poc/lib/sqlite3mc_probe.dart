@@ -53,15 +53,15 @@ Future<void> runSqlite3McProof({required String directoryPath}) async {
   }
 
   var wrongKeyRejected = false;
+  final wrongDatabase = await openWithKey(_wrongTestKey);
   try {
-    final wrongDatabase = await openWithKey(_wrongTestKey);
     try {
       await wrongDatabase.rawQuery('SELECT name FROM sqlite_master');
-    } finally {
-      await wrongDatabase.close();
+    } on Object {
+      wrongKeyRejected = true;
     }
-  } on Object {
-    wrongKeyRejected = true;
+  } finally {
+    await wrongDatabase.close();
   }
 
   if (!wrongKeyRejected) {
@@ -72,6 +72,11 @@ Future<void> runSqlite3McProof({required String directoryPath}) async {
 
   final reopened = await openWithKey(_correctTestKey);
   try {
+    final schemaRows =
+        await reopened.rawQuery('SELECT name FROM sqlite_master');
+    if (!schemaRows.any((row) => row['name'] == 'secret_payload')) {
+      throw StateError('Correct key could not read sqlite_master.');
+    }
     final rows = await reopened.query('secret_payload');
     if (rows.length != 1 || rows.single['value'] != _plaintextCanary) {
       throw StateError('Correct-key reopen did not recover the canary row.');
