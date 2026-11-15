@@ -260,6 +260,7 @@ export function createApp({ pool, verifyIdentity, allowedOrigins = [] }) {
 
   app.use("/v1/admin/*", requireAdmin);
 
+  // Admin list is filtered server-side; clients cannot supply authorization roles.
   app.get("/v1/admin/announcements", async (c) => {
     const requestedLimit = Number.parseInt(c.req.query("limit") ?? "50", 10);
     const limit = Number.isFinite(requestedLimit)
