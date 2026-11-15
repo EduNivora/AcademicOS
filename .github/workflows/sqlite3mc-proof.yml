@@ -57,6 +57,18 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Free runner disk space before emulator image
+        run: |
+          echo "Disk space before cleanup:"
+          df -h /
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf /usr/local/share/chromium
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune -af || true
+          echo "Disk space after cleanup:"
+          df -h /
+
       - name: Run Android emulator encryption proof
         uses: reactivecircus/android-emulator-runner@v2
         with:
