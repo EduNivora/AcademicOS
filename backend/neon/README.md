@@ -93,11 +93,12 @@ The Notices API is deployed to the Neon project's default branch.
 
 - Function slug: `notices`
 - Runtime: Node.js 24
-- Active deployment: version 5
+- Last confirmed live deployment: version 5
 - Invocation URL: `https://br-late-bread-bajll3is-notices.compute.c-8.eu-central-1.aws.neon.tech`
 - Health check: `GET /health` returned HTTP 200 and confirmed a database query.
 - Public feed: `GET /v1/announcements` returned HTTP 200 with an empty feed.
 - Admin guard: unauthenticated `GET /v1/admin/announcements` returned HTTP 401.
+- The current source branch adds authenticated `GET /v1/me` and receipt/profile improvements. Its deployment bundle is built and stored as a GitHub Actions artifact, but these newer source changes have **not yet been deployed** to the live Function. The live deployment remains version 5 until a verified deployment is performed.
 
 The bundle workflow builds the Node.js 24 entrypoint, packages its runtime
 dependencies, and uploads the ZIP plus bundled entrypoint as a GitHub Actions

@@ -124,6 +124,8 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<bool> loginWithGoogle() async {
+    await _secureStorageService.clearNeonAuthCookie();
+    await _secureStorageService.saveNeonAuthSessionActive(false);
     final account = await _googleDataSource.signIn();
     if (account == null) return false;
     await _secureStorageService.saveGoogleAccountData(
@@ -138,6 +140,8 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<bool> loginWithCachedGoogleAccount() async {
+    await _secureStorageService.clearNeonAuthCookie();
+    await _secureStorageService.saveNeonAuthSessionActive(false);
     final cached = await _secureStorageService.getGoogleAccountData();
     final email = cached['email'];
     final id = cached['id'];
@@ -148,8 +152,14 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<bool> loginWithUsername(String username, String password) {
-    return _localDataSource.verifyCredentials(username, password);
+  Future<bool> loginWithUsername(String username, String password) async {
+    final authenticated =
+        await _localDataSource.verifyCredentials(username, password);
+    if (authenticated) {
+      await _secureStorageService.clearNeonAuthCookie();
+      await _secureStorageService.saveNeonAuthSessionActive(false);
+    }
+    return authenticated;
   }
 
   @override
