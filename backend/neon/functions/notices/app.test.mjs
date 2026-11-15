@@ -257,11 +257,11 @@ test("first-admin bootstrap SQL is guarded and uses a matching dollar-quote deli
     "utf8",
   );
 
-  assert.match(sql, /LOCK TABLE public\\.app_users IN EXCLUSIVE MODE;/);
-  assert.match(sql, /DO \\$bootstrap\\$/);
-  assert.match(sql, /END\\s+\\$bootstrap\\$;/);
-  assert.match(sql, /position\\('replace_with_' in target_email\\) > 0/);
-  assert.match(sql, /"emailVerified" IS TRUE/);
-  assert.match(sql, /banned IS NOT TRUE/);
-  assert.match(sql, /WHERE role = 'admin'/);
+  assert.ok(sql.includes("LOCK TABLE public.app_users IN EXCLUSIVE MODE;"));
+  assert.ok(sql.includes("DO $bootstrap$"));
+  assert.ok(sql.includes("END\n$bootstrap$;"));
+  assert.ok(sql.includes("position('replace_with_' in target_email) > 0"));
+  assert.ok(sql.includes('"emailVerified" IS TRUE'));
+  assert.ok(sql.includes("banned IS NOT TRUE"));
+  assert.ok(sql.includes("WHERE role = 'admin'"));
 });
