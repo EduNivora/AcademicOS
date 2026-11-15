@@ -50,7 +50,10 @@ was introduced.
 
 All registered-user endpoints require a Neon Auth JWT in the Authorization
 Bearer header. The API verifies its EdDSA signature against the branch JWKS,
-checks the issuer, and resolves the subject against the managed Auth user table.
+checks both issuer and audience against the origin of `NEON_AUTH_BASE_URL`
+(the scheme and host only, not the `/edunivora/auth` path), and resolves the
+subject against the managed Auth user table. A regression test locks this
+Neon-specific JWT contract.
 Admin authorization is enforced from `app_users.role` on every request; it is
 never trusted from a client-supplied field. `GET /v1/me` exposes this role to the
 client without granting any additional authority.
@@ -98,7 +101,7 @@ The Notices API is deployed to the Neon project's default branch.
 - Health check: `GET /health` returned HTTP 200 and confirmed a database query.
 - Public feed: `GET /v1/announcements` returned HTTP 200 with an empty feed.
 - Admin guard: unauthenticated `GET /v1/admin/announcements` returned HTTP 401.
-- The current source branch adds authenticated `GET /v1/me` and receipt/profile improvements. The latest source bundle is built and stored as a GitHub Actions artifact, but these newer source changes have **not yet been deployed** to the live Function. A live smoke check currently returns 404 for `GET /v1/me`, while `/health` and the public feed return 200 and the unauthenticated admin route returns 401. Do not consider the admin console operational until a verified deployment exposes `/v1/me`.
+- The current source branch adds authenticated `GET /v1/me`, receipt/profile improvements, and the corrected JWT issuer/audience validation. The latest source bundle is built and stored as a GitHub Actions artifact, but these newer source changes have **not yet been deployed** to the live Function. The active deployment remains version 7; the recorded smoke check returned 404 for `GET /v1/me`, while `/health` and the public feed returned 200 and the unauthenticated admin route returned 401. Do not consider the admin console operational until a verified deployment exposes `/v1/me` and accepts a real Neon JWT.
 
 The bundle workflow builds the Node.js 24 entrypoint, packages its runtime
 dependencies, and uploads the ZIP plus bundled entrypoint as a GitHub Actions
@@ -117,7 +120,8 @@ tokens. Never place database credentials in the Flutter client.
 
 The Flutter client loads the public feed from `GET /v1/announcements` and
 caches it locally for offline reading. Registered users obtain a short-lived
-Neon Auth JWT from `GET /token`; the client sends it as a Bearer token to the
+Neon Auth JWT from the Neon `get-session` response (the session token field or
+the `set-auth-jwt` response header); the client sends it as a Bearer token to the
 registered delivery and read-receipt endpoints. Guest installations use only
 anonymous aggregate delivery/view counters. If token retrieval fails, the
 client skips metrics rather than misclassifying a signed-in account as a guest.
