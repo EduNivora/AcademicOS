@@ -81,6 +81,7 @@ class DatabaseHelper {
       onConfigure: _onConfigure,
       onCreate: _onCreateDatabase,
       onUpgrade: _onUpgradeDatabase,
+      onOpen: _migrateLegacyMaterialFiles,
     );
   }
 
