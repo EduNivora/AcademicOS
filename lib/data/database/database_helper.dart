@@ -654,7 +654,7 @@ class DatabaseHelper {
   Future<void> setActiveAcademicTerm(int id) async {
     final db = await database;
     await db.transaction((txn) async {
-      final changed = await txn.update(
+      await txn.update(
         'academic_terms',
         {'is_active': 0},
       );
