@@ -11,9 +11,9 @@ Future<void> platformPost(Uri uri) {
 Future<PlatformHttpResponse> platformRequest(
   Uri uri, {
   required String method,
-  Map<String, String> headers = const <String, String>{},
+  required Map<String, String> headers,
   String? body,
-  bool withCredentials = false,
+  required bool withCredentials,
 }) {
   throw UnsupportedError('HTTP is not supported on this platform.');
 }

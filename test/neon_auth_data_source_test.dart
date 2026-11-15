@@ -26,9 +26,9 @@ void main() {
     Future<PlatformHttpResponse> request(
       Uri uri, {
       required String method,
-      Map<String, String> headers = const {},
+      required Map<String, String> headers,
       String? body,
-      bool withCredentials = false,
+      required bool withCredentials,
     }) async {
       requests.add((uri: uri, headers: Map.of(headers)));
       if (uri.path.endsWith('/sign-in/email')) {
@@ -72,9 +72,9 @@ void main() {
     Future<PlatformHttpResponse> request(
       Uri uri, {
       required String method,
-      Map<String, String> headers = const {},
+      required Map<String, String> headers,
       String? body,
-      bool withCredentials = false,
+      required bool withCredentials,
     }) async {
       requests.add((uri: uri, body: body));
       return const PlatformHttpResponse(
@@ -107,9 +107,9 @@ void main() {
     Future<PlatformHttpResponse> request(
       Uri uri, {
       required String method,
-      Map<String, String> headers = const {},
+      required Map<String, String> headers,
       String? body,
-      bool withCredentials = false,
+      required bool withCredentials,
     }) async {
       credentialsIncluded = withCredentials;
       cookieHeaderSent = headers.containsKey('Cookie');
@@ -142,9 +142,9 @@ void main() {
     final auth = NeonAuthDataSource(
       request: (_, {
         required method,
-        headers = const {},
+        required Map<String, String> headers,
         body,
-        withCredentials = false,
+        required bool withCredentials,
       }) async => const PlatformHttpResponse(
         statusCode: 401,
         body: '{"message":"Invalid email or password"}',
@@ -172,9 +172,9 @@ void main() {
     Future<PlatformHttpResponse> request(
       Uri uri, {
       required String method,
-      Map<String, String> headers = const {},
+      required Map<String, String> headers,
       String? body,
-      bool withCredentials = false,
+      required bool withCredentials,
     }) async {
       requestedPaths.add(uri.path);
       return const PlatformHttpResponse(statusCode: 200, body: 'null');

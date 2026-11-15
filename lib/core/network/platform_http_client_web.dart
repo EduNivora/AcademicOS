@@ -30,9 +30,9 @@ Future<void> platformPost(Uri uri) async {
 Future<PlatformHttpResponse> platformRequest(
   Uri uri, {
   required String method,
-  Map<String, String> headers = const <String, String>{},
+  required Map<String, String> headers,
   String? body,
-  bool withCredentials = false,
+  required bool withCredentials,
 }) async {
   final request = await html.HttpRequest.request(
     uri.toString(),

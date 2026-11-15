@@ -52,6 +52,7 @@ class AnnouncementRepository {
         'Accept': 'application/json',
         'Authorization': 'Bearer $accessToken',
       },
+      withCredentials: false,
     ).timeout(const Duration(seconds: 12));
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception('Announcement acknowledgement failed.');

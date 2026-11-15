@@ -43,14 +43,14 @@ Future<void> platformPost(Uri uri) async {
 Future<PlatformHttpResponse> platformRequest(
   Uri uri, {
   required String method,
-  Map<String, String> headers = const <String, String>{},
+  required Map<String, String> headers,
   String? body,
-  bool withCredentials = false,
+  required bool withCredentials,
 }) async {
   final client = HttpClient()..connectionTimeout = const Duration(seconds: 12);
   try {
     final request = await client.openUrl(method, uri);
-    headers.forEach(request.headers.set);
+    headers.forEach((name, value) => request.headers.set(name, value));
     if (body != null) request.write(body);
     final response = await request.close().timeout(const Duration(seconds: 15));
     final responseBody = await response.transform(utf8.decoder).join();
