@@ -167,3 +167,8 @@ No institutional portal, lecturer portal, student administration, official unive
 
 ### Security distinction
 Encrypted Google Drive backups do not imply that the live SQLite database is encrypted at rest. Production database encryption remains a separate security/release gate and must not be claimed until implemented and tested.
+
+### Password-protected backup archive (integration branch; pending verification)
+The current integration adds a local encrypted archive envelope using Argon2id (versioned parameters) to derive a wrapping key, a random 256-bit data key wrapped with AES-256-GCM, and AES-256-GCM authenticated payload encryption with independent nonces. The screen exports the `.edunivora` archive and decrypts it before payload validation and database replacement. Plaintext legacy JSON import remains for backward compatibility; new exports are encrypted.
+
+This is only the archive cryptography and local export/import integration. It does not yet implement Google Drive OAuth/upload/download, a complete SQLite snapshot and settings manifest, checksums, staged file/database replacement, or production SQLite-at-rest encryption. CI and platform runtime acceptance must pass on the exact integration commit before this path is considered verified.

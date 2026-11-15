@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import '../../core/academic/academic_report_service.dart';
 import '../../data/database/database_helper.dart';
 import '../../data/services/backup_payload_validator.dart';
+import '../../data/services/backup_archive_crypto_service.dart';
 
 class BackupExportScreen extends StatefulWidget {
   const BackupExportScreen({super.key});
@@ -23,6 +24,11 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
       const AcademicReportService();
   final TextEditingController _restoreController = TextEditingController();
   final TextEditingController _reportController = TextEditingController();
+  final TextEditingController _backupPasswordController = TextEditingController();
+  final TextEditingController _backupPasswordConfirmController = TextEditingController();
+  final TextEditingController _restorePasswordController = TextEditingController();
+  final BackupArchiveCryptoService _backupCrypto =
+      const BackupArchiveCryptoService();
 
   bool _isBusy = false;
   String? _lastBackupPath;
@@ -32,12 +38,19 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
   void dispose() {
     _restoreController.dispose();
     _reportController.dispose();
+    _backupPasswordController.dispose();
+    _backupPasswordConfirmController.dispose();
+    _restorePasswordController.dispose();
     super.dispose();
   }
 
   Future<void> _exportBackup() async {
     setState(() => _isBusy = true);
     try {
+      if (_backupPasswordController.text !=
+          _backupPasswordConfirmController.text) {
+        throw const FormatException('كلمتا مرور النسخة غير متطابقتين.');
+      }
       final courses = await _databaseHelper.getCourses();
       final tasks = await _databaseHelper.getTasks();
       final exams = await _databaseHelper.getExams();
@@ -77,21 +90,20 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
         'payload': encodedBackup,
       };
       final jsonBackupText = const JsonEncoder.withIndent('  ').convert(boxed);
-      final backupBytes = Uint8List.fromList(utf8.encode(jsonBackupText));
-      if (backupBytes.length > 50 * 1024 * 1024) {
-        throw const FormatException(
-          'حجم النسخة يتجاوز حد الاستيراد الحالي (50 MB). قلّل عدد/حجم المرفقات ثم أعد المحاولة.',
-        );
-      }
+      final encryptedBytes = await _backupCrypto.encrypt(
+        plaintext: utf8.encode(jsonBackupText),
+        password: _backupPasswordController.text,
+      );
+      final encryptedArchiveText = utf8.decode(encryptedBytes);
 
       final fileName =
-          'academic_os_backup_${DateTime.now().millisecondsSinceEpoch}.json';
+          'edunivora_backup_${DateTime.now().millisecondsSinceEpoch}.edunivora';
       final savedPath = await FilePicker.platform.saveFile(
         fileName: fileName,
-        bytes: backupBytes,
+        bytes: encryptedBytes,
         type: FileType.custom,
-        allowedExtensions: const ['json'],
-        dialogTitle: 'حفظ النسخة الاحتياطية',
+        allowedExtensions: const ['edunivora'],
+        dialogTitle: 'حفظ النسخة الاحتياطية المشفرة',
       );
       if (savedPath == null && !kIsWeb) {
         if (!mounted) return;
@@ -102,10 +114,10 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
       }
 
       _lastBackupPath = savedPath ?? fileName;
-      _restoreController.text = jsonBackupText;
+      _restoreController.text = encryptedArchiveText;
 
       if (!mounted) return;
-      await _showShareOptions(jsonBackupText, _lastBackupPath!);
+      await _showShareOptions(encryptedArchiveText, _lastBackupPath!);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -134,7 +146,7 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: const ['json'],
+        allowedExtensions: const ['edunivora', 'json'],
         allowMultiple: false,
         withData: true,
       );
@@ -143,12 +155,12 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
       final bytes = result.files.single.bytes;
       if (bytes == null) {
         throw const FormatException(
-          'تعذر قراءة محتوى الملف. اختر ملف JSON صالحاً.',
+          'تعذر قراءة محتوى الملف. اختر نسخة EduNivora أو JSON قديمة صالحة.',
         );
       }
-      if (bytes.length > 50 * 1024 * 1024) {
+      if (bytes.length > 80 * 1024 * 1024) {
         throw const FormatException(
-          'حجم النسخة الاحتياطية يتجاوز الحد المسموح (50 MB).',
+          'حجم النسخة الاحتياطية يتجاوز الحد المسموح (80 MB).',
         );
       }
 
@@ -176,7 +188,10 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
         throw const FormatException('النسخة الاحتياطية فارغة.');
       }
 
-      final decoded = await _decodeBackup(rawText);
+      final decoded = await _decodeBackup(
+        rawText,
+        password: _restorePasswordController.text,
+      );
       if (decoded == null) {
         throw const FormatException('صيغة النسخة الاحتياطية غير صالحة.');
       }
@@ -223,7 +238,31 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
     }
   }
 
-  Future<Map<String, dynamic>?> _decodeBackup(String rawText) async {
+  Future<Map<String, dynamic>?> _decodeBackup(
+    String rawText, {
+    required String password,
+  }) async {
+    try {
+      final initial = jsonDecode(rawText);
+      if (initial is Map<String, dynamic> &&
+          initial['format'] == 'edunivora_encrypted_backup') {
+        final plaintext = await _backupCrypto.decrypt(
+          archive: utf8.encode(rawText),
+          password: password,
+        );
+        return _decodePlainBackup(utf8.decode(plaintext, allowMalformed: false));
+      }
+      return _decodePlainBackup(rawText);
+    } on FormatException {
+      rethrow;
+    } catch (_) {
+      throw const FormatException(
+        'تعذر فك تشفير النسخة. تحقق من كلمة المرور وسلامة الملف.',
+      );
+    }
+  }
+
+  Map<String, dynamic>? _decodePlainBackup(String rawText) {
     try {
       final decoded = jsonDecode(rawText);
       if (decoded is Map<String, dynamic>) {
@@ -237,7 +276,8 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
         if (decoded.containsKey('courses') ||
             decoded.containsKey('tasks') ||
             decoded.containsKey('exams') ||
-            decoded.containsKey('schedule')) {
+            decoded.containsKey('schedule') ||
+            decoded.containsKey('materials')) {
           return decoded;
         }
       }
@@ -354,7 +394,7 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
+        onTap: _isBusy ? null : onTap,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -405,9 +445,39 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          const Text(
+            'كلمة مرور النسخة الاحتياطية',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _backupPasswordController,
+            obscureText: true,
+            enableSuggestions: false,
+            autocorrect: false,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.lock_outline),
+              hintText: '12 حرفاً على الأقل',
+              helperText: 'فقدان كلمة المرور يعني تعذر استعادة النسخة.',
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _backupPasswordConfirmController,
+            obscureText: true,
+            enableSuggestions: false,
+            autocorrect: false,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.lock_reset),
+              hintText: 'أعد كتابة كلمة المرور للتأكيد',
+            ),
+          ),
+          const SizedBox(height: 12),
           _buildActionCard(
-            'نسخ احتياطي فوري',
-            'تصدير المقررات والمهام والاختبارات والجدول وبيانات المرفقات ومحتوى الملفات الفعلي ضمن النسخة.',
+            'إنشاء نسخة مشفرة',
+            'تشفير بياناتك الأكاديمية ومحتوى المرفقات بكلمة مرور قبل حفظ ملف EduNivora.',
             Icons.backup_rounded,
             _exportBackup,
           ),
@@ -418,12 +488,24 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
           ),
           const SizedBox(height: 8),
           TextField(
+            controller: _restorePasswordController,
+            obscureText: true,
+            enableSuggestions: false,
+            autocorrect: false,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.key),
+              hintText: 'كلمة مرور النسخة المشفرة',
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
             controller: _restoreController,
             minLines: 6,
             maxLines: 10,
             decoration: InputDecoration(
               hintText:
-                  'ألصق نص ملف backup.json هنا أو استخدم النسخة المحفوظة من الحافظة',
+                  'ألصق نص ملف النسخة المشفرة هنا أو استخدم النسخة المحفوظة من الحافظة',
               filled: true,
               fillColor: Colors.grey.shade100,
               border: OutlineInputBorder(
