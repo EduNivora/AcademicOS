@@ -11,22 +11,22 @@ on:
     paths:
       - "backend/neon/functions/notices/**"
       - "package.json"
-      - "!backend/neon/dist/**"
+      - "package-lock.json"
+      - "neon.ts"
+      - ".github/workflows/neon-function-bundle.yml"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   bundle:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.ref_name }}
-          persist-credentials: true
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+          cache: npm
       - name: Install root build dependencies
         run: npm install --ignore-scripts --no-audit --no-fund
       - name: Build self-contained Node.js 24 bundle
@@ -51,17 +51,12 @@ jobs:
           JSON
           npm install --prefix "$package_dir" --omit=dev --ignore-scripts --no-audit --no-fund
           (cd "$package_dir" && zip -qr "$RUNNER_TEMP/notices-function.zip" .)
-          base64 -w0 "$RUNNER_TEMP/notices-function.zip" > backend/neon/dist/notices-function.zip.b64
-          printf '\n' >> backend/neon/dist/notices-function.zip.b64
-      - name: Commit generated deployment artifacts
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add backend/neon/dist/notices.mjs backend/neon/dist/notices-function.zip.b64
-          if git diff --cached --quiet; then
-            echo "Deployment artifacts are already current."
-            exit 0
-          fi
-          git commit -m "build(neon): package notices function dependencies"
-          git pull --rebase origin ${{ github.ref_name }}
-          git push origin HEAD:${{ github.ref_name }}
+      - name: Upload deployable bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: notices-function-bundle-${{ github.sha }}
+          path: |
+            backend/neon/dist/notices.mjs
+            ${{ runner.temp }}/notices-function.zip
+          if-no-files-found: error
+          retention-days: 14
