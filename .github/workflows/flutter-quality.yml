@@ -2,7 +2,7 @@ name: Flutter quality gate
 
 on:
   pull_request:
-    branches: [main, chore/edunivora-phase0-execution]
+    branches: [main, chore/edunivora-phase0-execution, feat/encrypted-backup-integration]
   push:
     branches: [main]
 
