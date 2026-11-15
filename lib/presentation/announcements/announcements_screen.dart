@@ -4,16 +4,21 @@ import 'package:flutter/material.dart';
 
 import '../../data/models/announcement.dart';
 import '../../data/repositories/announcement_repository.dart';
+import '../../domain/usecases/auth_use_cases.dart';
 
 class AnnouncementsScreen extends StatefulWidget {
-  const AnnouncementsScreen({super.key});
+  final AuthUseCases authUseCases;
+
+  const AnnouncementsScreen({super.key, required this.authUseCases});
 
   @override
   State<AnnouncementsScreen> createState() => _AnnouncementsScreenState();
 }
 
 class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
-  static final AnnouncementRepository _repository = AnnouncementRepository();
+  late final AnnouncementRepository _repository = AnnouncementRepository(
+    getAccessToken: widget.authUseCases.getCloudAccessToken.call,
+  );
 
   late Future<List<Announcement>> _announcementsFuture;
 
@@ -38,7 +43,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
 
   void _openAnnouncement(Announcement announcement) {
     unawaited(
-      _repository.recordGuestView(announcement.id).catchError((_) {}),
+      _repository.recordOpened(announcement.id).catchError((_) {}),
     );
 
     showDialog<void>(

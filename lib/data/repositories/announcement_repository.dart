@@ -9,6 +9,10 @@ import '../models/announcement.dart';
 
 typedef AnnouncementGet = Future<String> Function(Uri uri);
 typedef AnnouncementPost = Future<void> Function(Uri uri);
+typedef AnnouncementAuthenticatedPost = Future<void> Function(
+  Uri uri,
+  String accessToken,
+);
 
 class AnnouncementRepository {
   static const String _cacheKey = 'edunivora_public_announcements_v1';
@@ -18,18 +22,41 @@ class AnnouncementRepository {
 
   final AnnouncementGet _get;
   final AnnouncementPost _post;
+  final AnnouncementAuthenticatedPost _authenticatedPost;
+  final Future<String?> Function()? _getAccessToken;
   final String _baseUrl;
   final Set<String> _deliveredInSession = <String>{};
 
   AnnouncementRepository({
     AnnouncementGet? get,
     AnnouncementPost? post,
+    AnnouncementAuthenticatedPost? authenticatedPost,
+    Future<String?> Function()? getAccessToken,
     String baseUrl = EdunivoraApiConfig.noticesBaseUrl,
   })  : _get = get ?? platformGet,
         _post = post ?? platformPost,
+        _authenticatedPost = authenticatedPost ?? _platformAuthenticatedPost,
+        _getAccessToken = getAccessToken,
         _baseUrl = baseUrl.replaceFirst(RegExp(r'/+$'), '');
 
   Uri _endpoint(String path) => Uri.parse('$_baseUrl$path');
+
+  static Future<void> _platformAuthenticatedPost(
+    Uri uri,
+    String accessToken,
+  ) async {
+    final response = await platformRequest(
+      uri,
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+    ).timeout(const Duration(seconds: 12));
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Announcement acknowledgement failed.');
+    }
+  }
 
   Future<List<Announcement>> fetchAnnouncements() async {
     try {
@@ -50,7 +77,7 @@ class AnnouncementRepository {
           .toList(growable: false);
 
       await _writeCache(announcements);
-      await _recordGuestDeliveries(announcements);
+      await _recordDeliveries(announcements);
       return announcements;
     } catch (_) {
       final cached = await _readCache();
@@ -59,10 +86,59 @@ class AnnouncementRepository {
     }
   }
 
-  Future<void> recordGuestView(String announcementId) async {
+  Future<void> recordOpened(String announcementId) async {
+    String? accessToken;
+    try {
+      accessToken = await _getAccessToken?.call();
+    } catch (_) {
+      return;
+    }
+
+    if (accessToken != null && accessToken.isNotEmpty) {
+      await _authenticatedPost(
+        _endpoint('/v1/announcements/$announcementId/read'),
+        accessToken,
+      ).timeout(const Duration(seconds: 12));
+      return;
+    }
+
     await _post(
       _endpoint('/v1/announcements/$announcementId/guest-view'),
     ).timeout(const Duration(seconds: 12));
+  }
+
+  Future<void> _recordDeliveries(
+    List<Announcement> announcements,
+  ) async {
+    String? accessToken;
+    try {
+      accessToken = await _getAccessToken?.call();
+    } catch (_) {
+      return;
+    }
+
+    if (accessToken != null && accessToken.isNotEmpty) {
+      for (final announcement in announcements) {
+        unawaited(_sendRegisteredDelivery(announcement, accessToken));
+      }
+      return;
+    }
+
+    await _recordGuestDeliveries(announcements);
+  }
+
+  Future<void> _sendRegisteredDelivery(
+    Announcement announcement,
+    String accessToken,
+  ) async {
+    try {
+      await _authenticatedPost(
+        _endpoint('/v1/announcements/${announcement.id}/delivered'),
+        accessToken,
+      ).timeout(const Duration(seconds: 12));
+    } catch (_) {
+      // The API endpoint is idempotent; the next feed fetch retries.
+    }
   }
 
   Future<void> _recordGuestDeliveries(
@@ -75,7 +151,6 @@ class AnnouncementRepository {
               const <String>[])
           .toSet();
     } catch (_) {
-      // Continue with in-memory deduplication if local preferences are unavailable.
       persistedIds = <String>{};
     }
 
@@ -94,12 +169,9 @@ class AnnouncementRepository {
   ) async {
     try {
       await _post(
-        _endpoint(
-          '/v1/announcements/${announcement.id}/guest-delivered',
-        ),
+        _endpoint('/v1/announcements/${announcement.id}/guest-delivered'),
       ).timeout(const Duration(seconds: 12));
     } catch (_) {
-      // A failed acknowledgement remains eligible for retry on a later fetch.
       _deliveredInSession.remove(announcement.id);
       return;
     }

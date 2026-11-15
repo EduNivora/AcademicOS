@@ -118,4 +118,69 @@ void main() {
 
     await expectLater(repository.fetchAnnouncements(), throwsFormatException);
   });
+
+  test('registered feed records authenticated delivery, not guest metrics',
+      () async {
+    final guestPosts = <Uri>[];
+    final authenticatedPosts = <({Uri uri, String token})>[];
+    final repository = AnnouncementRepository(
+      get: (_) async => jsonEncode(_payload),
+      post: (uri) async { guestPosts.add(uri); },
+      authenticatedPost: (uri, token) async {
+        authenticatedPosts.add((uri: uri, token: token));
+      },
+      getAccessToken: () async => 'signed-jwt',
+      baseUrl: 'https://api.example.test',
+    );
+
+    await repository.fetchAnnouncements();
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(guestPosts, isEmpty);
+    expect(authenticatedPosts, hasLength(1));
+    expect(authenticatedPosts.single.uri.path, endsWith('/delivered'));
+    expect(authenticatedPosts.single.token, 'signed-jwt');
+  });
+
+  test('opening a notice records read receipt for a registered user', () async {
+    Uri? recordedUri;
+    String? recordedToken;
+    final repository = AnnouncementRepository(
+      get: (_) async => jsonEncode(_payload),
+      post: (_) async {},
+      authenticatedPost: (uri, token) async {
+        recordedUri = uri;
+        recordedToken = token;
+      },
+      getAccessToken: () async => 'signed-jwt',
+      baseUrl: 'https://api.example.test',
+    );
+
+    await repository.recordOpened('f7d0b52a-4a36-4fd9-9ad5-8cbbece8f3d1');
+
+    expect(recordedUri?.path, endsWith('/read'));
+    expect(recordedToken, 'signed-jwt');
+  });
+
+  test('does not count signed-in users as guests when token retrieval fails',
+      () async {
+    final guestPosts = <Uri>[];
+    final authenticatedPosts = <Uri>[];
+    final repository = AnnouncementRepository(
+      get: (_) async => jsonEncode(_payload),
+      post: (uri) async { guestPosts.add(uri); },
+      authenticatedPost: (uri, _) async {
+        authenticatedPosts.add(uri);
+      },
+      getAccessToken: () async => throw Exception('auth temporarily offline'),
+      baseUrl: 'https://api.example.test',
+    );
+
+    await repository.fetchAnnouncements();
+    await repository.recordOpened('f7d0b52a-4a36-4fd9-9ad5-8cbbece8f3d1');
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(guestPosts, isEmpty);
+    expect(authenticatedPosts, isEmpty);
+  });
 }

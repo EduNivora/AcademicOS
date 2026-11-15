@@ -2258,7 +2258,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => const AnnouncementsScreen(),
+                            builder: (_) => AnnouncementsScreen(authUseCases: widget.authUseCases),
                           ),
                         );
                       },
