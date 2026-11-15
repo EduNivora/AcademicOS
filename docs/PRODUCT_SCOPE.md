@@ -108,3 +108,24 @@ Google Drive backup, encrypted archives, upload and restore are Release 2 accept
 - [Architecture](../ARCHITECTURE.md)
 - [Feature Acceptance Matrix](FEATURE_ACCEPTANCE_MATRIX.md)
 - [README](../README.md)
+
+
+## 10.1 Release 1 cloud provider decision — 2026-11-15
+
+The Release 1 cloud metadata provider is the dedicated Neon project `edunivora`
+(PostgreSQL 17, AWS Europe Central / Frankfurt). Neon Managed Auth (Better Auth)
+is enabled for optional identity. This provider decision does not change the
+local-first rule: academic records and files remain in local SQLite.
+
+The app-owned cloud schema is restricted to profile/role projection, public
+announcements, registered delivery/read receipts, anonymous daily guest event
+counters, and notice-admin audit metadata. Password hashes, OAuth credentials,
+academic records, attachments, and academic reports are not stored in the
+app-owned tables.
+
+Implementation status must be reported accurately: Neon Auth and the schema are
+provisioned; backend source and automated tests are in the implementation
+branch; the API is not yet deployed and the Flutter client is not yet connected
+to Managed Auth. Production Google OAuth credentials, production SMTP, trusted
+origins, administrator bootstrap, retention policy, and end-to-end platform
+verification remain open gates.
