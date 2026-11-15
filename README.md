@@ -338,3 +338,7 @@ checks returned HTTP 200, and the unauthenticated admin route returned HTTP
 publishing, Flutter authentication integration, production CORS, or release
 readiness. The Flutter client still requires Managed Auth integration and
 platform testing.
+
+The public announcements feed is available to guests through the Flutter
+Announcements screen. It reads only public notices from Neon and caches the
+latest feed locally for offline viewing; it does not upload academic data.
