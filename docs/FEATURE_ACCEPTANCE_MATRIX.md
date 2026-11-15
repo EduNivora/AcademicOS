@@ -104,3 +104,23 @@ Notice delivery is not guaranteed while a device is offline or notifications are
 Google Drive backup, encrypted archive export/import, upload/download and backup-specific UI are **deferred to Release 2**. They are not Release 1 acceptance gates and must not delay the core academic application, optional accounts, public notices, local persistence, security hardening or Release 1 validation.
 
 Existing PRs/branches for backup are parked as draft work. Do not merge them into the Release 1 integration branch. Reassess their code, dependencies and security assumptions during Release 2 planning; passing isolated tests does not change the release boundary.
+
+
+## Neon account and public-notice backend — implementation status (2026-11-15)
+
+| Area | Current status | Remaining acceptance evidence |
+|---|---|---|
+| Neon PostgreSQL project | **Provisioned and inspected** — dedicated `edunivora` project, PostgreSQL 17, Frankfurt region | Monitor actual free-tier consumption and verify production quotas |
+| Neon Managed Auth | **Enabled/configured** — email/password with mandatory OTP email verification; organization plugin disabled | Flutter client integration, sign-up/sign-in/sign-out/session restoration tests, production SMTP, production Google OAuth credentials and trusted origins |
+| Cloud schema | **Provisioned and inspected** — profile projection, notices, registered delivery/read receipts, anonymous daily guest counters, admin audit | Migration CI on a clean child branch, retention policy and production data-access review |
+| Notices API | **Implemented in branch, not deployed** — Hono/Node.js 24 source with JWT verification and admin role checks | Deploy Neon Function, test public feed, delivery/read idempotency, admin publish/report and abuse controls against the live branch |
+| Flutter account integration | **Incomplete** — current Flutter authentication remains local | Integrate supported Managed Auth client flows without breaking guest/offline entry; verify Android, Windows and Web separately |
+| Operator bootstrap | **Incomplete** | Controlled first-admin promotion procedure and protected admin UI |
+| Guest analytics | **Schema/API implementation** — aggregate counters only; no guest identifier persisted | Verify aggregate semantics, abuse controls and approved retention period |
+
+The current Neon Auth configuration reports a shared Google OAuth provider and
+shared SMTP sender. These are development configuration only; production
+release requires the project's own Google OAuth client credentials, verified
+redirect/trusted origins, and a production SMTP sender. Do not report Google
+or email sign-in as production-ready until the Flutter flows and delivery are
+tested end to end.
