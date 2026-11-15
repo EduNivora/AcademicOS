@@ -331,5 +331,10 @@ EduNivora uses a dedicated Neon PostgreSQL project for optional account
 identity and public notices only. Academic records and attachments remain in
 local SQLite and are never uploaded by this backend. Neon Managed Auth is
 enabled; the Hono API source, migrations and tests are in
-[`backend/neon`](backend/neon/README.md). The API is not yet deployed and the
-Flutter client still requires Managed Auth integration and platform testing.
+[`backend/neon`](backend/neon/README.md). The Notices API is deployed to the
+Neon default branch (function version 5). Its health and public-feed smoke
+checks returned HTTP 200, and the unauthenticated admin route returned HTTP
+401. These smoke checks do not prove registered-user JWT flows, admin
+publishing, Flutter authentication integration, production CORS, or release
+readiness. The Flutter client still requires Managed Auth integration and
+platform testing.
