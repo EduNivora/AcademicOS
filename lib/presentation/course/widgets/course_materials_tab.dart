@@ -49,6 +49,13 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
       return;
     }
 
+    if (bytes.length > 50 * 1024 * 1024) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('حجم الملف يتجاوز الحد المسموح (50 MB).')),
+      );
+      return;
+    }
+
     final fileName = p.basename(file.name);
     final ext = p.extension(fileName).replaceFirst('.', '').toLowerCase();
     if (!{'pdf', 'doc', 'docx', 'txt'}.contains(ext)) {
