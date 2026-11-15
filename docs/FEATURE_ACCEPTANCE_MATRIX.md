@@ -42,6 +42,8 @@
 | Cloud sync and multi-device conflict resolution | **Not implemented** | No verified sync backend or conflict-resolution implementation | Product decision, threat model, sync protocol, conflict strategy, encryption/key lifecycle and offline queue semantics |
 
 | Registered announcement receipts | Implemented / end-to-end unverified | Flutter obtains Neon JWTs and sends Bearer-authenticated delivery/read receipts; repository tests cover registered-versus-guest routing | Exact-head Flutter CI, live JWT verification and idempotent database receipts, session expiry, and Web CORS |
+| Admin announcement console | Implemented / end-to-end unverified | Role-gated Flutter console supports draft list/create/edit, publish, archive and aggregate reports; role is read from authenticated `GET /v1/me` and API authorization remains server-side | Bootstrap first verified admin with the operator-only SQL script, live JWT/role checks for all actions, audit trail verification, Web CORS and device acceptance |
+| First administrator bootstrap | Implemented as controlled operator procedure / not executed | One-time SQL script verifies the target email and refuses if an admin already exists | Execute only after the intended owner account completes email OTP; confirm admin role and test unauthorized account remains blocked |
 | Guest announcement metrics | Present / partially verified | Anonymous aggregate counters; no guest ID/IP/device fingerprint; persistent local delivery dedupe and retry tests | Abuse controls, rate limiting, retention/purge policy, and exact-head platform acceptance |
 
 ## Build, platform and operational acceptance
