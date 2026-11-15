@@ -285,3 +285,18 @@ flutter test
 ## Summary
 
 Academic OS هو تطبيق أكاديمي محلي مصمم لمساعدة الطالب على تنظيم حياته الدراسية بطريقة ذكية ومنظمة. يجمع بين إدارة المهام والمقررات، التذكيرات، والمعدلات، مع بنية واضحة وقاعدة بيانات محلية؛ لكن ملف SQLite غير مشفر حالياً، لذلك لا تُعد حماية البيانات عند السكون مكتملة حتى تنفيذ بند التشفير في Issue #3.
+
+
+## Product scope (approved 2026-11-15)
+
+EduNivora is a **guest-first, local-first personal academic application**. A student can open and use core features without signing in. Creating an account with Google or email/password is optional; the central service stores only minimal account identity data and notice receipts, not academic records or files.
+
+Academic terms, courses, schedules, tasks, exams, notes, materials, attachments, settings, and reports remain on the student's device and work offline. Attachments must use durable app-owned storage.
+
+### Personal backup and notices
+- Students may explicitly back up their complete local academic workspace to a normal, visible `EduNivora` folder in their own Google Drive.
+- The backup is encrypted using a student-chosen password with additional key protection. The password and plaintext keys are never stored by EduNivora. Drive backup is not cloud synchronization.
+- Notices are published to all app installations, including guests. Registered students may be identified by account name in delivery/read reports; guest metrics are anonymous aggregates only.
+- A minimal protected operator interface is limited to notice publishing and notice reports.
+
+Institutional portals, lecturer/student administration, official university attendance integration, institutional messaging, fees/payments, university dashboards, and academic cloud synchronization are outside the current product scope. See [docs/PRODUCT_SCOPE.md](docs/PRODUCT_SCOPE.md) for the authoritative product specification and [ARCHITECTURE.md](ARCHITECTURE.md) for technical boundaries.
