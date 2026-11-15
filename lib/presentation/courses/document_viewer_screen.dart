@@ -37,7 +37,7 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
   void dispose() {
     final previewPath = _resolvedFilePath;
     if (previewPath != null) {
-      unawaited(File(previewPath).delete().catchError((_) {}));
+      unawaited(File(previewPath).delete().then<void>((_) {}, onError: (Object _) {}));
     }
     super.dispose();
   }
