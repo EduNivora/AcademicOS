@@ -323,3 +323,13 @@ flutter build web --release
 ```
 
 يتحقق GitHub Actions من تجهيز runtime وبناء نسخة Web ويرفعها كـ artifact. نجاح البناء لا يثبت وحده استمرارية IndexedDB بعد إعادة التحميل، أو العمل دون اتصال، أو سلامة تعدد التبويبات؛ يلزم اختبار المتصفح لهذه السلوكيات قبل إعلان دعم Web إنتاجياً.
+
+
+## Release 1 cloud metadata backend
+
+EduNivora uses a dedicated Neon PostgreSQL project for optional account
+identity and public notices only. Academic records and attachments remain in
+local SQLite and are never uploaded by this backend. Neon Managed Auth is
+enabled; the Hono API source, migrations and tests are in
+[`backend/neon`](backend/neon/README.md). The API is not yet deployed and the
+Flutter client still requires Managed Auth integration and platform testing.
