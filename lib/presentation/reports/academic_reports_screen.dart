@@ -1,0 +1,155 @@
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../../core/academic/academic_report_service.dart';
+import '../../data/database/database_helper.dart';
+
+/// Release 1 academic reporting; backup export and restore are deliberately
+/// kept out of the student-facing application until Release 2.
+class AcademicReportsScreen extends StatefulWidget {
+  const AcademicReportsScreen({super.key});
+
+  @override
+  State<AcademicReportsScreen> createState() => _AcademicReportsScreenState();
+}
+
+class _AcademicReportsScreenState extends State<AcademicReportsScreen> {
+  final DatabaseHelper _databaseHelper = DatabaseHelper.instance;
+  final AcademicReportService _reportService = const AcademicReportService();
+  final TextEditingController _reportController = TextEditingController();
+
+  bool _isBusy = false;
+  String _reportText = '';
+
+  @override
+  void dispose() {
+    _reportController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _generateAcademicReport() async {
+    if (_isBusy) return;
+    setState(() => _isBusy = true);
+    try {
+      final courses = await _databaseHelper.getCourses();
+      final tasks = await _databaseHelper.getTasks();
+      final exams = await _databaseHelper.getExams();
+      final schedule = await _databaseHelper.getSchedules();
+
+      final report = _reportService.generateAcademicReport(
+        courses: courses,
+        tasks: tasks,
+        exams: exams,
+        schedule: List<Map<String, dynamic>>.from(schedule),
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _reportText = report;
+        _reportController.text = report;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم تجهيز التقرير الأكاديمي بنجاح.')),
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Academic report generation failed: $error\\n$stackTrace');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر إنشاء التقرير الأكاديمي: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _isBusy = false);
+    }
+  }
+
+  Future<void> _saveReport() async {
+    if (_reportText.trim().isEmpty) {
+      await _generateAcademicReport();
+    }
+    if (!mounted || _reportText.trim().isEmpty) return;
+
+    try {
+      final fileName =
+          'edunivora_academic_report_${DateTime.now().millisecondsSinceEpoch}.txt';
+      final savedPath = await FilePicker.platform.saveFile(
+        fileName: fileName,
+        bytes: Uint8List.fromList(_reportText.codeUnits),
+        type: FileType.custom,
+        allowedExtensions: const ['txt'],
+        dialogTitle: 'حفظ التقرير الأكاديمي',
+      );
+      await Clipboard.setData(ClipboardData(text: _reportText));
+      if (!mounted) return;
+      final message = savedPath == null
+          ? 'تم نسخ التقرير إلى الحافظة. لم يتم حفظ ملف.'
+          : 'تم حفظ التقرير في $savedPath ونسخه إلى الحافظة.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Academic report export failed: $error\\n$stackTrace');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر حفظ التقرير: $error')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('التقارير الأكاديمية')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          const Text(
+            'ملخص أكاديمي مبني على بياناتك المحلية',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'يُنشأ التقرير من المقررات والمهام والاختبارات والجدول المحفوظ على هذا الجهاز. لا تُرفع سجلاتك الأكاديمية إلى خادم.',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _reportController,
+            readOnly: true,
+            minLines: 12,
+            maxLines: 20,
+            decoration: InputDecoration(
+              hintText: 'اضغط «إنشاء التقرير» لعرض ملخصك الأكاديمي.',
+              filled: true,
+              fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: _isBusy ? null : _generateAcademicReport,
+            icon: _isBusy
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.assessment_outlined),
+            label: const Text('إنشاء التقرير'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: _isBusy ? null : _saveReport,
+            icon: const Icon(Icons.file_download_outlined),
+            label: const Text('حفظ التقرير ومشاركته'),
+          ),
+        ],
+      ),
+    );
+  }
+}
