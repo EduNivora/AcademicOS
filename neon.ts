@@ -5,7 +5,7 @@ export default defineConfig({
   functions: {
     notices: {
       name: "EduNivora Notices API",
-      source: "backend/neon/functions/notices/index.mjs",
+      source: "backend/neon/dist/notices.mjs",
     },
   },
   branch: () => ({
