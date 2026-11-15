@@ -37,6 +37,10 @@ class CourseMaterialModel {
         filePath: map['file_path'] as String,
         fileType: map['file_type'] as String,
         createdAt: map['created_at'] as String?,
-        fileBytes: map['file_bytes'] as Uint8List?,
+        fileBytes: map['file_bytes'] == null
+            ? null
+            : Uint8List.fromList(
+                List<int>.from(map['file_bytes'] as List),
+              ),
       );
 }
