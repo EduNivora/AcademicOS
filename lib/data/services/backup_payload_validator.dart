@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import '../models/course_material_model.dart';
 import '../models/course_model.dart';
 import '../models/exam_model.dart';
@@ -25,6 +28,7 @@ class BackupPayloadValidator {
   static const _schemas = {
     'academic_os_backup_v1',
     'academic_os_backup_v2',
+    'academic_os_backup_v3',
   };
   static const _days = {
     'السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة',
@@ -59,7 +63,7 @@ class BackupPayloadValidator {
     final examRows = rows('exams', isRequired: true);
     final scheduleRows = rows('schedule', isRequired: true);
     final materialValue = payload['materials'];
-    if (schema == 'academic_os_backup_v2' && materialValue is! List) {
+    if ((schema == 'academic_os_backup_v2' || schema == 'academic_os_backup_v3') && materialValue is! List) {
       throw const FormatException('Backup v2 must contain materials as a list.');
     }
     if (materialValue != null && materialValue is! List) {
@@ -353,6 +357,7 @@ class BackupPayloadValidator {
     final path = row['file_path'];
     final type = row['file_type'];
     final createdAt = row['created_at'];
+    final encodedBytes = row['file_bytes_base64'];
     if (courseId is! int || courseId <= 0 ||
         title is! String || title.trim().isEmpty ||
         path is! String || path.trim().isEmpty ||
@@ -363,6 +368,26 @@ class BackupPayloadValidator {
         (createdAt is! String || DateTime.tryParse(createdAt) == null)) {
       throw const FormatException('Material created_at is invalid.');
     }
-    return CourseMaterialModel.fromMap(row);
+    Uint8List? bytes;
+    if (encodedBytes != null) {
+      if (encodedBytes is! String || encodedBytes.isEmpty) {
+        throw const FormatException('Material attachment bytes are invalid.');
+      }
+      try {
+        bytes = Uint8List.fromList(base64.decode(encodedBytes));
+      } on FormatException {
+        throw const FormatException('Material attachment bytes are not valid base64.');
+      }
+      if (bytes.isEmpty || bytes.length > 50 * 1024 * 1024) {
+        throw const FormatException('Material attachment size is invalid or exceeds 50 MB.');
+      }
+    }
+    if (row['file_bytes'] != null) {
+      throw const FormatException('Raw attachment bytes are not a valid JSON backup field.');
+    }
+    return CourseMaterialModel.fromMap({
+      ...row,
+      if (bytes != null) 'file_bytes': bytes,
+    });
   }
 }
