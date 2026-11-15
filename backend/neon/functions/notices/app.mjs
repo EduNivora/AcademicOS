@@ -187,7 +187,12 @@ export function createApp({ pool, verifyIdentity, allowedOrigins = [] }) {
     const token = authorization.match(/^Bearer\s+(.+)$/i)?.[1];
     if (!token) return jsonError(c, 401, "unauthorized", "Sign-in is required.");
 
-    const identity = await verifyIdentity(token);
+    let identity;
+    try {
+      identity = await verifyIdentity(token);
+    } catch {
+      return jsonError(c, 401, "invalid_token", "The session is invalid or expired.");
+    }
     if (!identity?.sub || !isUuid(identity.sub)) {
       return jsonError(c, 401, "invalid_token", "The session is invalid or expired.");
     }
@@ -202,7 +207,12 @@ export function createApp({ pool, verifyIdentity, allowedOrigins = [] }) {
     const token = authorization.match(/^Bearer\s+(.+)$/i)?.[1];
     if (!token) return jsonError(c, 401, "unauthorized", "Sign-in is required.");
 
-    const identity = await verifyIdentity(token);
+    let identity;
+    try {
+      identity = await verifyIdentity(token);
+    } catch {
+      return jsonError(c, 401, "invalid_token", "The session is invalid or expired.");
+    }
     if (!identity?.sub || !isUuid(identity.sub)) {
       return jsonError(c, 401, "invalid_token", "The session is invalid or expired.");
     }
@@ -271,7 +281,12 @@ export function createApp({ pool, verifyIdentity, allowedOrigins = [] }) {
     const token = authorization.match(/^Bearer\s+(.+)$/i)?.[1];
     if (!token) return jsonError(c, 401, "unauthorized", "Sign-in is required.");
 
-    const identity = await verifyIdentity(token);
+    let identity;
+    try {
+      identity = await verifyIdentity(token);
+    } catch {
+      return jsonError(c, 401, "invalid_token", "The session is invalid or expired.");
+    }
     if (!identity?.sub || !isUuid(identity.sub)) {
       return jsonError(c, 401, "invalid_token", "The session is invalid or expired.");
     }
