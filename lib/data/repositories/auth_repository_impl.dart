@@ -24,36 +24,48 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<UserEntity?> getCurrentUser() async {
-    try {
-      final session = await _neonAuthDataSource.getSession();
-      final user = session?['user'];
-      if (user is Map) return _mapNeonUser(Map<String, dynamic>.from(user));
-    } catch (_) {
-      // The local-first workspace remains available when Auth is offline.
+    if (await _secureStorageService.isNeonAuthSessionActive()) {
+      try {
+        final session = await _neonAuthDataSource.getSession();
+        final user = session?['user'];
+        if (user is Map) return _mapNeonUser(Map<String, dynamic>.from(user));
+      } catch (_) {
+        // Do not substitute a different local identity for an offline cloud user.
+      }
+      return null;
     }
     return _localDataSource.getCachedUser();
   }
 
   @override
   Future<bool> isLoggedIn() async {
+    final hasNeonSession = await _secureStorageService.isNeonAuthSessionActive();
+    if (!hasNeonSession) return _localDataSource.isSessionActive();
+
+    Map<String, dynamic>? session;
     try {
-      final session = await _neonAuthDataSource.getSession();
-      final user = session?['user'];
-      if (user is Map &&
-          user['emailVerified'] == true &&
-          user['banned'] != true) {
-        final email = user['email'];
-        if (email is String && email.isNotEmpty) {
-          await _secureStorageService.saveAuthUsername(email);
-        }
-        await _secureStorageService.saveAuthSessionActive(true);
-        return true;
-      }
-      await _secureStorageService.clearNeonAuthCookie();
+      session = await _neonAuthDataSource.getSession();
     } catch (_) {
-      // Do not block guest mode when the remote identity service is offline.
+      // Keep the cookie for a later retry, but never block guest academic access.
+      return false;
     }
-    return _localDataSource.isSessionActive();
+
+    final user = session?['user'];
+    if (user is Map &&
+        user['emailVerified'] == true &&
+        user['banned'] != true) {
+      final email = user['email'];
+      if (email is String && email.isNotEmpty) {
+        await _secureStorageService.saveAuthUsername(email);
+      }
+      await _secureStorageService.saveAuthSessionActive(true);
+      return true;
+    }
+
+    await _secureStorageService.clearNeonAuthCookie();
+    await _secureStorageService.saveNeonAuthSessionActive(false);
+    await _secureStorageService.saveAuthSessionActive(false);
+    return false;
   }
 
   @override
@@ -82,6 +94,7 @@ class AuthRepositoryImpl implements AuthRepository {
       return false;
     }
     await _secureStorageService.saveAuthUsername(email.trim().toLowerCase());
+    await _secureStorageService.saveNeonAuthSessionActive(true);
     await _secureStorageService.saveAuthSessionActive(true);
     return true;
   }
@@ -163,6 +176,7 @@ class AuthRepositoryImpl implements AuthRepository {
       return false;
     }
     await _secureStorageService.saveAuthUsername(email.trim().toLowerCase());
+    await _secureStorageService.saveNeonAuthSessionActive(true);
     await _secureStorageService.saveAuthSessionActive(true);
     return true;
   }
@@ -173,8 +187,20 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<String?> getCloudAccessToken() =>
-      _neonAuthDataSource.getAccessToken();
+  Future<String?> getCloudAccessToken() async {
+    if (!await _secureStorageService.isNeonAuthSessionActive()) return null;
+    try {
+      return await _neonAuthDataSource.getAccessToken();
+    } on NeonAuthException catch (error) {
+      if (error.statusCode == 401) {
+        await _secureStorageService.clearNeonAuthCookie();
+        await _secureStorageService.saveNeonAuthSessionActive(false);
+        await _secureStorageService.saveAuthSessionActive(false);
+        return null;
+      }
+      rethrow;
+    }
+  }
 
   UserEntity _mapNeonUser(Map<String, dynamic> user) {
     final email = user['email'] is String ? user['email'] as String : '';
