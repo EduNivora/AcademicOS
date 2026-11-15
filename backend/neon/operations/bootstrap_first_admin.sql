@@ -12,7 +12,7 @@ DECLARE
   target_id UUID;
   target_name TEXT;
 BEGIN
-  IF target_email = '' OR target_email LIKE '%REPLACE_WITH_%' THEN
+  IF target_email = '' OR position('replace_with_' in target_email) > 0 THEN
     RAISE EXCEPTION 'Replace the admin email placeholder before running this script';
   END IF;
 
