@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
@@ -39,40 +37,47 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
     final FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'doc', 'docx', 'txt'],
+      withData: true,
     );
     if (result == null) return;
     final file = result.files.first;
-    String? path = file.path;
-    if (path == null && file.bytes != null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('معاينة الملفات غير مدعومة في المتصفح.')));
+    final bytes = file.bytes;
+    if (bytes == null || bytes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذر قراءة محتوى الملف المحدد.')),
+      );
       return;
     }
 
-    final fileName = p.basename(path!);
+    final fileName = p.basename(file.name);
     final ext = p.extension(fileName).replaceFirst('.', '').toLowerCase();
-    try {
-      final appDir = Directory.systemTemp.path;
-      final dest = p.join(appDir, 'academic_os_materials');
-      await Directory(dest).create(recursive: true);
-      final destPath =
-          p.join(dest, '${DateTime.now().millisecondsSinceEpoch}_$fileName');
-      await File(path).copy(destPath);
+    if (!{'pdf', 'doc', 'docx', 'txt'}.contains(ext)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('نوع الملف غير مدعوم.')),
+      );
+      return;
+    }
 
+    try {
       final model = CourseMaterialModel(
         courseId: widget.courseId,
         title: fileName,
-        filePath: destPath,
+        filePath: 'dbblob://${DateTime.now().microsecondsSinceEpoch}',
         fileType: ext,
+        fileBytes: bytes,
       );
       await DatabaseHelper.instance.insertMaterial(model.toMap());
       await _loadMaterials();
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('تم إضافة الملف بنجاح.')));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم حفظ الملف داخل مساحة التطبيق.')),
+      );
     } catch (e) {
-      debugPrint('Failed to save material: $e');
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('فشل حفظ الملف.')));
+      debugPrint('Failed to persist material: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('فشل حفظ الملف. لم يتم تسجيله كمرفق.')),
+      );
     }
   }
 
@@ -82,7 +87,7 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
         context,
         MaterialPageRoute(
             builder: (_) => DocumentViewerScreen(
-                filePath: material.filePath, title: material.title)),
+                filePath: material.filePath, title: material.title, fileBytes: material.fileBytes)),
       );
     } else {
       showDialog(
