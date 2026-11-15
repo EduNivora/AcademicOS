@@ -1,5 +1,7 @@
 import 'dart:html' as html;
 
+import 'platform_http_client.dart';
+
 Future<String> platformGet(Uri uri) async {
   final request = await html.HttpRequest.request(
     uri.toString(),
@@ -23,4 +25,33 @@ Future<void> platformPost(Uri uri) async {
   if (status < 200 || status >= 300) {
     throw Exception('HTTP $status while submitting EduNivora notice metric.');
   }
+}
+
+Future<PlatformHttpResponse> platformRequest(
+  Uri uri, {
+  required String method,
+  Map<String, String> headers = const <String, String>{},
+  String? body,
+  bool withCredentials = false,
+}) async {
+  final request = await html.HttpRequest.request(
+    uri.toString(),
+    method: method,
+    sendData: body,
+    requestHeaders: headers,
+    withCredentials: withCredentials,
+  ).timeout(const Duration(seconds: 15));
+  final responseHeaders = <String, List<String>>{};
+  for (final line in (request.getAllResponseHeaders() ?? '').split('\r\n')) {
+    final separator = line.indexOf(':');
+    if (separator <= 0) continue;
+    final name = line.substring(0, separator).trim().toLowerCase();
+    final value = line.substring(separator + 1).trim();
+    responseHeaders.putIfAbsent(name, () => <String>[]).add(value);
+  }
+  return PlatformHttpResponse(
+    statusCode: request.status ?? 0,
+    body: request.responseText ?? '',
+    headers: responseHeaders,
+  );
 }

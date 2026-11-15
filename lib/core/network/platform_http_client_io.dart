@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'platform_http_client.dart';
+
 Future<String> platformGet(Uri uri) async {
   final client = HttpClient()..connectionTimeout = const Duration(seconds: 12);
   try {
@@ -33,6 +35,34 @@ Future<void> platformPost(Uri uri) async {
         uri: uri,
       );
     }
+  } finally {
+    client.close(force: true);
+  }
+}
+
+Future<PlatformHttpResponse> platformRequest(
+  Uri uri, {
+  required String method,
+  Map<String, String> headers = const <String, String>{},
+  String? body,
+  bool withCredentials = false,
+}) async {
+  final client = HttpClient()..connectionTimeout = const Duration(seconds: 12);
+  try {
+    final request = await client.openUrl(method, uri);
+    headers.forEach(request.headers.set);
+    if (body != null) request.write(body);
+    final response = await request.close().timeout(const Duration(seconds: 15));
+    final responseBody = await response.transform(utf8.decoder).join();
+    final responseHeaders = <String, List<String>>{};
+    response.headers.forEach((name, values) {
+      responseHeaders[name.toLowerCase()] = List<String>.unmodifiable(values);
+    });
+    return PlatformHttpResponse(
+      statusCode: response.statusCode,
+      body: responseBody,
+      headers: responseHeaders,
+    );
   } finally {
     client.close(force: true);
   }
