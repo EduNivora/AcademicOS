@@ -6,7 +6,7 @@ BEGIN;
 -- Serialize concurrent operator runs so two first-admin promotions cannot race.
 LOCK TABLE public.app_users IN EXCLUSIVE MODE;
 
-DO $
+DO $bootstrap$
 DECLARE
   target_email TEXT := lower(trim('REPLACE_WITH_VERIFIED_ADMIN_EMAIL'));
   target_id UUID;
@@ -38,6 +38,6 @@ BEGIN
 
   RAISE NOTICE 'First administrator role assigned to %', target_email;
 END
-$$;
+$bootstrap$;
 
 COMMIT;
