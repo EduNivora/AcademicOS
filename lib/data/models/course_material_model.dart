@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 class CourseMaterialModel {
   final int? id;
   final int courseId;
@@ -5,6 +7,7 @@ class CourseMaterialModel {
   final String filePath;
   final String fileType;
   final String? createdAt;
+  final Uint8List? fileBytes;
 
   CourseMaterialModel({
     this.id,
@@ -13,6 +16,7 @@ class CourseMaterialModel {
     required this.filePath,
     required this.fileType,
     this.createdAt,
+    this.fileBytes,
   });
 
   Map<String, dynamic> toMap() => {
@@ -22,6 +26,7 @@ class CourseMaterialModel {
         'file_path': filePath,
         'file_type': fileType,
         'created_at': createdAt ?? DateTime.now().toIso8601String(),
+        if (fileBytes != null) 'file_bytes': fileBytes,
       };
 
   factory CourseMaterialModel.fromMap(Map<String, dynamic> map) =>
@@ -32,5 +37,6 @@ class CourseMaterialModel {
         filePath: map['file_path'] as String,
         fileType: map['file_type'] as String,
         createdAt: map['created_at'] as String?,
+        fileBytes: map['file_bytes'] as Uint8List?,
       );
 }
