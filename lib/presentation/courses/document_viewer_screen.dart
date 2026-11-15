@@ -44,8 +44,6 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
         );
         await previewFile.writeAsBytes(widget.fileBytes!, flush: true);
         _resolvedFilePath = previewFile.path;
-      } else {
-        _resolvedFilePath = widget.filePath;
       }
     } catch (error) {
       debugPrint('Unable to prepare local PDF preview: $error');
