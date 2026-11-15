@@ -44,12 +44,21 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
       final schedule = await _databaseHelper.getSchedules();
       final materials = await _databaseHelper.getAllMaterials();
 
+      final backupMaterials = materials.map((row) {
+        final copy = Map<String, dynamic>.from(row);
+        final bytes = copy.remove('file_bytes');
+        if (bytes is List<int>) {
+          copy['file_bytes_base64'] = base64.encode(bytes);
+        }
+        return copy;
+      }).toList(growable: false);
+
       final payload = _academicReportService.buildBackupPayload(
         courses: courses,
         tasks: tasks,
         exams: exams,
         schedule: List<Map<String, dynamic>>.from(schedule),
-        materials: materials,
+        materials: backupMaterials,
       );
 
       final encodedBackup = _academicReportService.encodeBackupJson(payload);
@@ -382,7 +391,7 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
         children: [
           _buildActionCard(
             'نسخ احتياطي فوري',
-            'تصدير المقررات والمهام والاختبارات والجدول وبيانات المرفقات؛ ملفات المرفقات نفسها لا تُضمَّن في JSON.',
+            'تصدير المقررات والمهام والاختبارات والجدول وبيانات المرفقات ومحتوى الملفات الفعلي ضمن النسخة.',
             Icons.backup_rounded,
             _exportBackup,
           ),
