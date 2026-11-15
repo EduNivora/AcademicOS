@@ -49,6 +49,6 @@ jobs:
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          accountId: d9979a917e9175a9128bd146ff88bc9d
           command: pages deploy build/web --project-name=edunivora --branch=chore/edunivora-phase0-execution
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
