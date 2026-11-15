@@ -44,12 +44,31 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
       final schedule = await _databaseHelper.getSchedules();
       final materials = await _databaseHelper.getAllMaterials();
 
+      final missingAttachments = materials.where((row) {
+        final bytes = row['file_bytes'];
+        return bytes is! List<int> || bytes.isEmpty;
+      }).length;
+      if (missingAttachments > 0) {
+        throw StateError(
+          'تعذر إنشاء نسخة كاملة: يوجد $missingAttachments مرفق قديم بلا محتوى محفوظ. أعد إرفاق الملفات المفقودة أولاً.',
+        );
+      }
+
+      final backupMaterials = materials.map((row) {
+        final copy = Map<String, dynamic>.from(row);
+        final bytes = copy.remove('file_bytes');
+        if (bytes is List<int>) {
+          copy['file_bytes_base64'] = base64.encode(bytes);
+        }
+        return copy;
+      }).toList(growable: false);
+
       final payload = _academicReportService.buildBackupPayload(
         courses: courses,
         tasks: tasks,
         exams: exams,
         schedule: List<Map<String, dynamic>>.from(schedule),
-        materials: materials,
+        materials: backupMaterials,
       );
 
       final encodedBackup = _academicReportService.encodeBackupJson(payload);
@@ -58,12 +77,18 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
         'payload': encodedBackup,
       };
       final jsonBackupText = const JsonEncoder.withIndent('  ').convert(boxed);
+      final backupBytes = Uint8List.fromList(utf8.encode(jsonBackupText));
+      if (backupBytes.length > 50 * 1024 * 1024) {
+        throw const FormatException(
+          'حجم النسخة يتجاوز حد الاستيراد الحالي (50 MB). قلّل عدد/حجم المرفقات ثم أعد المحاولة.',
+        );
+      }
 
       final fileName =
           'academic_os_backup_${DateTime.now().millisecondsSinceEpoch}.json';
       final savedPath = await FilePicker.platform.saveFile(
         fileName: fileName,
-        bytes: Uint8List.fromList(utf8.encode(jsonBackupText)),
+        bytes: backupBytes,
         type: FileType.custom,
         allowedExtensions: const ['json'],
         dialogTitle: 'حفظ النسخة الاحتياطية',
@@ -382,7 +407,7 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
         children: [
           _buildActionCard(
             'نسخ احتياطي فوري',
-            'تصدير المقررات والمهام والاختبارات والجدول وبيانات المرفقات؛ ملفات المرفقات نفسها لا تُضمَّن في JSON.',
+            'تصدير المقررات والمهام والاختبارات والجدول وبيانات المرفقات ومحتوى الملفات الفعلي ضمن النسخة.',
             Icons.backup_rounded,
             _exportBackup,
           ),

@@ -36,7 +36,7 @@ class DatabaseHelper {
   static bool _nativeFactoryInitialized = false;
 
   static const String _databaseName = 'academic_os.db';
-  static const int _databaseVersion = 10;
+  static const int _databaseVersion = 11;
   static const String _materialsTable = 'course_materials';
   static const String _taskTable = 'tasks';
   static const String _courseTable = 'courses';
@@ -81,7 +81,65 @@ class DatabaseHelper {
       onConfigure: _onConfigure,
       onCreate: _onCreateDatabase,
       onUpgrade: _onUpgradeDatabase,
+      onOpen: _migrateLegacyMaterialFiles,
     );
+  }
+
+  Future<void> _migrateLegacyMaterialFiles(Database db) async {
+    if (kIsWeb) return;
+
+    final legacyRoot = Directory(join(Directory.systemTemp.path, 'academic_os_materials'));
+    if (!await legacyRoot.exists()) return;
+
+    String canonicalRoot;
+    try {
+      canonicalRoot = await legacyRoot.resolveSymbolicLinks();
+    } catch (error) {
+      debugPrint('Legacy attachment migration skipped: $error');
+      return;
+    }
+
+    final rows = await db.query(
+      _materialsTable,
+      columns: ['id', 'file_path', 'file_bytes'],
+      where: 'file_bytes IS NULL',
+    );
+    for (final row in rows) {
+      final id = row['id'];
+      final storedPath = row['file_path'];
+      if (id is! int || storedPath is! String || storedPath.trim().isEmpty) {
+        continue;
+      }
+
+      try {
+        final source = File(storedPath);
+        if (!await source.exists()) continue;
+        final canonicalFile = await source.resolveSymbolicLinks();
+        if (!isWithin(canonicalRoot, canonicalFile) ||
+            canonicalFile == canonicalRoot) {
+          debugPrint('Rejected legacy attachment outside owned temporary root: $id');
+          continue;
+        }
+
+        final bytes = await source.readAsBytes();
+        if (bytes.isEmpty || bytes.length > 50 * 1024 * 1024) continue;
+        final migrated = await db.update(
+          _materialsTable,
+          {
+            'file_bytes': bytes,
+            'file_path': 'dbblob://legacy-$id',
+          },
+          where: 'id = ? AND file_bytes IS NULL',
+          whereArgs: [id],
+        );
+        if (migrated == 1) {
+          await source.delete();
+        }
+      } catch (error) {
+        // Preserve the source file and legacy row on any failed migration.
+        debugPrint('Legacy attachment $id could not be migrated: $error');
+      }
+    }
   }
 
   Future<void> _onConfigure(Database db) async {
@@ -186,6 +244,7 @@ class DatabaseHelper {
         title TEXT NOT NULL,
         file_path TEXT NOT NULL,
         file_type TEXT NOT NULL,
+        file_bytes BLOB,
         created_at TEXT
       )
     ''');
@@ -207,6 +266,9 @@ class DatabaseHelper {
           created_at TEXT
         )
       ''');
+    }
+    if (oldVersion < 11) {
+      await _ensureColumn(db, _materialsTable, 'file_bytes', 'BLOB');
     }
     if (oldVersion < 2) {
       await _ensureColumn(
@@ -389,6 +451,24 @@ class DatabaseHelper {
           throw StateError(
             'This legacy backup omits course materials and would orphan '
             'existing attachments. Restore a v2 backup instead.',
+          );
+        }
+      }
+
+      if (materials != null && materials.any((material) => material.fileBytes == null)) {
+        final existingRows = await txn.query(
+          _materialsTable,
+          columns: ['file_bytes'],
+        );
+        final wouldDiscardStoredBytes = existingRows.any(
+          (row) => row['file_bytes'] is List<int> &&
+              (row['file_bytes'] as List<int>).isNotEmpty,
+        );
+        if (wouldDiscardStoredBytes) {
+          throw StateError(
+            'This metadata-only backup does not contain attachment bytes and '
+            'cannot replace the current workspace without losing stored files. '
+            'Use a complete v3 backup.',
           );
         }
       }
@@ -646,5 +726,16 @@ class DatabaseHelper {
   Future<int> deleteMaterial(int id) async {
     final db = await database;
     return await db.delete(_materialsTable, where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<Map<String, dynamic>?> getMaterialById(int id) async {
+    final db = await database;
+    final rows = await db.query(
+      _materialsTable,
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.first;
   }
 }

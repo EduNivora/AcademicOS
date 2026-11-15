@@ -14,7 +14,7 @@ class AcademicReportService {
     required List<ExamModel> exams,
     required List<Map<String, dynamic>> schedule,
     List<Map<String, dynamic>> materials = const [],
-    String schema = 'academic_os_backup_v2',
+    String schema = 'academic_os_backup_v3',
   }) {
     final payload = <String, dynamic>{
       'schema': schema,

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:academic_os/data/database/database_helper.dart';
@@ -107,8 +109,9 @@ void main() {
               id: restoredMaterialId,
               courseId: restoredCourseId,
               title: 'Restored notes',
-              filePath: '/tmp/restored-notes.pdf',
+              filePath: 'dbblob://restored-notes',
               fileType: 'pdf',
+              fileBytes: Uint8List.fromList([37, 80, 68, 70, 45, 49]),
             ),
           ],
         );
@@ -215,4 +218,108 @@ void main() {
       await helper.close();
     });
   });
+
+    test('course material attachment bytes persist in SQLite', () async {
+      final helper = DatabaseHelper.instance;
+      await helper.close();
+      const courseId = 987661;
+      const materialId = 987662;
+      await helper.deleteMaterial(materialId);
+      await helper.deleteCourse(courseId);
+      final bytes = Uint8List.fromList([37, 80, 68, 70, 45, 49, 46, 52]);
+      try {
+        await helper.insertCourse(
+          const CourseModel(
+            id: courseId,
+            name: 'Attachment persistence',
+            instructor: 'Instructor',
+            code: 'ATT-1',
+            credits: 3,
+          ),
+        );
+        await helper.insertMaterial({
+          'id': materialId,
+          'course_id': courseId,
+          'title': 'sample.pdf',
+          'file_path': 'dbblob://sample',
+          'file_type': 'pdf',
+          'file_bytes': bytes,
+        });
+        final row = await helper.getMaterialById(materialId);
+        expect(row, isNotNull);
+        expect(row!['file_bytes'], isA<Uint8List>());
+        expect(List<int>.from(row['file_bytes'] as Uint8List), orderedEquals(bytes));
+        await helper.deleteMaterial(materialId);
+        expect(await helper.getMaterialById(materialId), isNull);
+      } finally {
+        await helper.deleteMaterial(materialId);
+        await helper.deleteCourse(courseId);
+        await helper.close();
+      }
+    });
+
+
+    test('metadata-only backup cannot discard existing attachment bytes', () async {
+      final helper = DatabaseHelper.instance;
+      await helper.close();
+      const courseId = 987663;
+      const materialId = 987664;
+      await helper.deleteMaterial(materialId);
+      await helper.deleteCourse(courseId);
+      final bytes = Uint8List.fromList([37, 80, 68, 70]);
+      try {
+        await helper.insertCourse(
+          const CourseModel(
+            id: courseId,
+            name: 'Protected attachment',
+            instructor: 'Instructor',
+            code: 'SAFE-1',
+            credits: 3,
+          ),
+        );
+        await helper.insertMaterial({
+          'id': materialId,
+          'course_id': courseId,
+          'title': 'protected.pdf',
+          'file_path': 'dbblob://protected',
+          'file_type': 'pdf',
+          'file_bytes': bytes,
+        });
+
+        await expectLater(
+          helper.replaceAcademicData(
+            courses: const [
+              CourseModel(
+                id: courseId,
+                name: 'Protected attachment',
+                instructor: 'Instructor',
+                code: 'SAFE-1',
+                credits: 3,
+              ),
+            ],
+            tasks: const [],
+            exams: const [],
+            schedules: const [],
+            materials: [
+              CourseMaterialModel(
+                id: materialId,
+                courseId: courseId,
+                title: 'protected.pdf',
+                filePath: '/legacy/metadata-only.pdf',
+                fileType: 'pdf',
+              ),
+            ],
+          ),
+          throwsA(isA<StateError>()),
+        );
+
+        final row = await helper.getMaterialById(materialId);
+        expect(List<int>.from(row?['file_bytes'] as Uint8List), orderedEquals(bytes));
+      } finally {
+        await helper.deleteMaterial(materialId);
+        await helper.deleteCourse(courseId);
+        await helper.close();
+      }
+    });
+
 }

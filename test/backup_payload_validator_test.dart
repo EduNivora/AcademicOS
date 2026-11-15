@@ -143,4 +143,28 @@ void main() {
       ..remove('materials');
     expect(validator.validate(payload).materials, isNull);
   });
+
+  test('v3 backup decodes attachment bytes for database restore', () {
+    final payload = _validPayload()
+      ..['schema'] = 'academic_os_backup_v3';
+    (payload['materials'] as List).first['file_bytes_base64'] = 'JVBERi0xLjQK';
+    final result = validator.validate(payload);
+    expect(result.materials, hasLength(1));
+    expect(result.materials!.single.fileBytes, isNotNull);
+    expect(result.materials!.single.fileBytes, isNotEmpty);
+  });
+
+  test('v3 backup rejects attachment metadata without file bytes', () {
+    final payload = _validPayload()
+      ..['schema'] = 'academic_os_backup_v3';
+    expect(() => validator.validate(payload), throwsFormatException);
+  });
+
+  test('v3 backup rejects malformed attachment base64', () {
+    final payload = _validPayload()
+      ..['schema'] = 'academic_os_backup_v3';
+    (payload['materials'] as List).first['file_bytes_base64'] = '%%%';
+    expect(() => validator.validate(payload), throwsFormatException);
+  });
+
 }
