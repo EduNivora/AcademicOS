@@ -44,6 +44,7 @@ was introduced.
 - `PATCH /v1/admin/announcements/:id` — admin-only draft editing.
 - `POST /v1/admin/announcements/:id/publish` — admin-only publication.
 - `POST /v1/admin/announcements/:id/archive` — admin-only archive.
+- `GET /v1/admin/announcements?status=draft|published|archived` — admin-only notice list.
 - `GET /v1/admin/announcements/:id/report` — admin-only report.
 
 All registered-user endpoints require a Neon Auth JWT in the Authorization
