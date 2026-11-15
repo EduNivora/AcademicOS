@@ -85,6 +85,17 @@ Future<void> runSqlite3McProof({
     if (rows.length != 1 || rows.single['value'] != _plaintextCanary) {
       throw StateError('Correct-key reopen did not recover the canary row.');
     }
+
+    // Reading the schema and row is not enough to prove every database page
+    // remains structurally sound after a failed wrong-key attempt. Run the
+    // engine's full integrity check after reopening with the correct key.
+    final integrityRows = await reopened.rawQuery('PRAGMA integrity_check');
+    if (integrityRows.length != 1 ||
+        integrityRows.single.values.single != 'ok') {
+      throw StateError(
+        'Correct-key database integrity check failed: $integrityRows',
+      );
+    }
   } finally {
     await reopened.close();
   }
