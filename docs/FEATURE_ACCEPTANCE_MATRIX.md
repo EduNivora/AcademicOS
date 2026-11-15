@@ -98,3 +98,14 @@ Notice delivery is not guaranteed while a device is offline or notifications are
 - Artifact `academicos-android-debug-apk`: 97,515,795 bytes; SHA-256 `cb9dbc7a7ae803aff094abe6efea26a8664ae74d81be306d04610f99883d70d4`; expires 2026-11-29.
 - This CI run predates the documentation commit recording these approved decisions; rerun CI on the resulting documentation commit before claiming that new head is verified.
 - No PR merge is implied by this documentation update.
+
+## Encrypted backup archive implementation — pending acceptance
+
+The integration branch adds a password-protected local archive path in the backup screen:
+- Argon2id derives a key-encryption key using a unique 16-byte salt and fixed, versioned parameters (19 MiB memory, 2 iterations, parallelism 1).
+- A random 256-bit data-encryption key is wrapped with AES-256-GCM; the backup payload is separately encrypted with AES-256-GCM and independent 96-bit nonces.
+- Authentication tags and version/KDF metadata are stored in the archive envelope. Passwords and plaintext keys are not persisted.
+- Export writes an `.edunivora` encrypted archive; restore decrypts and validates it before calling the existing database replacement transaction. Legacy plaintext JSON import remains available for compatibility.
+- Unit tests in `test/backup_archive_crypto_service_test.dart` cover round-trip, weak passwords, wrong passwords, ciphertext tampering and malformed/unsupported envelopes.
+
+**Status: implemented on the integration branch; not yet CI-verified or accepted.** This is not yet the approved complete Google Drive backup: Google OAuth, the visible `EduNivora` Drive folder, resumable upload/download, manifest/checksums, full SQLite snapshot/settings, staged cross-device restore and failure-injection acceptance remain open. Live SQLite-at-rest encryption is a separate release gate. Do not claim the complete backup requirement is met.
