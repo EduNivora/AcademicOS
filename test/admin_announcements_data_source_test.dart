@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:academic_os/core/network/platform_http_client.dart';
 import 'package:academic_os/data/datasources/admin_announcements_data_source.dart';
@@ -53,5 +55,34 @@ void main() {
       throwsA(isA<AdminAnnouncementsException>()
           .having((error) => error.statusCode, 'statusCode', 403)),
     );
+  });
+
+  test('creates a draft using the API item response contract', () async {
+    final source = AdminAnnouncementsDataSource(
+      baseUrl: 'https://api.example.test',
+      request: (_, {
+        required String method,
+        required Map<String, String> headers,
+        String? body,
+        required bool withCredentials,
+      }) async {
+        expect(method, 'POST');
+        expect(headers['Authorization'], 'Bearer admin-jwt');
+        expect(jsonDecode(body!)['title'], 'Exam schedule');
+        return const PlatformHttpResponse(
+          statusCode: 201,
+          body: '{"item":{"id":"notice-2","title":"Exam schedule","status":"draft"}}',
+        );
+      },
+    );
+
+    final created = await source.create(
+      accessToken: 'admin-jwt',
+      title: 'Exam schedule',
+      body: 'The exam timetable is available.',
+    );
+
+    expect(created['id'], 'notice-2');
+    expect(created['status'], 'draft');
   });
 }
