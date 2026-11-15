@@ -6,6 +6,7 @@ export default defineConfig({
     notices: {
       name: "EduNivora Notices API",
       source: "backend/neon/dist/notices.mjs",
+      externalPackages: ["pg", "@neon/functions"],
     },
   },
   branch: () => ({
