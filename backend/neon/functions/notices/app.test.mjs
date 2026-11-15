@@ -171,7 +171,7 @@ test("authenticated profile endpoint returns the server-owned role", async () =>
   assert.equal(response.status, 200);
   const body = await response.json();
   assert.equal(body.user.role, "admin");
-  assert.equal(body.user.email, "student@example.com");
+  assert.equal(body.user.email, "test@example.com");
 });
 
 test("profile endpoint rejects missing bearer credentials", async () => {

@@ -106,7 +106,7 @@ export function createApp({ pool, verifyIdentity, allowedOrigins = [] }) {
 
   app.get("/v1/me", async (c) => {
     const authorization = c.req.header("Authorization") ?? "";
-    const token = authorization.match(/^Bearer\\s+(.+)$/i)?.[1];
+    const token = authorization.match(/^Bearer\s+(.+)$/i)?.[1];
     if (!token) return jsonError(c, 401, "unauthorized", "Sign-in is required.");
 
     let identity;
