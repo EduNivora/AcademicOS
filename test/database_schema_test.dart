@@ -327,181 +327,186 @@ void main() {
     });
 
 
+
   test(
     'academic terms enforce uniqueness, active selection, rename links and delete protection',
     () async {
-    final helper = DatabaseHelper.instance;
-    await helper.close();
+      final helper = DatabaseHelper.instance;
+      await helper.close();
 
-    final start = DateTime(2026, 9, 1);
-    final end = DateTime(2026, 12, 20);
-    const firstName = '__db_term_integration_first__';
-    const secondName = '__db_term_integration_second__';
-    const courseId = 987671;
+      final startDate = DateTime(2026, 9, 1);
+      final endDate = DateTime(2026, 12, 20);
+      const firstName = '__db_term_integration_first__';
+      const secondName = '__db_term_integration_second__';
+      const courseId = 987671;
 
-    await helper.deleteCourse(courseId);
-    final existing = await helper.getAcademicTerms();
-    for (final term in existing.where(
-      (term) =>
-          term.name == firstName ||
-          term.name == secondName ||
-          term.name == 'Renamed integration term',
-    )) {
-      await helper.deleteAcademicTerm(term.id!);
-    }
-    final previousActive = await helper.getActiveAcademicTerm();
+      await helper.deleteCourse(courseId);
+      final existing = await helper.getAcademicTerms();
+      for (final term in existing.where(
+        (term) =>
+            term.name == firstName ||
+            term.name == secondName ||
+            term.name == 'Renamed integration term',
+      )) {
+        await helper.deleteAcademicTerm(term.id!);
+      }
+      final previousActive = await helper.getActiveAcademicTerm();
 
-    int? firstId;
-    int? secondId;
-    try {
-      firstId = await helper.insertAcademicTerm(
-        AcademicTermModel(
-          name: firstName,
-          startDate: start,
-          endDate: end,
-          isActive: true,
-        ),
-      );
-      secondId = await helper.insertAcademicTerm(
-        AcademicTermModel(
-          name: secondName,
-          startDate: start,
-          endDate: end,
-          isActive: true,
-        ),
-      );
-
-      expect((await helper.getActiveAcademicTerm())?.id, secondId);
-      final termsAfterActivation = await helper.getAcademicTerms();
-      expect(
-        termsAfterActivation.singleWhere((term) => term.id == firstId).isActive,
-        isFalse,
-      );
-
-      await expectLater(
-        helper.insertAcademicTerm(
+      int? firstId;
+      int? secondId;
+      try {
+        firstId = await helper.insertAcademicTerm(
           AcademicTermModel(
-            name: secondName.toUpperCase(),
-            startDate: start,
-            endDate: end,
+            name: firstName,
+            startDate: startDate,
+            endDate: endDate,
+            isActive: true,
           ),
-        ),
-        throwsA(isA<Exception>()),
-      );
+        );
+        secondId = await helper.insertAcademicTerm(
+          AcademicTermModel(
+            name: secondName,
+            startDate: startDate,
+            endDate: endDate,
+            isActive: true,
+          ),
+        );
 
+        expect((await helper.getActiveAcademicTerm())?.id, secondId);
+        final termsAfterActivation = await helper.getAcademicTerms();
+        expect(
+          termsAfterActivation.singleWhere((term) => term.id == firstId).isActive,
+          isFalse,
+        );
+
+        await expectLater(
+          helper.insertAcademicTerm(
+            AcademicTermModel(
+              name: secondName.toUpperCase(),
+              startDate: startDate,
+              endDate: endDate,
+            ),
+          ),
+          throwsA(isA<Exception>()),
+        );
+
+        await helper.insertCourse(
+          const CourseModel(
+            id: courseId,
+            name: 'Term relationship test',
+            instructor: 'Instructor',
+            code: 'TERM-DB-1',
+            credits: 3,
+            semester: secondName,
+          ),
+        );
+
+        await helper.updateAcademicTerm(
+          AcademicTermModel(
+            id: secondId,
+            name: 'Renamed integration term',
+            startDate: startDate,
+            endDate: endDate,
+            isActive: true,
+          ),
+        );
+        expect(
+          (await helper.getCourseById(courseId))?.semester,
+          'Renamed integration term',
+        );
+
+        await expectLater(
+          helper.deleteAcademicTerm(secondId),
+          throwsA(isA<StateError>()),
+        );
+
+        await helper.deleteCourse(courseId);
+        expect(await helper.deleteAcademicTerm(secondId), 1);
+        expect(await helper.deleteAcademicTerm(firstId), 1);
+
+        final db = await helper.database;
+        final columns = await db.rawQuery('PRAGMA table_info(academic_terms)');
+        final columnNames = columns.map((row) => row['name']).toSet();
+        expect(
+          columnNames,
+          containsAll([
+            'name',
+            'start_date',
+            'end_date',
+            'is_active',
+            'created_at',
+          ]),
+        );
+        final indexes = await db.rawQuery('PRAGMA index_list(academic_terms)');
+        final indexNames = indexes.map((row) => row['name']).toSet();
+        expect(indexNames, contains('idx_academic_terms_name'));
+        expect(indexNames, contains('idx_academic_terms_single_active'));
+      } finally {
+        await helper.deleteCourse(courseId);
+        for (final id in [secondId, firstId]) {
+          if (id != null) {
+            await helper.deleteAcademicTerm(id);
+          }
+        }
+        if (previousActive?.id != null) {
+          await helper.setActiveAcademicTerm(previousActive!.id!);
+        }
+        await helper.close();
+      }
+    },
+  );
+
+  test(
+    'schema v11 upgrades to v12 without losing existing course data',
+    () async {
+      final helper = DatabaseHelper.instance;
+      await helper.close();
+      const courseId = 987672;
+      await helper.deleteCourse(courseId);
       await helper.insertCourse(
         const CourseModel(
           id: courseId,
-          name: 'Term relationship test',
+          name: 'Migration preservation',
           instructor: 'Instructor',
-          code: 'TERM-DB-1',
+          code: 'MIG-12',
           credits: 3,
-          semester: secondName,
         ),
       );
 
-      await helper.updateAcademicTerm(
-        AcademicTermModel(
-          id: secondId,
-          name: 'Renamed integration term',
-          startDate: start,
-          endDate: end,
-          isActive: true,
-        ),
-      );
-      expect(
-        (await helper.getCourseById(courseId))?.semester,
-        'Renamed integration term',
-      );
+      try {
+        final db = await helper.database;
+        await db.execute('DROP TABLE IF EXISTS academic_terms');
+        await db.execute('PRAGMA user_version = 11');
+        await helper.close();
 
-      await expectLater(
-        helper.deleteAcademicTerm(secondId),
-        throwsA(isA<StateError>()),
-      );
+        final upgradedDb = await helper.database;
+        final version = await upgradedDb.rawQuery('PRAGMA user_version');
+        expect(version.single['user_version'], 12);
 
-      await helper.deleteCourse(courseId);
-      expect(await helper.deleteAcademicTerm(secondId), 1);
-      expect(await helper.deleteAcademicTerm(firstId), 1);
-
-      final db = await helper.database;
-      final columns = await db.rawQuery('PRAGMA table_info(academic_terms)');
-      final columnNames = columns.map((row) => row['name']).toSet();
-      expect(
-        columnNames,
-        containsAll([
-          'name',
-          'start_date',
-          'end_date',
-          'is_active',
-          'created_at',
-        ]),
-      );
-      final indexes = await db.rawQuery('PRAGMA index_list(academic_terms)');
-      final indexNames = indexes.map((row) => row['name']).toSet();
-      expect(indexNames, contains('idx_academic_terms_name'));
-      expect(indexNames, contains('idx_academic_terms_single_active'));
-    } finally {
-      await helper.deleteCourse(courseId);
-      for (final id in [secondId, firstId]) {
-        if (id != null) {
-          await helper.deleteAcademicTerm(id);
-        }
+        final termColumns =
+            await upgradedDb.rawQuery('PRAGMA table_info(academic_terms)');
+        expect(
+          termColumns.map((row) => row['name']),
+          containsAll(['name', 'start_date', 'end_date', 'is_active']),
+        );
+        final indexes =
+            await upgradedDb.rawQuery('PRAGMA index_list(academic_terms)');
+        expect(
+          indexes.map((row) => row['name']),
+          containsAll([
+            'idx_academic_terms_name',
+            'idx_academic_terms_single_active',
+          ]),
+        );
+        expect(
+          (await helper.getCourseById(courseId))?.name,
+          'Migration preservation',
+        );
+      } finally {
+        await helper.deleteCourse(courseId);
+        await helper.close();
       }
-      if (previousActive?.id != null) {
-        await helper.setActiveAcademicTerm(previousActive!.id!);
-      }
-      await helper.close();
-    }
-  },
+    },
   );
-
-
-  test('schema v11 upgrades to v12 without losing existing course data', () async {
-    final helper = DatabaseHelper.instance;
-    await helper.close();
-    const courseId = 987672;
-    await helper.deleteCourse(courseId);
-    await helper.insertCourse(
-      const CourseModel(
-        id: courseId,
-        name: 'Migration preservation',
-        instructor: 'Instructor',
-        code: 'MIG-12',
-        credits: 3,
-      ),
-    );
-
-    try {
-      final db = await helper.database;
-      await db.execute('DROP TABLE IF EXISTS academic_terms');
-      await db.execute('PRAGMA user_version = 11');
-      await helper.close();
-
-      final upgradedDb = await helper.database;
-      final version = await upgradedDb.rawQuery('PRAGMA user_version');
-      expect(version.single['user_version'], 12);
-
-      final termColumns =
-          await upgradedDb.rawQuery('PRAGMA table_info(academic_terms)');
-      expect(
-        termColumns.map((row) => row['name']),
-        containsAll(['name', 'start_date', 'end_date', 'is_active']),
-      );
-      final indexes =
-          await upgradedDb.rawQuery('PRAGMA index_list(academic_terms)');
-      expect(
-        indexes.map((row) => row['name']),
-        containsAll([
-          'idx_academic_terms_name',
-          'idx_academic_terms_single_active',
-        ]),
-      );
-      expect((await helper.getCourseById(courseId))?.name,
-          'Migration preservation');
-    } finally {
-      await helper.deleteCourse(courseId);
-      await helper.close();
-    }
-  });
 
 }
