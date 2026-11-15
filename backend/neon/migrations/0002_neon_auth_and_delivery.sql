@@ -40,14 +40,27 @@ CREATE INDEX IF NOT EXISTS announcement_deliveries_user_idx
 
 CREATE TABLE IF NOT EXISTS public.announcement_admin_audit (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  actor_user_id UUID NOT NULL
-    REFERENCES public.app_users(id) ON DELETE RESTRICT,
+  actor_user_id UUID
+    REFERENCES public.app_users(id) ON DELETE SET NULL,
   announcement_id UUID
     REFERENCES public.announcements(id) ON DELETE SET NULL,
   action TEXT NOT NULL
     CHECK (action IN ('create', 'update', 'publish', 'archive', 'view_report')),
   occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Preserve audit events if an account is deleted, while anonymizing the actor.
+ALTER TABLE public.announcement_admin_audit
+  ALTER COLUMN actor_user_id DROP NOT NULL;
+
+ALTER TABLE public.announcement_admin_audit
+  DROP CONSTRAINT IF EXISTS announcement_admin_audit_actor_user_id_fkey;
+
+ALTER TABLE public.announcement_admin_audit
+  ADD CONSTRAINT announcement_admin_audit_actor_user_id_fkey
+  FOREIGN KEY (actor_user_id)
+  REFERENCES public.app_users(id)
+  ON DELETE SET NULL;
 
 CREATE INDEX IF NOT EXISTS announcement_admin_audit_time_idx
   ON public.announcement_admin_audit (occurred_at DESC);
