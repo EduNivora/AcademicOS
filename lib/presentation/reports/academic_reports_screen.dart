@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -76,7 +77,7 @@ class _AcademicReportsScreenState extends State<AcademicReportsScreen> {
           'edunivora_academic_report_${DateTime.now().millisecondsSinceEpoch}.txt';
       final savedPath = await FilePicker.platform.saveFile(
         fileName: fileName,
-        bytes: Uint8List.fromList(_reportText.codeUnits),
+        bytes: Uint8List.fromList(utf8.encode(_reportText)),
         type: FileType.custom,
         allowedExtensions: const ['txt'],
         dialogTitle: 'حفظ التقرير الأكاديمي',
