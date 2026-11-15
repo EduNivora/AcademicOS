@@ -8,8 +8,11 @@ for (const key of required) {
   if (!process.env[key]) throw new Error(`Missing required runtime variable: ${key}`);
 }
 
+const databaseUrl = new URL(process.env.DATABASE_URL);
+databaseUrl.searchParams.set("sslmode", "verify-full");
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: databaseUrl.toString(),
   max: 5,
   idleTimeoutMillis: 10_000,
   connectionTimeoutMillis: 5_000,
