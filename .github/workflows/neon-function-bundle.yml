@@ -35,8 +35,7 @@ jobs:
           set -euo pipefail
           package_dir="$RUNNER_TEMP/notices-function"
           mkdir -p "$package_dir"
-          cp backend/neon/functions/notices/app.mjs "$package_dir/app.mjs"
-          cp backend/neon/functions/notices/index.mjs "$package_dir/index.mjs"
+          cp backend/neon/dist/notices.mjs "$package_dir/index.mjs"
           cat > "$package_dir/package.json" <<'JSON'
           {
             "type": "module",
