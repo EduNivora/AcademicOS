@@ -59,10 +59,7 @@ export function createApp({ pool, verifyIdentity, allowedOrigins = [] }) {
     "*",
     cors({
       origin: (origin) =>
-        origin &&
-        (allowedOrigins.includes("*") || allowedOrigins.includes(origin))
-          ? origin
-          : "",
+        origin && allowedOrigins.includes(origin) ? origin : "",
       allowMethods: ["GET", "POST", "PATCH", "OPTIONS"],
       allowHeaders: ["Content-Type", "Authorization"],
       maxAge: 600,
