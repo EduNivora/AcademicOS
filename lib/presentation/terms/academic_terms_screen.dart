@@ -17,9 +17,9 @@ class _AcademicTermsScreenState extends State<AcademicTermsScreen> {
   String? _loadError;
 
   String _formatDate(DateTime value) =>
-      '\${value.year.toString().padLeft(4, '0')}-'
-      '\${value.month.toString().padLeft(2, '0')}-'
-      '\${value.day.toString().padLeft(2, '0')}';
+      '${value.year.toString().padLeft(4, '0')}-'
+      '${value.month.toString().padLeft(2, '0')}-'
+      '${value.day.toString().padLeft(2, '0')}';
 
   @override
   void initState() {
@@ -222,7 +222,7 @@ class _AcademicTermsScreenState extends State<AcademicTermsScreen> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('حذف الفصل الدراسي؟'),
         content: Text(
-          'سيتم حذف «\${term.name}». لا يمكن حذف فصل ما زالت هناك مقررات مرتبطة باسمه.',
+          'سيتم حذف «${term.name}». لا يمكن حذف فصل ما زالت هناك مقررات مرتبطة باسمه.',
         ),
         actions: [
           TextButton(
@@ -360,7 +360,7 @@ class _AcademicTermsScreenState extends State<AcademicTermsScreen> {
                                 ],
                               ),
                               subtitle: Text(
-                                '\${_formatDate(term.startDate)} — \${_formatDate(term.endDate)}',
+                                '${_formatDate(term.startDate)} — ${_formatDate(term.endDate)}',
                               ),
                               trailing: PopupMenuButton<String>(
                                 onSelected: (action) {
