@@ -1,8 +1,12 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_pdfview/flutter_pdfview.dart';
+import 'package:path/path.dart' as p;
+
+import '../../core/security/material_path_guard.dart';
 import '../../core/services/local_summarizer_service.dart';
 
 // Extracts PDF text locally with flutter_pdf_text.
@@ -21,11 +25,36 @@ class DocumentViewerScreen extends StatefulWidget {
 
 class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
   bool _isSummarizing = false;
+  late Future<String?> _safeFilePathFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _safeFilePathFuture = _resolveSafeFilePath();
+  }
+
+  @override
+  void didUpdateWidget(covariant DocumentViewerScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.filePath != widget.filePath) {
+      _safeFilePathFuture = _resolveSafeFilePath();
+    }
+  }
+
+  Future<String?> _resolveSafeFilePath() {
+    if (kIsWeb) return Future<String?>.value(null);
+    final rootDirectory = Directory(
+      p.join(Directory.systemTemp.path, 'academic_os_materials'),
+    );
+    return MaterialPathGuard(rootDirectory: rootDirectory)
+        .resolveOwnedFilePath(widget.filePath);
+  }
 
   Future<String> _extractTextFromPdf() async {
     try {
-      final file = File(widget.filePath);
-      if (!file.existsSync()) return '';
+      final safePath = await _safeFilePathFuture;
+      if (safePath == null) return '';
+      final file = File(safePath);
 
       // Extract text locally without uploading the document.
       final doc = await pdf_text.PDFDoc.fromFile(file);
@@ -151,18 +180,27 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
         ],
       ),
       body: SafeArea(
-        child: Builder(builder: (context) {
-          if (!File(widget.filePath).existsSync()) {
-            return Center(child: Text('الملف غير موجود'));
-          }
-          return PDFView(
-            filePath: widget.filePath,
-            enableSwipe: true,
-            swipeHorizontal: false,
-            autoSpacing: true,
-            pageFling: true,
-          );
-        }),
+        child: FutureBuilder<String?>(
+          future: _safeFilePathFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final safePath = snapshot.data;
+            if (safePath == null) {
+              return const Center(
+                child: Text('الملف غير موجود أو مساره غير موثوق. أعد إرفاق الملف من مصدره الأصلي.'),
+              );
+            }
+            return PDFView(
+              filePath: safePath,
+              enableSwipe: true,
+              swipeHorizontal: false,
+              autoSpacing: true,
+              pageFling: true,
+            );
+          },
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _isSummarizing ? null : _onSummarizePressed,
