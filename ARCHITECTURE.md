@@ -168,3 +168,37 @@ No institutional portal, lecturer portal, student administration, official unive
 
 ### Security distinction
 Encrypted Google Drive backups do not imply that the live SQLite database is encrypted at rest. Production database encryption remains a separate security/release gate and must not be claimed until implemented and tested.
+
+
+## 12. Release 1 cloud metadata backend — Neon
+
+The dedicated Neon project `edunivora` is the PostgreSQL provider for optional
+accounts and public notices only. Neon Managed Auth (Better Auth) owns the
+`neon_auth` schema, password verification, OAuth identities, email
+verification, and sessions. The app-owned `public.app_users` table is only a
+minimal profile/role projection linked by UUID to `neon_auth."user"(id)`; it
+does not store passwords or session tokens.
+
+App-owned cloud tables:
+- `app_users`: profile and notice-operator role projection.
+- `announcements`: plain-text public notices.
+- `announcement_deliveries` and `announcement_reads`: registered account
+  acknowledgements.
+- `announcement_guest_daily_metrics`: aggregate guest delivery/view counters
+  with no guest identifier.
+- `announcement_admin_audit`: narrow audit events for notice administration.
+
+The intended API is a Neon Function (Hono + Node.js 24 + PostgreSQL `pg`
+pool). It verifies Managed Auth JWTs using the branch JWKS and performs
+server-side role checks. The database URL and Auth keys must never be shipped
+inside the Flutter client.
+
+Current implementation boundary: Neon Auth and database schema are provisioned;
+the API source and tests are on `feat/neon-managed-auth-and-notices`. Deployment,
+Flutter integration, production OAuth/SMTP setup, trusted origins, admin
+bootstrap, and receipt-retention policy are not yet accepted. Existing Flutter
+authentication remains local until the managed client is implemented and
+verified. Guest academic use remains available without a network connection.
+
+Google Drive backup remains deferred to Release 2. No academic cloud sync is
+introduced by this backend.
