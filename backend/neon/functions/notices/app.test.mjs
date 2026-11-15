@@ -230,3 +230,21 @@ test("wildcard CORS configuration does not authorize arbitrary origins", async (
   });
   assert.equal(response.headers.get("Access-Control-Allow-Origin"), null);
 });
+
+test("protected endpoints return 401 when token verification infrastructure fails", async () => {
+  const app = createApp({
+    pool: createPool(),
+    verifyIdentity: async () => { throw new Error("JWKS temporarily unavailable"); },
+    allowedOrigins: ["https://app.example.test"],
+  });
+  const headers = { Authorization: "Bearer syntactically-present-token" };
+
+  const receipt = await app.request(
+    `/v1/announcements/${announcementId}/delivered`,
+    { method: "POST", headers },
+  );
+  assert.equal(receipt.status, 401);
+
+  const admin = await app.request("/v1/admin/announcements", { headers });
+  assert.equal(admin.status, 401);
+});
