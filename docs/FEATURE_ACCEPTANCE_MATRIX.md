@@ -124,3 +124,5 @@ release requires the project's own Google OAuth client credentials, verified
 redirect/trusted origins, and a production SMTP sender. Do not report Google
 or email sign-in as production-ready until the Flutter flows and delivery are
 tested end to end.
+
+| Flutter public notices feed | **Implemented in branch** — public feed screen, offline cache, guest delivery/view aggregate events | Flutter analyze/tests, Android/Web builds, live CORS from actual Web origin, offline cache behavior and API error handling |
