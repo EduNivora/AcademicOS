@@ -103,9 +103,29 @@ class NeonAuthDataSource {
   }
 
   Future<String?> getAccessToken() async {
-    final result = await _sendNullable('/token', method: 'GET');
-    final token = result?['token'];
-    return token is String && token.isNotEmpty ? token : null;
+    Map<String, dynamic>? session;
+    try {
+      session = await getSession();
+    } on NeonAuthException catch (error) {
+      if (error.statusCode == 401) {
+        await _sessionStore.clearCookie();
+        return null;
+      }
+      rethrow;
+    }
+    if (session == null) return null;
+
+    try {
+      final result = await _sendNullable('/token', method: 'GET');
+      final token = result?['token'];
+      return token is String && token.isNotEmpty ? token : null;
+    } on NeonAuthException catch (error) {
+      if (error.statusCode == 401) {
+        await _sessionStore.clearCookie();
+        return null;
+      }
+      rethrow;
+    }
   }
 
   Future<void> signOut() async {

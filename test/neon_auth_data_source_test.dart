@@ -113,6 +113,12 @@ void main() {
     }) async {
       credentialsIncluded = withCredentials;
       cookieHeaderSent = headers.containsKey('Cookie');
+      if (uri.path.endsWith('/get-session')) {
+        return const PlatformHttpResponse(
+          statusCode: 200,
+          body: '{"session":{"id":"session-1"},"user":{"id":"user-1","email":"student@example.com"}}',
+        );
+      }
       return const PlatformHttpResponse(
         statusCode: 200,
         body: '{"token":"jwt-token"}',
@@ -157,5 +163,31 @@ void main() {
                 'Invalid email or password'),
       ),
     );
+  });
+
+  test('returns no JWT for a guest without making a token request', () async {
+    final store = _MemorySessionStore();
+    final requestedPaths = <String>[];
+
+    Future<PlatformHttpResponse> request(
+      Uri uri, {
+      required String method,
+      Map<String, String> headers = const {},
+      String? body,
+      bool withCredentials = false,
+    }) async {
+      requestedPaths.add(uri.path);
+      return const PlatformHttpResponse(statusCode: 200, body: 'null');
+    }
+
+    final auth = NeonAuthDataSource(
+      request: request,
+      sessionStore: store,
+      baseUrl: 'https://auth.example.test/auth',
+      webMode: false,
+    );
+
+    expect(await auth.getAccessToken(), isNull);
+    expect(requestedPaths, ['/auth/get-session']);
   });
 }
