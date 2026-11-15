@@ -13,7 +13,7 @@ class PlatformHttpResponse {
 typedef PlatformHttpRequest = Future<PlatformHttpResponse> Function(
   Uri uri, {
   required String method,
-  Map<String, String> headers,
+  required Map<String, String> headers,
   String? body,
-  bool withCredentials,
+  required bool withCredentials,
 });
