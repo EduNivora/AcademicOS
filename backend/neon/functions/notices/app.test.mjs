@@ -162,6 +162,23 @@ test("announcement input is bounded and validated", async () => {
   assert.equal(response.status, 400);
 });
 
+
+test("authenticated profile endpoint returns the server-owned role", async () => {
+  const pool = createPool({ role: "admin" });
+  const response = await makeApp({ pool }).request("/v1/me", {
+    headers: { Authorization: "Bearer valid" },
+  });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.user.role, "admin");
+  assert.equal(body.user.email, "student@example.com");
+});
+
+test("profile endpoint rejects missing bearer credentials", async () => {
+  const response = await makeApp({ pool: createPool() }).request("/v1/me");
+  assert.equal(response.status, 401);
+});
+
 test("guest delivery is recorded as an aggregate event without identity", async () => {
   const pool = createPool();
   const response = await makeApp({ pool }).request(

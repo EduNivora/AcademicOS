@@ -35,6 +35,7 @@ was introduced.
 ## API
 
 - `GET /health`
+- `GET /v1/me` — authenticated app profile and server-owned role projection.
 - `GET /v1/announcements?limit=20&before=<ISO timestamp>` — public, guest-safe feed.
 - `POST /v1/announcements/:id/guest-view` — increments an aggregate daily view counter.
 - `POST /v1/announcements/:id/guest-delivered` — increments an aggregate daily delivery counter.
@@ -51,7 +52,8 @@ All registered-user endpoints require a Neon Auth JWT in the Authorization
 Bearer header. The API verifies its EdDSA signature against the branch JWKS,
 checks the issuer, and resolves the subject against the managed Auth user table.
 Admin authorization is enforced from `app_users.role` on every request; it is
-never trusted from a client-supplied field.
+never trusted from a client-supplied field. `GET /v1/me` exposes this role to the
+client without granting any additional authority.
 
 Guest metrics contain counters only. They do not store guest IDs, IP addresses,
 device fingerprints, or stable guest identifiers. Guest counters are event
@@ -75,6 +77,15 @@ available without a network connection. This implementation has unit coverage,
 but real-account end-to-end flows on Android and Web are not yet accepted.
 Production Web authentication is blocked until the actual deployed origin is
 added to Neon trusted origins and credentialed CORS is verified.
+
+## First administrator bootstrap
+
+Do not expose an admin-registration button or accept a role from the client.
+Create the first account through the normal Flutter email/OTP flow, verify its
+email, then run `operations/bootstrap_first_admin.sql` once in the Neon SQL
+Editor after replacing its email placeholder with that verified address. The
+script refuses to run if an administrator already exists or if the verified
+account cannot be found. Keep this operation restricted to the project owner.
 
 ## Deployment
 

@@ -104,6 +104,35 @@ export function createApp({ pool, verifyIdentity, allowedOrigins = [] }) {
     return c.json({ items: result.rows });
   });
 
+  app.get("/v1/me", async (c) => {
+    const authorization = c.req.header("Authorization") ?? "";
+    const token = authorization.match(/^Bearer\\s+(.+)$/i)?.[1];
+    if (!token) return jsonError(c, 401, "unauthorized", "Sign-in is required.");
+
+    let identity;
+    try {
+      identity = await verifyIdentity(token);
+    } catch {
+      return jsonError(c, 401, "invalid_token", "The session is invalid or expired.");
+    }
+    if (!identity?.sub || !isUuid(identity.sub)) {
+      return jsonError(c, 401, "invalid_token", "The session is invalid or expired.");
+    }
+
+    const profile = await ensureProfile(pool, identity.sub);
+    if (!profile) {
+      return jsonError(c, 401, "account_unavailable", "Account is unavailable.");
+    }
+    return c.json({
+      user: {
+        id: profile.id,
+        displayName: profile.display_name,
+        email: profile.email,
+        role: profile.role,
+      },
+    });
+  });
+
   // Guest analytics store aggregate counters only. No guest id, IP address,
   // device fingerprint, or cross-session identifier is persisted.
   app.post("/v1/announcements/:id/guest-view", async (c) => {
