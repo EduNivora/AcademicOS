@@ -9,7 +9,6 @@ import '../../domain/usecases/task_use_cases.dart';
 import 'pin_lock_screen.dart';
 import 'login_screen.dart';
 import '../home/home_screen.dart';
-import '../onboarding/onboarding_screen.dart';
 
 class AuthGateScreen extends StatefulWidget {
   final AuthUseCases authUseCases;
@@ -234,14 +233,16 @@ class _AuthGateScreenState extends State<AuthGateScreen> {
       );
     }
 
-    return StudentProfileSetupScreen(
+    // Guest-first entry: authentication and profile setup are optional.
+    // Existing local academic data remains available without creating an account.
+    return HomeScreen(
       taskUseCases: widget.taskUseCases,
       courseUseCases: widget.courseUseCases,
-      authUseCases: widget.authUseCases,
       isDarkMode: widget.isDarkMode,
       isArabic: widget.isArabic,
       onThemeChanged: widget.onThemeChanged,
       onLanguageChanged: widget.onLanguageChanged,
+      authUseCases: widget.authUseCases,
     );
   }
 }
