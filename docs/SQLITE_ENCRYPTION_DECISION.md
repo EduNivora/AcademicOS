@@ -23,8 +23,8 @@ The application lockfile currently resolves:
 
 The production database factory currently routes:
 
-- Android/iOS/macOS through the `sqflite` plugin factory.
-- Windows/Linux/macOS through `databaseFactoryFfi`.
+- Android/iOS use the `sqflite` platform plugin factory.
+- Windows/Linux/macOS use `databaseFactoryFfi`.
 - Web through `databaseFactoryFfiWeb`.
 
 The FFI factory is therefore **not** the current Android database engine. Selecting SQLite3MC for the FFI package alone would not encrypt Android databases while Android continues using the native `sqflite` plugin.
