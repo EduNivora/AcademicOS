@@ -310,3 +310,16 @@ Academic terms, courses, schedules, tasks, exams, notes, materials, attachments,
 - Backup-related code retained in the repository is unaccepted work-in-progress; it is not a completed or available backup service.
 
 Institutional portals, lecturer/student administration, official university attendance integration, institutional messaging, fees/payments, university dashboards, and academic cloud synchronization are outside the current product scope. See [docs/PRODUCT_SCOPE.md](docs/PRODUCT_SCOPE.md) for the authoritative product specification and [ARCHITECTURE.md](ARCHITECTURE.md) for technical boundaries.
+
+
+## تجهيز وبناء نسخة Web
+
+يحتاج SQLite على Web إلى ملفات WebAssembly وShared Worker التي يوفرها `sqflite_common_ffi_web`. بعد تثبيت Flutter والتبعيات، جهّز runtime ثم ابنِ نسخة Web:
+
+```bash
+flutter pub get
+dart run sqflite_common_ffi_web:setup --force --verbose
+flutter build web --release
+```
+
+يتحقق GitHub Actions من تجهيز runtime وبناء نسخة Web ويرفعها كـ artifact. نجاح البناء لا يثبت وحده استمرارية IndexedDB بعد إعادة التحميل، أو العمل دون اتصال، أو سلامة تعدد التبويبات؛ يلزم اختبار المتصفح لهذه السلوكيات قبل إعلان دعم Web إنتاجياً.
