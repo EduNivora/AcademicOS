@@ -85,6 +85,63 @@ class DatabaseHelper {
     );
   }
 
+  Future<void> _migrateLegacyMaterialFiles(Database db) async {
+    if (kIsWeb) return;
+
+    final legacyRoot = Directory(join(Directory.systemTemp.path, 'academic_os_materials'));
+    if (!await legacyRoot.exists()) return;
+
+    String canonicalRoot;
+    try {
+      canonicalRoot = await legacyRoot.resolveSymbolicLinks();
+    } catch (error) {
+      debugPrint('Legacy attachment migration skipped: $error');
+      return;
+    }
+
+    final rows = await db.query(
+      _materialsTable,
+      columns: ['id', 'file_path', 'file_bytes'],
+      where: 'file_bytes IS NULL',
+    );
+    for (final row in rows) {
+      final id = row['id'];
+      final storedPath = row['file_path'];
+      if (id is! int || storedPath is! String || storedPath.trim().isEmpty) {
+        continue;
+      }
+
+      try {
+        final source = File(storedPath);
+        if (!await source.exists()) continue;
+        final canonicalFile = await source.resolveSymbolicLinks();
+        if (!isWithin(canonicalRoot, canonicalFile) ||
+            canonicalFile == canonicalRoot) {
+          debugPrint('Rejected legacy attachment outside owned temporary root: $id');
+          continue;
+        }
+
+        final bytes = await source.readAsBytes();
+        if (bytes.isEmpty || bytes.length > 50 * 1024 * 1024) continue;
+        final migrated = await db.update(
+          _materialsTable,
+          {
+            'file_bytes': bytes,
+            'file_path': 'dbblob://legacy-$id',
+          },
+          where: 'id = ? AND file_bytes IS NULL',
+          whereArgs: [id],
+        );
+        if (migrated == 1) {
+          await source.delete();
+        }
+      } catch (error) {
+        // Preserve the source file and legacy row on any failed migration.
+        debugPrint('Legacy attachment $id could not be migrated: $error');
+      }
+    }
+  }
+
   Future<void> _onConfigure(Database db) async {
     await db.execute('PRAGMA foreign_keys = ON');
     await db.execute('PRAGMA journal_mode = WAL');
