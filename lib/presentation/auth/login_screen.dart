@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../domain/usecases/auth_use_cases.dart';
 import 'register_screen.dart';
+import 'email_verification_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final AuthUseCases authUseCases;
@@ -68,10 +69,29 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       await widget.onLoginSuccess();
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
+      final identity = _usernameController.text.trim();
+      final message = error.toString().toLowerCase();
+      final verificationRequired = identity.contains('@') &&
+          (message.contains('email_not_verified') ||
+              message.contains('email not verified') ||
+              message.contains('email verification'));
+      if (verificationRequired) {
+        setState(() => _isLoading = false);
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => EmailVerificationScreen(
+              email: identity,
+              authUseCases: widget.authUseCases,
+              onVerificationSuccess: widget.onLoginSuccess,
+            ),
+          ),
+        );
+        return;
+      }
       setState(() {
-        _errorMessage = 'تعذّر إكمال تسجيل الدخول. حاول مرة أخرى.';
+        _errorMessage = 'تعذّر إكمال تسجيل الدخول. تحقق من بياناتك وحاول مرة أخرى.';
         _isLoading = false;
       });
     }

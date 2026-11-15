@@ -90,8 +90,12 @@ class AuthRepositoryImpl implements AuthRepository {
       password: password,
     );
     final user = result['user'];
-    if (user is! Map || user['emailVerified'] != true || user['banned'] == true) {
-      return false;
+    if (user is! Map) return false;
+    if (user['emailVerified'] != true) {
+      throw StateError('email_not_verified');
+    }
+    if (user['banned'] == true) {
+      throw StateError('account_unavailable');
     }
     await _secureStorageService.saveAuthUsername(email.trim().toLowerCase());
     await _secureStorageService.saveNeonAuthSessionActive(true);
@@ -190,7 +194,13 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<String?> getCloudAccessToken() async {
     if (!await _secureStorageService.isNeonAuthSessionActive()) return null;
     try {
-      return await _neonAuthDataSource.getAccessToken();
+      final token = await _neonAuthDataSource.getAccessToken();
+      if (token == null) {
+        await _secureStorageService.clearNeonAuthCookie();
+        await _secureStorageService.saveNeonAuthSessionActive(false);
+        await _secureStorageService.saveAuthSessionActive(false);
+      }
+      return token;
     } on NeonAuthException catch (error) {
       if (error.statusCode == 401) {
         await _secureStorageService.clearNeonAuthCookie();
