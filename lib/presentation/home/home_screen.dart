@@ -28,7 +28,7 @@ import '../../core/notifications/notification_service.dart';
 import '../notifications/upcoming_notifications_screen.dart';
 import '../schedule/weekly_schedule_screen.dart';
 import '../focus/focus_timer_screen.dart';
-import '../settings/backup_export_screen.dart';
+import '../reports/academic_reports_screen.dart';
 import '../study_plan/study_planner_screen.dart';
 import '../task/add_edit_task_screen.dart';
 import '../screens/grade_distribution_screen.dart';
@@ -755,7 +755,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                         const Text('⏱️  ', style: TextStyle(fontSize: 18)),
                         Expanded(
                             child: Text(
-                                'أدوات الإنتاجية: جلسات التركيز والنسخ الاحتياطي المحلي للبيانات.'))
+                                'أدوات الإنتاجية: جلسات التركيز والتقارير الأكاديمية المحلية.'))
                       ]),
                     ],
                   ),
@@ -2285,16 +2285,16 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                       },
                     ),
                     _DrawerItem(
-                      icon: Icons.backup_table_rounded,
+                      icon: Icons.assessment_outlined,
                       label: widget.isArabic
-                          ? 'النسخ الاحتياطي والتقارير'
-                          : 'Backup & Reports',
+                          ? 'التقارير الأكاديمية'
+                          : 'Academic Reports',
                       onTap: () {
                         Navigator.pop(context);
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => const BackupExportScreen(),
+                            builder: (_) => const AcademicReportsScreen(),
                           ),
                         );
                       },
@@ -2674,15 +2674,15 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                                     },
                                   ),
                                   _buildServiceCard(
-                                    icon: Icons.backup_table_outlined,
-                                    title: 'النسخ الاحتياطي',
-                                    subtitle: 'احتياطيات وتقارير أكاديمية',
+                                    icon: Icons.assessment_outlined,
+                                    title: 'التقارير الأكاديمية',
+                                    subtitle: 'ملخص الأداء والمهام والاختبارات',
                                     onTap: () {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
                                           builder: (_) =>
-                                              const BackupExportScreen(),
+                                              const AcademicReportsScreen(),
                                         ),
                                       );
                                     },
