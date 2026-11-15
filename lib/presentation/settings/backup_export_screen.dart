@@ -77,12 +77,18 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
         'payload': encodedBackup,
       };
       final jsonBackupText = const JsonEncoder.withIndent('  ').convert(boxed);
+      final backupBytes = Uint8List.fromList(utf8.encode(jsonBackupText));
+      if (backupBytes.length > 50 * 1024 * 1024) {
+        throw const FormatException(
+          'حجم النسخة يتجاوز حد الاستيراد الحالي (50 MB). قلّل عدد/حجم المرفقات ثم أعد المحاولة.',
+        );
+      }
 
       final fileName =
           'academic_os_backup_${DateTime.now().millisecondsSinceEpoch}.json';
       final savedPath = await FilePicker.platform.saveFile(
         fileName: fileName,
-        bytes: Uint8List.fromList(utf8.encode(jsonBackupText)),
+        bytes: backupBytes,
         type: FileType.custom,
         allowedExtensions: const ['json'],
         dialogTitle: 'حفظ النسخة الاحتياطية',
