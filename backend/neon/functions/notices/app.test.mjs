@@ -6,41 +6,51 @@ import { createApp } from "./app.mjs";
 const announcementId = "f7d0b52a-4a36-4fd9-9ad5-8cbbece8f3d1";
 const userId = "9c6d51f0-78b9-4b3e-8a3b-5cb08d0a29a0";
 
-function createPool({ role = "user" } = {}) {
+function createPool({ role = "user", failAudit = false } = {}) {
   const calls = [];
+  const query = async (sql, params = []) => {
+    calls.push({ sql, params });
+    if (failAudit && sql.includes("INSERT INTO public.announcement_admin_audit")) {
+      throw new Error("simulated audit insert failure");
+    }
+    if (sql === "BEGIN" || sql === "COMMIT" || sql === "ROLLBACK") {
+      return { rowCount: null, rows: [] };
+    }
+    if (sql.includes('FROM neon_auth."user"')) {
+      return { rowCount: 1, rows: [{ id: userId, name: "Test User", email: "test@example.com" }] };
+    }
+    if (sql.includes("INSERT INTO public.app_users")) {
+      return { rowCount: 1, rows: [{ id: userId, display_name: "Test User", email: "test@example.com", role }] };
+    }
+    if (sql.includes("INSERT INTO public.announcement_deliveries")) {
+      return { rowCount: 1, rows: [{ announcement_id: announcementId }] };
+    }
+    if (sql.includes("INSERT INTO public.announcement_reads")) {
+      return { rowCount: 1, rows: [{ announcement_id: announcementId }] };
+    }
+    if (sql.includes("SELECT 1 FROM public.announcements")) {
+      return { rowCount: 1, rows: [{ "?column?": 1 }] };
+    }
+    if (sql.includes("INSERT INTO public.announcement_guest_daily_metrics")) {
+      return { rowCount: 1, rows: [{ views_count: "1", delivered_count: "1" }] };
+    }
+    if (sql.includes("INSERT INTO public.announcements")) {
+      return { rowCount: 1, rows: [{ id: announcementId, title: "Notice", body: "Text", status: "draft" }] };
+    }
+    if (sql.includes("INSERT INTO public.announcement_admin_audit")) {
+      return { rowCount: 1, rows: [] };
+    }
+    if (sql.includes("SELECT id, title, body, published_at")) {
+      return { rowCount: 0, rows: [] };
+    }
+    if (sql.includes("SELECT 1")) return { rowCount: 1, rows: [{ "?column?": 1 }] };
+    return { rowCount: 0, rows: [] };
+  };
   return {
     calls,
-    async query(sql, params = []) {
-      calls.push({ sql, params });
-      if (sql.includes('FROM neon_auth."user"')) {
-        return { rowCount: 1, rows: [{ id: userId, name: "Test User", email: "test@example.com" }] };
-      }
-      if (sql.includes("INSERT INTO public.app_users")) {
-        return { rowCount: 1, rows: [{ id: userId, display_name: "Test User", email: "test@example.com", role }] };
-      }
-      if (sql.includes("INSERT INTO public.announcement_deliveries")) {
-        return { rowCount: 1, rows: [{ announcement_id: announcementId }] };
-      }
-      if (sql.includes("INSERT INTO public.announcement_reads")) {
-        return { rowCount: 1, rows: [{ announcement_id: announcementId }] };
-      }
-      if (sql.includes("SELECT 1 FROM public.announcements")) {
-        return { rowCount: 1, rows: [{ "?column?": 1 }] };
-      }
-      if (sql.includes("INSERT INTO public.announcement_guest_daily_metrics")) {
-        return { rowCount: 1, rows: [{ views_count: "1", delivered_count: "1" }] };
-      }
-      if (sql.includes("INSERT INTO public.announcements")) {
-        return { rowCount: 1, rows: [{ id: announcementId, title: "Notice", body: "Text", status: "draft" }] };
-      }
-      if (sql.includes("INSERT INTO public.announcement_admin_audit")) {
-        return { rowCount: 1, rows: [] };
-      }
-      if (sql.includes("SELECT id, title, body, published_at")) {
-        return { rowCount: 0, rows: [] };
-      }
-      if (sql.includes("SELECT 1")) return { rowCount: 1, rows: [{ "?column?": 1 }] };
-      return { rowCount: 0, rows: [] };
+    query,
+    async connect() {
+      return { query, release() {} };
     },
   };
 }
@@ -151,6 +161,23 @@ test("administrator can create a draft announcement", async () => {
   });
   assert.equal(response.status, 201);
   assert.equal((await response.json()).item.status, "draft");
+  assert.ok(pool.calls.some((call) => call.sql === "BEGIN"));
+  assert.ok(pool.calls.some((call) => call.sql === "COMMIT"));
+});
+
+test("admin mutation rolls back when its audit insert fails", async () => {
+  const pool = createPool({ role: "admin", failAudit: true });
+  const response = await makeApp({ pool }).request("/v1/admin/announcements", {
+    method: "POST",
+    headers: { Authorization: "Bearer valid", "Content-Type": "application/json" },
+    body: JSON.stringify({ title: "Notice", body: "Plain text" }),
+  });
+  assert.equal(response.status, 500);
+  assert.ok(pool.calls.some((call) => call.sql === "BEGIN"));
+  assert.ok(pool.calls.some((call) => call.sql.includes("INSERT INTO public.announcements")));
+  assert.ok(pool.calls.some((call) => call.sql.includes("INSERT INTO public.announcement_admin_audit")));
+  assert.ok(pool.calls.some((call) => call.sql === "ROLLBACK"));
+  assert.equal(pool.calls.some((call) => call.sql === "COMMIT"), false);
 });
 
 test("announcement input is bounded and validated", async () => {
