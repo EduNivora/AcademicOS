@@ -84,11 +84,14 @@ Current flow:
 4. Validate the payload schema, row types, identifiers, dates, supported enums, schedule ranges, and course references before mutation.
 5. Replace academic records through a database transaction.
 
-Current limitations:
+Current limitations and security boundaries:
 
-- Course-material records are metadata only; attachment bytes are not packaged.
-- Local attachment paths are not portable between devices.
-- Checksummed attachment archives, path-safe extraction, staged file restoration, and end-to-end rollback/failure-injection coverage remain unimplemented.
+- Course-material records in the JSON backup are metadata only; attachment bytes are not packaged.
+- The current material UI copies files into `Directory.systemTemp/academic_os_materials`, not a durable app-owned documents/support directory. The OS or runtime may purge this temporary location.
+- Deleting a material currently removes its database row but does not remove the copied file, so orphaned files can accumulate.
+- The Web picker path currently rejects the bytes-only result instead of storing it in browser-owned persistent storage.
+- The backup validator currently checks `file_path` only as a non-empty string. The PDF viewer consumes the stored path directly; imported absolute or traversal paths are not yet constrained to an app-owned attachment root. Treat material paths from imported backups as untrusted metadata and do not open them until attachment ownership/path containment is implemented.
+- Checksummed attachment archives, safe generated names, canonical-path containment, staged file restoration, database/file rollback, and end-to-end failure-injection coverage remain unimplemented.
 - Cross-device and real-browser file picker behavior still require platform validation.
 
 A JSON export must not be represented as a complete device backup until its referenced attachment files are included and verified.
