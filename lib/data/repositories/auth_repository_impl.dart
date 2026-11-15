@@ -4,19 +4,23 @@ import '../../domain/repositories/auth_repository.dart';
 import '../datasources/auth_google_data_source.dart';
 import '../datasources/auth_local_data_source.dart';
 import '../datasources/neon_auth_data_source.dart';
+import '../datasources/neon_account_data_source.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
   final AuthLocalDataSource _localDataSource;
   final AuthGoogleDataSource _googleDataSource;
   final AuthSecureStorageService _secureStorageService;
   final NeonAuthDataSource _neonAuthDataSource;
+  final NeonAccountDataSource _neonAccountDataSource;
 
   AuthRepositoryImpl(
     this._localDataSource,
     this._googleDataSource,
     this._secureStorageService, {
     NeonAuthDataSource? neonAuthDataSource,
-  }) : _neonAuthDataSource = neonAuthDataSource ??
+    NeonAccountDataSource? neonAccountDataSource,
+  }) : _neonAccountDataSource = neonAccountDataSource ?? NeonAccountDataSource(),
+       _neonAuthDataSource = neonAuthDataSource ??
             NeonAuthDataSource(
               sessionStore:
                   SecureStorageNeonAuthSessionStore(_secureStorageService),
@@ -28,7 +32,22 @@ class AuthRepositoryImpl implements AuthRepository {
       try {
         final session = await _neonAuthDataSource.getSession();
         final user = session?['user'];
-        if (user is Map) return _mapNeonUser(Map<String, dynamic>.from(user));
+        if (user is Map) {
+          var role = 'user';
+          try {
+            final token = await _neonAuthDataSource.getAccessToken();
+            if (token != null) {
+              final profile = await _neonAccountDataSource.getProfile(token);
+              role = profile['role']?.toString() ?? 'user';
+            }
+          } catch (_) {
+            // A profile lookup failure must never grant admin privileges.
+          }
+          return _mapNeonUser(
+            Map<String, dynamic>.from(user),
+            role: role,
+          );
+        }
       } catch (_) {
         // Do not substitute a different local identity for an offline cloud user.
       }
@@ -212,7 +231,7 @@ class AuthRepositoryImpl implements AuthRepository {
     }
   }
 
-  UserEntity _mapNeonUser(Map<String, dynamic> user) {
+  UserEntity _mapNeonUser(Map<String, dynamic> user, {String role = 'user'}) {
     final email = user['email'] is String ? user['email'] as String : '';
     final name = user['name'] is String ? user['name'] as String : email;
     final createdAt = DateTime.tryParse(user['createdAt']?.toString() ?? '') ??
@@ -224,6 +243,7 @@ class AuthRepositoryImpl implements AuthRepository {
       displayName: name,
       isGoogleLinked: false,
       isBiometricEnabled: false,
+      role: role,
       createdAt: createdAt,
     );
   }
