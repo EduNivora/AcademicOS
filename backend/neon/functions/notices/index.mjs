@@ -1,7 +1,7 @@
 import { Pool } from "pg";
-import { createRemoteJWKSet, jwtVerify } from "jose";
 import { attachDatabasePool } from "@neon/functions";
 import { createApp } from "./app.mjs";
+import { createNeonIdentityVerifier } from "./token_verifier.mjs";
 
 const required = ["DATABASE_URL", "NEON_AUTH_BASE_URL", "NEON_AUTH_JWKS_URL"];
 for (const key of required) {
@@ -19,14 +19,10 @@ const pool = new Pool({
 });
 attachDatabasePool(pool);
 
-const jwks = createRemoteJWKSet(new URL(process.env.NEON_AUTH_JWKS_URL));
-const verifyIdentity = async (token) => {
-  const { payload } = await jwtVerify(token, jwks, {
-    issuer: process.env.NEON_AUTH_BASE_URL,
-    algorithms: ["EdDSA"],
-  });
-  return payload;
-};
+const verifyIdentity = createNeonIdentityVerifier({
+  authBaseUrl: process.env.NEON_AUTH_BASE_URL,
+  jwksUrl: process.env.NEON_AUTH_JWKS_URL,
+});
 
 const allowedOrigins = (process.env.APP_ORIGINS ?? "")
   .split(",")
