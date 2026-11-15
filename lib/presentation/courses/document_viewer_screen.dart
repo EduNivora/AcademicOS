@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_pdfview/flutter_pdfview.dart';
@@ -41,6 +42,7 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
   }
 
   Future<String?> _resolveSafeFilePath() {
+    if (kIsWeb) return Future<String?>.value(null);
     final rootDirectory = Directory(
       p.join(Directory.systemTemp.path, 'academic_os_materials'),
     );
