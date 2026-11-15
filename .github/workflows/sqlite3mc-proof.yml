@@ -29,7 +29,9 @@ jobs:
           cache: true
 
       - name: Generate Android project scaffolding
-        run: flutter create --platforms=android --project-name=sqlite3mc_poc --org=org.edunivora .
+        run: |
+          flutter create --platforms=android --project-name=sqlite3mc_poc --org=org.edunivora .
+          rm -f test/widget_test.dart
 
       - name: Show toolchain
         run: flutter --version && dart --version
