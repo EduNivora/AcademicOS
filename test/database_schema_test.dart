@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:academic_os/data/database/database_helper.dart';
 import 'package:academic_os/data/models/course_material_model.dart';
 import 'package:academic_os/data/models/course_model.dart';
+import 'package:academic_os/data/models/academic_term_model.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -321,5 +322,122 @@ void main() {
         await helper.close();
       }
     });
+
+
+  test('academic terms enforce uniqueness, active selection, rename links and delete protection', () async {
+    final helper = DatabaseHelper.instance;
+    await helper.close();
+
+    final previousActive = await helper.getActiveAcademicTerm();
+    final start = DateTime(2026, 9, 1);
+    final end = DateTime(2026, 12, 20);
+    const firstName = '__db_term_integration_first__';
+    const secondName = '__db_term_integration_second__';
+    const courseId = 987671;
+
+    final existing = await helper.getAcademicTerms();
+    for (final term in existing.where(
+      (term) => term.name == firstName || term.name == secondName || term.name == 'Renamed integration term',
+    )) {
+      await helper.deleteAcademicTerm(term.id!);
+    }
+    await helper.deleteCourse(courseId);
+
+    int? firstId;
+    int? secondId;
+    try {
+      firstId = await helper.insertAcademicTerm(
+        AcademicTermModel(
+          name: firstName,
+          startDate: start,
+          endDate: end,
+          isActive: true,
+        ),
+      );
+      secondId = await helper.insertAcademicTerm(
+        AcademicTermModel(
+          name: secondName,
+          startDate: start,
+          endDate: end,
+          isActive: true,
+        ),
+      );
+
+      expect((await helper.getActiveAcademicTerm())?.id, secondId);
+      final termsAfterActivation = await helper.getAcademicTerms();
+      expect(
+        termsAfterActivation.singleWhere((term) => term.id == firstId).isActive,
+        isFalse,
+      );
+
+      await expectLater(
+        helper.insertAcademicTerm(
+          AcademicTermModel(
+            name: secondName.toUpperCase(),
+            startDate: start,
+            endDate: end,
+          ),
+        ),
+        throwsA(isA<Exception>()),
+      );
+
+      await helper.insertCourse(
+        const CourseModel(
+          id: courseId,
+          name: 'Term relationship test',
+          instructor: 'Instructor',
+          code: 'TERM-DB-1',
+          credits: 3,
+          semester: secondName,
+        ),
+      );
+
+      await helper.updateAcademicTerm(
+        AcademicTermModel(
+          id: secondId,
+          name: 'Renamed integration term',
+          startDate: start,
+          endDate: end,
+          isActive: true,
+        ),
+      );
+      expect(
+        (await helper.getCourseById(courseId))?.semester,
+        'Renamed integration term',
+      );
+
+      await expectLater(
+        helper.deleteAcademicTerm(secondId),
+        throwsA(isA<StateError>()),
+      );
+
+      await helper.deleteCourse(courseId);
+      expect(await helper.deleteAcademicTerm(secondId), 1);
+      expect(await helper.deleteAcademicTerm(firstId), 1);
+
+      final db = await helper.database;
+      final columns = await db.rawQuery('PRAGMA table_info(academic_terms)');
+      final columnNames = columns.map((row) => row['name']).toSet();
+      expect(
+        columnNames,
+        containsAll(['name', 'start_date', 'end_date', 'is_active', 'created_at']),
+      );
+      final indexes = await db.rawQuery('PRAGMA index_list(academic_terms)');
+      final indexNames = indexes.map((row) => row['name']).toSet();
+      expect(indexNames, contains('idx_academic_terms_name'));
+      expect(indexNames, contains('idx_academic_terms_single_active'));
+    } finally {
+      await helper.deleteCourse(courseId);
+      for (final id in [secondId, firstId]) {
+        if (id != null) {
+          await helper.deleteAcademicTerm(id);
+        }
+      }
+      if (previousActive?.id != null) {
+        await helper.setActiveAcademicTerm(previousActive!.id!);
+      }
+      await helper.close();
+    }
+  });
 
 }
