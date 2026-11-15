@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -30,6 +31,15 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
   void initState() {
     super.initState();
     _preparePreviewFile();
+  }
+
+  @override
+  void dispose() {
+    final previewPath = _resolvedFilePath;
+    if (previewPath != null) {
+      unawaited(File(previewPath).delete().catchError((_) {}));
+    }
+    super.dispose();
   }
 
   Future<void> _preparePreviewFile() async {
