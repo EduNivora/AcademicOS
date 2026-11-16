@@ -70,8 +70,17 @@ class DatabaseHelper {
       );
     }
 
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, _databaseName);
+    // The web implementation stores databases in IndexedDB, not in a
+    // filesystem directory. Use a stable database name directly so startup
+    // does not need a getDatabasesPath round-trip through the SQLite worker.
+    // Native platforms continue to use their normal databases directory.
+    final String path;
+    if (kIsWeb) {
+      path = _databaseName;
+    } else {
+      final dbPath = await getDatabasesPath();
+      path = join(dbPath, _databaseName);
+    }
 
     // Never replace persistent storage with an in-memory database.
     // A failed open must be surfaced to startup so the user is not led to
