@@ -12,6 +12,26 @@ function isUuid(value) {
   return typeof value === "string" && UUID_PATTERN.test(value);
 }
 
+// Keep each admin state change and its audit record in one atomic transaction.
+async function runAdminTransaction(pool, operation) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await operation(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackError) {
+      console.error("EduNivora admin transaction rollback failed", rollbackError?.name ?? "UnknownError");
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 async function ensureProfile(pool, subject) {
   if (!isUuid(subject)) return null;
 
@@ -46,8 +66,8 @@ async function ensureProfile(pool, subject) {
 }
 
 export function createApp({ pool, verifyIdentity, allowedOrigins = [] }) {
-  if (!pool || typeof pool.query !== "function") {
-    throw new TypeError("A PostgreSQL pool is required");
+  if (!pool || typeof pool.query !== "function" || typeof pool.connect !== "function") {
+    throw new TypeError("A PostgreSQL pool with query and connect methods is required");
   }
   if (typeof verifyIdentity !== "function") {
     throw new TypeError("A token verifier is required");
@@ -332,19 +352,22 @@ export function createApp({ pool, verifyIdentity, allowedOrigins = [] }) {
     }
 
     const profile = c.get("profile");
-    const created = await pool.query(
-      `INSERT INTO public.announcements (title, body, created_by)
-       VALUES ($1, $2, $3::uuid)
-       RETURNING id, title, body, status, created_at`,
-      [title, body, profile.id],
-    );
-    const announcement = created.rows[0];
-    await pool.query(
-      `INSERT INTO public.announcement_admin_audit
-         (actor_user_id, announcement_id, action)
-       VALUES ($1::uuid, $2::uuid, 'create')`,
-      [profile.id, announcement.id],
-    );
+    const announcement = await runAdminTransaction(pool, async (client) => {
+      const created = await client.query(
+        `INSERT INTO public.announcements (title, body, created_by)
+         VALUES ($1, $2, $3::uuid)
+         RETURNING id, title, body, status, created_at`,
+        [title, body, profile.id],
+      );
+      const item = created.rows[0];
+      await client.query(
+        `INSERT INTO public.announcement_admin_audit
+           (actor_user_id, announcement_id, action)
+         VALUES ($1::uuid, $2::uuid, 'create')`,
+        [profile.id, item.id],
+      );
+      return item;
+    });
     return c.json({ item: announcement }, 201);
   });
 
@@ -360,23 +383,25 @@ export function createApp({ pool, verifyIdentity, allowedOrigins = [] }) {
       return jsonError(c, 400, "invalid_announcement", "Title and plain-text body are required.");
     }
     const profile = c.get("profile");
-    const updated = await pool.query(
-      `UPDATE public.announcements
-          SET title = $2, body = $3, updated_at = NOW()
-        WHERE id = $1::uuid AND status = 'draft'
-        RETURNING id, title, body, status, updated_at`,
-      [announcementId, title, body],
-    );
-    if (updated.rowCount === 0) {
-      return jsonError(c, 404, "draft_not_found", "Editable draft not found.");
-    }
-    await pool.query(
-      `INSERT INTO public.announcement_admin_audit
-         (actor_user_id, announcement_id, action)
-       VALUES ($1::uuid, $2::uuid, 'update')`,
-      [profile.id, announcementId],
-    );
-    return c.json({ item: updated.rows[0] });
+    const item = await runAdminTransaction(pool, async (client) => {
+      const updated = await client.query(
+        `UPDATE public.announcements
+            SET title = $2, body = $3, updated_at = NOW()
+          WHERE id = $1::uuid AND status = 'draft'
+          RETURNING id, title, body, status, updated_at`,
+        [announcementId, title, body],
+      );
+      if (updated.rowCount === 0) return null;
+      await client.query(
+        `INSERT INTO public.announcement_admin_audit
+           (actor_user_id, announcement_id, action)
+         VALUES ($1::uuid, $2::uuid, 'update')`,
+        [profile.id, announcementId],
+      );
+      return updated.rows[0];
+    });
+    if (!item) return jsonError(c, 404, "draft_not_found", "Editable draft not found.");
+    return c.json({ item });
   });
 
   app.post("/v1/admin/announcements/:id/publish", async (c) => {
@@ -385,25 +410,27 @@ export function createApp({ pool, verifyIdentity, allowedOrigins = [] }) {
       return jsonError(c, 400, "invalid_announcement_id", "Invalid announcement id.");
     }
     const profile = c.get("profile");
-    const published = await pool.query(
-      `UPDATE public.announcements
-          SET status = 'published',
-              published_at = NOW(),
-              updated_at = NOW()
-        WHERE id = $1::uuid AND status = 'draft'
-        RETURNING id, title, body, status, published_at`,
-      [announcementId],
-    );
-    if (published.rowCount === 0) {
-      return jsonError(c, 404, "draft_not_found", "Publishable draft not found.");
-    }
-    await pool.query(
-      `INSERT INTO public.announcement_admin_audit
-         (actor_user_id, announcement_id, action)
-       VALUES ($1::uuid, $2::uuid, 'publish')`,
-      [profile.id, announcementId],
-    );
-    return c.json({ item: published.rows[0] });
+    const item = await runAdminTransaction(pool, async (client) => {
+      const published = await client.query(
+        `UPDATE public.announcements
+            SET status = 'published',
+                published_at = NOW(),
+                updated_at = NOW()
+          WHERE id = $1::uuid AND status = 'draft'
+          RETURNING id, title, body, status, published_at`,
+        [announcementId],
+      );
+      if (published.rowCount === 0) return null;
+      await client.query(
+        `INSERT INTO public.announcement_admin_audit
+           (actor_user_id, announcement_id, action)
+         VALUES ($1::uuid, $2::uuid, 'publish')`,
+        [profile.id, announcementId],
+      );
+      return published.rows[0];
+    });
+    if (!item) return jsonError(c, 404, "draft_not_found", "Publishable draft not found.");
+    return c.json({ item });
   });
 
   app.post("/v1/admin/announcements/:id/archive", async (c) => {
@@ -412,23 +439,25 @@ export function createApp({ pool, verifyIdentity, allowedOrigins = [] }) {
       return jsonError(c, 400, "invalid_announcement_id", "Invalid announcement id.");
     }
     const profile = c.get("profile");
-    const archived = await pool.query(
-      `UPDATE public.announcements
-          SET status = 'archived', updated_at = NOW()
-        WHERE id = $1::uuid AND status <> 'archived'
-        RETURNING id, title, status, updated_at`,
-      [announcementId],
-    );
-    if (archived.rowCount === 0) {
-      return jsonError(c, 404, "announcement_not_found", "Announcement not found.");
-    }
-    await pool.query(
-      `INSERT INTO public.announcement_admin_audit
-         (actor_user_id, announcement_id, action)
-       VALUES ($1::uuid, $2::uuid, 'archive')`,
-      [profile.id, announcementId],
-    );
-    return c.json({ item: archived.rows[0] });
+    const item = await runAdminTransaction(pool, async (client) => {
+      const archived = await client.query(
+        `UPDATE public.announcements
+            SET status = 'archived', updated_at = NOW()
+          WHERE id = $1::uuid AND status <> 'archived'
+          RETURNING id, title, status, updated_at`,
+        [announcementId],
+      );
+      if (archived.rowCount === 0) return null;
+      await client.query(
+        `INSERT INTO public.announcement_admin_audit
+           (actor_user_id, announcement_id, action)
+         VALUES ($1::uuid, $2::uuid, 'archive')`,
+        [profile.id, announcementId],
+      );
+      return archived.rows[0];
+    });
+    if (!item) return jsonError(c, 404, "announcement_not_found", "Announcement not found.");
+    return c.json({ item });
   });
 
   app.get("/v1/admin/announcements/:id/report", async (c) => {
