@@ -62,6 +62,7 @@ function makeApp(options = {}) {
       ? { sub: userId, iss: "https://auth.example.test" }
       : null),
     allowedOrigins: ["https://app.example.test"],
+    guestMetricsProxySecret: options.guestMetricsProxySecret,
   });
 }
 
@@ -83,11 +84,45 @@ test("public feed rejects malformed pagination cursor", async () => {
   assert.equal(response.status, 400);
 });
 
-test("guest view stores aggregate metric without identity", async () => {
+test("guest metric writes are disabled when Worker authorization is not configured", async () => {
   const pool = createPool();
   const response = await makeApp({ pool }).request(
     `/v1/announcements/${announcementId}/guest-view`,
     { method: "POST" },
+  );
+  assert.equal(response.status, 503);
+  assert.equal(pool.calls.some((call) =>
+    call.sql.includes("announcement_guest_daily_metrics"),
+  ), false);
+});
+
+test("direct public guest metric writes are rejected without Worker authorization", async () => {
+  const pool = createPool();
+  const response = await makeApp({
+    pool,
+    guestMetricsProxySecret: "x".repeat(48),
+  }).request(
+    `/v1/announcements/${announcementId}/guest-view`,
+    { method: "POST" },
+    );
+  assert.equal(response.status, 403);
+  assert.equal(pool.calls.some((call) =>
+    call.sql.includes("announcement_guest_daily_metrics"),
+  ), false);
+});
+
+test("authorized Worker can increment an aggregate guest view counter", async () => {
+  const pool = createPool();
+  const secret = "x".repeat(48);
+  const response = await makeApp({
+    pool,
+    guestMetricsProxySecret: secret,
+  }).request(
+    `/v1/announcements/${announcementId}/guest-view`,
+    {
+      method: "POST",
+      headers: { "X-EduNivora-Worker-Secret": secret },
+    },
   );
   assert.equal(response.status, 204);
   const metricCall = pool.calls.find((call) =>
@@ -95,6 +130,25 @@ test("guest view stores aggregate metric without identity", async () => {
   );
   assert.ok(metricCall);
   assert.equal(metricCall.params.length, 1);
+});
+
+test("authorized Worker can increment an aggregate guest delivery counter", async () => {
+  const pool = createPool();
+  const secret = "y".repeat(48);
+  const response = await makeApp({
+    pool,
+    guestMetricsProxySecret: secret,
+  }).request(
+    `/v1/announcements/${announcementId}/guest-delivered`,
+    {
+      method: "POST",
+      headers: { "X-EduNivora-Worker-Secret": secret },
+    },
+  );
+  assert.equal(response.status, 204);
+  assert.ok(pool.calls.some((call) =>
+    call.sql.includes("announcement_guest_daily_metrics"),
+  ));
 });
 
 test("registered delivery endpoint rejects requests without bearer token", async () => {
