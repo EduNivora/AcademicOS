@@ -88,6 +88,16 @@ void main() {
         ),
         isNull,
       );
+
+      expect(
+        NotificationService.resolveLectureReminderDate(
+          now: DateTime(2026, 11, 16, 8),
+          weekdayName: 'الثلاثاء',
+          startTime: '09:00garbage',
+          reminderOffsetMinutes: 15,
+        ),
+        isNull,
+      );
     });
 
     test('accepts an IANA device timezone and rejects an invalid identifier',
