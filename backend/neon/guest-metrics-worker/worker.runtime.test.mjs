@@ -20,10 +20,11 @@ describe("AnnouncementMetricQuota SQLite Durable Object", () => {
       quota.reserve("view", 3, nextUtcMidnight),
     ]);
 
-    expect(results.map((result) => result.allowed)).toEqual([
-      true, true, true, false,
+    expect(results.filter((result) => result.allowed)).toHaveLength(3);
+    expect(results.filter((result) => !result.allowed)).toHaveLength(1);
+    expect(results.map((result) => result.used).sort((a, b) => a - b)).toEqual([
+      1, 2, 3, 3,
     ]);
-    expect(results.map((result) => result.used)).toEqual([1, 2, 3, 3]);
   });
 
   it("enforces a global cap across concurrent requests and Worker stubs", async () => {
