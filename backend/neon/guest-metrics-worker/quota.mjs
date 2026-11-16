@@ -29,7 +29,7 @@ export function reserveDailyQuota(sql, metricKind, limit) {
      RETURNING used_count`,
     metricKind,
     limit,
-  ).one();
+  ).toArray()[0];
 
   return row
     ? { allowed: true, used: Number(row.used_count) }
