@@ -128,7 +128,7 @@ export async function handleGuestMetricsRequest(
 
   // Confirm the announcement is currently public before allocating a
   // Durable Object. Arbitrary UUIDs must not create unbounded quota objects.
-  const upstreamBaseUrl = upstreamBase.replace(/\\/+$/, "");
+  const upstreamBaseUrl = upstreamBase;
   try {
     const announcementUrl = new URL(
       `/v1/announcements/${announcementId}`,
