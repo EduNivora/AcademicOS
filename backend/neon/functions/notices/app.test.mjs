@@ -41,7 +41,15 @@ function createPool({ role = "user", failAudit = false } = {}) {
       return { rowCount: 1, rows: [] };
     }
     if (sql.includes("SELECT id, title, body, published_at")) {
-      return { rowCount: 0, rows: [] };
+      return {
+        rowCount: 1,
+        rows: [{
+          id: announcementId,
+          title: "Welcome",
+          body: "Welcome to EduNivora.",
+          published_at: "2026-11-16T12:00:00.000Z",
+        }],
+      };
     }
     if (sql.includes("SELECT 1")) return { rowCount: 1, rows: [{ "?column?": 1 }] };
     return { rowCount: 0, rows: [] };
@@ -77,6 +85,17 @@ test("public announcement feed is available without authentication", async () =>
   const response = await makeApp().request("/v1/announcements");
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { items: [] });
+});
+
+test("public announcement detail is available without authentication", async () => {
+  const response = await makeApp().request(`/v1/announcements/${announcementId}`);
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).item.id, announcementId);
+});
+
+test("public announcement detail rejects invalid ids", async () => {
+  const response = await makeApp().request("/v1/announcements/not-a-uuid");
+  assert.equal(response.status, 400);
 });
 
 test("public feed rejects malformed pagination cursor", async () => {
