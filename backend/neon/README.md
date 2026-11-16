@@ -37,8 +37,8 @@ was introduced.
 - `GET /health`
 - `GET /v1/me` — authenticated app profile and server-owned role projection used to gate the admin console.
 - `GET /v1/announcements?limit=20&before=<ISO timestamp>` — public, guest-safe feed.
-- `POST /v1/announcements/:id/guest-view` — increments an aggregate daily view counter.
-- `POST /v1/announcements/:id/guest-delivered` — increments an aggregate daily delivery counter.
+- `POST /v1/announcements/:id/guest-view` — Worker-authorized aggregate daily view counter.
+- `POST /v1/announcements/:id/guest-delivered` — Worker-authorized aggregate daily delivery counter.
 - `POST /v1/announcements/:id/delivered` — authenticated registered delivery acknowledgement.
 - `POST /v1/announcements/:id/read` — authenticated registered read receipt.
 - `POST /v1/admin/announcements` — admin-only draft creation.
@@ -62,10 +62,24 @@ Guest metrics contain counters only. They do not store guest IDs, IP addresses,
 device fingerprints, or stable guest identifiers. Guest counters are event
 counts, not unique visitor counts, and must be interpreted accordingly.
 
-Abuse protection for these unauthenticated counter endpoints is not yet
-implemented. Treat guest aggregates as provisional, not authoritative analytics,
-until the privacy-preserving controls tracked in GitHub issue #24 are completed
-and tested. Public notice reading remains available independently of metrics.
+Guest metric writes are accepted by the source API only with the server-to-server
+`X-EduNivora-Worker-Secret` assertion. The planned Cloudflare Worker uses one
+SQLite-backed Durable Object per announcement and UTC day, enforcing separate
+global budgets for views and delivery acknowledgements (5,000 each by default).
+It stores only aggregate budget counters. The Worker forwards only the metric
+route and server-side assertion; it does not forward cookies, IP metadata,
+user-agent, device identifiers, or request bodies. A failed upstream request
+does not refund reserved quota, because Neon may have committed before a network
+failure was observed.
+
+The Worker implementation and Node tests are in
+`guest-metrics-worker/` and
+`functions/notices/guest_metrics_worker.test.mjs`. These tests exercise the
+quota algorithm and mocked Worker routing; they are not a substitute for a
+Cloudflare runtime deployment/concurrency test. Guest metrics are best-effort.
+Public notice reads remain independent and must continue if the proxy is down.
+Guest metrics are disabled in the Flutter client unless
+`EDUNIVORA_GUEST_METRICS_PROXY_URL` is supplied at build time.
 
 ## Authentication setup status
 
@@ -137,3 +151,35 @@ contains no guest identity. Clearing app/browser storage can cause a later
 acknowledgement to be counted again. Flutter unit tests cover the transport and
 routing decisions; exact-head Flutter CI and live JWT-backed database receipts
 remain acceptance gates.
+
+
+## Guest metrics Worker deployment — operator action required
+
+The guest-metrics Worker is intentionally not deployed by this source change.
+Before deployment:
+
+1. Review `guest-metrics-worker/wrangler.jsonc`, the Durable Object class
+   migration, quotas, source code, tests, and rollback instructions.
+2. Generate one random secret of at least 32 bytes in an approved password
+   manager/secret manager. Do not paste it into GitHub, chat, source files,
+   logs, or commits.
+3. Install that same secret as the Worker secret
+   `NEON_GUEST_METRICS_SECRET` and as the Neon Function environment variable
+   `GUEST_METRICS_PROXY_SECRET`. Do not set either production value until
+   the Worker deployment, quota tests, and rollback path are approved.
+4. Configure the actual Pages origin `https://edunivora.pages.dev` in
+   `EDUNIVORA_APP_ORIGINS`; verify the account's Workers subdomain or choose
+   an approved custom hostname.
+5. Deploy and smoke-test the Worker first. Then deploy the Neon Function with
+   the matching secret. Direct public guest-metric POSTs must return 403;
+   when the Neon secret is absent, the endpoint returns 503. Public GET feed
+   must remain 200 in either case.
+6. Build Flutter with
+   `--dart-define=EDUNIVORA_GUEST_METRICS_PROXY_URL=<verified-worker-url>`
+   only after the Worker and Neon Function have both passed live tests.
+
+Rollback must never restore unauthenticated direct writes. On a proxy incident,
+omit the Flutter proxy URL (guest metrics stop while public feed and local
+academic features remain available), or roll back to another reviewed Worker
+build that preserves the quota and server-secret checks. Do not redeploy the
+pre-fix Neon Function version 7 as a rollback target.
