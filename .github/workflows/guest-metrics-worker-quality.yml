@@ -10,6 +10,7 @@ on:
       - "backend/neon/functions/notices/**"
       - "package.json"
       - ".github/workflows/guest-metrics-worker-quality.yml"
+      - "vitest.guest-metrics.config.mjs"
   push:
     branches:
       - main
