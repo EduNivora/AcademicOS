@@ -116,7 +116,7 @@ test("concurrent bursts cannot exceed the atomic global quota", async () => {
   assert.equal(responses.filter((item) => item.status === 204).length, 7);
   assert.equal(responses.filter((item) => item.status === 429).length, 73);
   assert.equal(upstreamWrites, 7);
-  const quota = namespace.getByName(quotaObjectName(announcementId, "2026-11-16"));
+  const quota = namespace.get(namespace.idFromName(quotaObjectName(announcementId, "2026-11-16")));
   assert.equal(quota.sql.rows.get("view"), 7);
 });
 
@@ -147,7 +147,9 @@ test("separate Worker instances share the same announcement-day Durable Object",
 test("UTC date boundary creates a fresh daily quota object", async () => {
   const namespace = createNamespace();
   const env = makeEnv({ limit: 1, namespace });
-  const fetchImpl = async () => new Response(null, { status: 204 });
+  const fetchImpl = async (_url, options) => options.method === "GET"
+    ? new Response(JSON.stringify({ item: { id: announcementId } }), { status: 200 })
+    : new Response(null, { status: 204 });
 
   const beforeMidnight = new Date("2026-11-16T23:59:59.999Z");
   const afterMidnight = new Date("2026-11-17T00:00:00.000Z");
