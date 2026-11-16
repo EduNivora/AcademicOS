@@ -91,10 +91,50 @@ class _CourseListScreenState extends State<CourseListScreen> {
                                 subtitle: Text('${course.code} • ${course.instructor}'),
                                 trailing: IconButton(
                                   icon: const Icon(Icons.delete, color: Colors.red),
+                                  tooltip: 'حذف المقرر',
                                   onPressed: () async {
-                                    if (course.id == null) return;
-                                    await widget.courseUseCases.deleteCourse(course.id!);
-                                    await _loadCourses();
+                                    final courseId = course.id;
+                                    if (courseId == null) return;
+
+                                    final confirmed = await showDialog<bool>(
+                                      context: context,
+                                      builder: (dialogContext) => AlertDialog(
+                                        title: const Text('حذف المقرر؟'),
+                                        content: const Text(
+                                          'سيتم حذف المهام والاختبارات والحصص والمرفقات '
+                                          'المرتبطة بهذا المقرر أيضاً. لا يمكن التراجع عن ذلك.',
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(dialogContext, false),
+                                            child: const Text('إلغاء'),
+                                          ),
+                                          FilledButton(
+                                            onPressed: () =>
+                                                Navigator.pop(dialogContext, true),
+                                            style: FilledButton.styleFrom(
+                                              backgroundColor: Colors.red,
+                                              foregroundColor: Colors.white,
+                                            ),
+                                            child: const Text('حذف المقرر'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (confirmed != true || !mounted) return;
+
+                                    try {
+                                      await widget.courseUseCases.deleteCourse(courseId);
+                                      await _loadCourses();
+                                    } catch (error) {
+                                      if (!mounted) return;
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('تعذر حذف المقرر: $error'),
+                                        ),
+                                      );
+                                    }
                                   },
                                 ),
                                 onTap: () {
