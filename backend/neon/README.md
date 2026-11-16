@@ -62,6 +62,11 @@ Guest metrics contain counters only. They do not store guest IDs, IP addresses,
 device fingerprints, or stable guest identifiers. Guest counters are event
 counts, not unique visitor counts, and must be interpreted accordingly.
 
+Abuse protection for these unauthenticated counter endpoints is not yet
+implemented. Treat guest aggregates as provisional, not authoritative analytics,
+until the privacy-preserving controls tracked in GitHub issue #24 are completed
+and tested. Public notice reading remains available independently of metrics.
+
 ## Authentication setup status
 
 Neon Managed Auth is enabled for the EduNivora branch. Email/password is enabled
