@@ -65,13 +65,13 @@ Authentication-related secure-storage operations are implemented in `AuthSecureS
 
 These controls protect credential verification and session transitions; they do not encrypt the SQLite database.
 
-## 6. Database encryption status — release blocker
+## 6. Local database security status — Release 1 decision
 
-**SQLite database-at-rest encryption is not implemented.**
+**SQLite database-at-rest encryption is intentionally deferred to Release 2.**
 
-The application currently opens SQLite through sqflite/FFI factories. A database password value is generated and stored in secure storage, but it is not passed to an encrypted SQLite engine. The database file must therefore be treated as plaintext at rest.
+Release 1 continues to use the existing sqflite/FFI database implementation. The database file is not encrypted at rest; secure storage protects selected credentials and secrets only. This is a documented product-scope decision, not a completed encryption feature or a Release 1 blocker.
 
-Do not claim SQLCipher, SQLite encryption, or encrypted backups until an encrypted driver is integrated and verified with wrong-key tests, on-disk inspection, platform coverage, and a crash-safe migration from existing plaintext databases.
+Do not introduce an encrypted SQLite driver or plaintext-to-encrypted migration into Release 1. Reassess platform-specific database encryption as part of Release 2.
 
 ## 7. Backup and restore
 
@@ -112,7 +112,7 @@ Every result applies only to the exact commit SHA shown in the workflow run. Pas
 
 The following are explicit engineering work items, not implemented capabilities:
 
-- Encrypted SQLite storage and a safe plaintext-to-encrypted migration.
+- Release 2: evaluate local SQLite encryption and a safe migration strategy; it is intentionally out of Release 1 scope.
 - Portable attachment-aware backup/restore with checksums and rollback.
 - Platform-by-platform build and runtime verification.
 - Real-device Argon2id performance measurements.
@@ -167,7 +167,7 @@ Courses, terms, schedules, tasks, exams, notes, materials, attachments, preferen
 No institutional portal, lecturer portal, student administration, official university attendance integration, institutional messaging/email, tuition/fees/payments, university dashboards, academic cloud sync, or server-side storage of student academic records/files.
 
 ### Security distinction
-Encrypted Google Drive backups do not imply that the live SQLite database is encrypted at rest. Production database encryption remains a separate security/release gate and must not be claimed until implemented and tested.
+Encrypted Google Drive backups (Release 2) are a separate feature from local SQLite-at-rest encryption (also deferred to Release 2). Neither is part of Release 1.
 
 
 ## 12. Release 1 cloud metadata backend — Neon
@@ -197,10 +197,12 @@ Current implementation boundary: Neon Auth and database schema are provisioned,
 and the Notices API is deployed to the Neon default branch. Health and public
 feed smoke tests pass; unauthenticated admin access is rejected. The API source,
 tests and deployment artifact are on `feat/neon-managed-auth-and-notices`.
-Flutter integration, production OAuth/SMTP setup, trusted origins, admin
-bootstrap, and receipt-retention policy are not yet accepted. Existing Flutter
-authentication remains local until the managed client is implemented and
-verified. Guest academic use remains available without a network connection.
+The Flutter client now contains the Managed Auth REST adapter and email/OTP
+screens, with unit tests for request routing and session handling. Real-account
+end-to-end tests on Android and Web remain unaccepted. Production OAuth/SMTP,
+trusted origins, admin bootstrap, guest-metric abuse controls, and receipt
+retention policy remain open release gates. Guest academic use remains available
+offline.
 
 Google Drive backup remains deferred to Release 2. No academic cloud sync is
 introduced by this backend.
