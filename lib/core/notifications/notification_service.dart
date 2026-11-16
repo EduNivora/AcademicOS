@@ -187,7 +187,9 @@ class NotificationService {
       return null;
     }
 
-    final time = RegExp(r'^(\d{1,2}):(\d{2}) = int.parse(time.group(1)!);
+    final time = RegExp(r'^(\d{1,2}):(\d{2})
+
+    final hour = int.parse(time.group(1)!);
     final minute = int.parse(time.group(2)!);
     if (hour > 23 || minute > 59) return null;
 
