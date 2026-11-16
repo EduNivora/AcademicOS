@@ -146,6 +146,27 @@ export function createApp({
     return c.json({ items: result.rows });
   });
 
+  app.get("/v1/announcements/:id", async (c) => {
+    const announcementId = c.req.param("id");
+    if (!isUuid(announcementId)) {
+      return jsonError(c, 400, "invalid_announcement_id", "Invalid announcement id.");
+    }
+
+    const result = await pool.query(
+      `SELECT id, title, body, published_at
+         FROM public.announcements
+        WHERE id = $1::uuid
+          AND status = 'published'
+          AND published_at IS NOT NULL
+        LIMIT 1`,
+      [announcementId],
+    );
+    if (result.rowCount === 0) {
+      return jsonError(c, 404, "announcement_not_found", "Announcement not found.");
+    }
+    return c.json({ item: result.rows[0] });
+  });
+
   app.get("/v1/me", async (c) => {
     const authorization = c.req.header("Authorization") ?? "";
     const token = authorization.match(/^Bearer\s+(.+)$/i)?.[1];
