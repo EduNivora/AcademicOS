@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'core/security/auth_secure_storage_service.dart';
@@ -18,6 +21,7 @@ import 'domain/usecases/task_use_cases.dart';
 import 'core/initializer/app_initializer.dart';
 import 'core/notifications/notification_service.dart';
 import 'core/theme/app_theme.dart';
+import 'core/localization/app_locale.dart';
 import 'package:academic_os/presentation/auth/auth_gate_screen.dart';
 
 void main() async {
@@ -178,15 +182,52 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  static const String _languagePreferenceKey = 'edunivora_language_is_arabic_v1';
+
   bool _isDarkMode = false;
   bool _isArabic = true;
+  bool _languageChangedByUser = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreLanguagePreference();
+  }
+
+  Future<void> _restoreLanguagePreference() async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      final savedLanguage = preferences.getBool(_languagePreferenceKey);
+      if (!mounted || savedLanguage == null || _languageChangedByUser) return;
+      setState(() => _isArabic = savedLanguage);
+    } catch (_) {
+      // Language preference is optional; default to Arabic on read failure.
+    }
+  }
+
+  void _setLanguage(bool isArabic) {
+    _languageChangedByUser = true;
+    if (_isArabic != isArabic) {
+      setState(() => _isArabic = isArabic);
+    }
+    unawaited(_persistLanguagePreference(isArabic));
+  }
+
+  Future<void> _persistLanguagePreference(bool isArabic) async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setBool(_languagePreferenceKey, isArabic);
+    } catch (_) {
+      // A preference write failure must not prevent changing the current UI.
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Academic OS',
-      locale: const Locale('ar', 'SA'),
+      locale: appLocaleForLanguage(_isArabic),
       supportedLocales: const [Locale('ar', 'SA'), Locale('en', 'US')],
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
@@ -195,7 +236,7 @@ class _MyAppState extends State<MyApp> {
       ],
       builder: (context, child) {
         return Directionality(
-          textDirection: TextDirection.rtl,
+          textDirection: appTextDirectionForLanguage(_isArabic),
           child: child ?? const SizedBox.shrink(),
         );
       },
@@ -209,7 +250,7 @@ class _MyAppState extends State<MyApp> {
         isDarkMode: _isDarkMode,
         isArabic: _isArabic,
         onThemeChanged: (value) => setState(() => _isDarkMode = value),
-        onLanguageChanged: (value) => setState(() => _isArabic = value),
+        onLanguageChanged: _setLanguage,
       ),
     );
   }
