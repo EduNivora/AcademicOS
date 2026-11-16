@@ -39,7 +39,12 @@ void main() async {
     await appInitializer.initialize();
   } catch (error, stackTrace) {
     debugPrint('AppInitializer failed during startup: $error\n$stackTrace');
-    runApp(_StartupFailureApp(onRetry: main));
+    runApp(
+      _StartupFailureApp(
+        onRetry: main,
+        failureDetails: error.toString(),
+      ),
+    );
     return;
   }
 
@@ -105,9 +110,13 @@ void main() async {
 }
 
 class _StartupFailureApp extends StatelessWidget {
-  const _StartupFailureApp({required this.onRetry});
+  const _StartupFailureApp({
+    required this.onRetry,
+    required this.failureDetails,
+  });
 
   final VoidCallback onRetry;
+  final String failureDetails;
 
   @override
   Widget build(BuildContext context) {
@@ -143,6 +152,18 @@ class _StartupFailureApp extends StatelessWidget {
                       'التطبيق لحماية بياناتك من الحفظ المؤقت أو الفقدان. '
                       'تحقق من مساحة التخزين ثم أعد المحاولة.',
                       textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: SelectableText(
+                        failureDetails,
+                        textAlign: TextAlign.left,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.black54,
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 24),
                     FilledButton.icon(

@@ -42,8 +42,11 @@ jobs:
       - name: Verify Web output
         run: |
           test -s build/web/index.html
-          test -d build/web
-          echo "Flutter Web release output is ready for Cloudflare Pages."
+          test -s build/web/sqlite3.wasm
+          test -s build/web/sqflite_sw.js
+          test -s build/web/_headers
+          grep -F "Content-Type: application/wasm" build/web/_headers
+          echo "Flutter Web and persistent SQLite assets are ready for Cloudflare Pages."
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v4

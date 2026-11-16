@@ -1,0 +1,7 @@
+/sqlite3.wasm
+  Content-Type: application/wasm
+  Cache-Control: public, max-age=0, must-revalidate
+
+/sqflite_sw.js
+  Content-Type: application/javascript; charset=utf-8
+  Cache-Control: public, max-age=0, must-revalidate
