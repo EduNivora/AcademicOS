@@ -139,3 +139,15 @@ but real-account Android/Web end-to-end acceptance is still open. Production
 Google OAuth credentials, production SMTP, the final Web trusted origin,
 controlled first-admin bootstrap, retention policy, guest metric abuse controls,
 and end-to-end platform verification remain open gates.
+
+## 11. Release 1 platform boundary — 2026-11-16
+
+Release 1 is delivered as the **Android application only**. The complete Web application is deferred to a future release, including:
+- Student-facing Web application and browser UI.
+- Web-based notices administration.
+- Web/IndexedDB runtime acceptance and Web release artifacts.
+- Cloudflare Pages production deployment and Web-specific origins.
+
+The notices operator/admin experience required for Release 1 must be provided inside the Android application, subject to the existing server-side authorization rules. A separate Web administration interface is not a Release 1 requirement.
+
+Release 1 platform acceptance is limited to Android: offline guest-first startup, local SQLite and durable attachment storage, optional account flows, public notices and receipts, Android notifications, migrations, Debug/Release QA builds, and physical-device runtime checks. Production APK signing remains a separate release prerequisite for public distribution. Web-only pull requests must remain deferred and must not block Android release.
