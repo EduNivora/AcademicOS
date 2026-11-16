@@ -61,3 +61,11 @@ This status is not a release approval. The remaining internal work includes end-
 ## Release 2 deferred work
 
 Google Drive backup and restore, encrypted backup archives, backup password/key management, upload/download workflows, production SQLite encryption, and academic cloud synchronization are intentionally excluded from Release 1.
+
+## Binding scope correction — 2026-11-16
+
+Release 1 is an **Android application only**. The user-facing Web application, Web admin interface, Web runtime/browser acceptance, Web build artifacts, and Cloudflare Pages deployment are deferred and are not Release 1 acceptance gates. Do not merge or execute Web-only work as a Release 1 dependency. PR #30 is retained as a draft for a future release.
+
+The Release 1 CI gate must cover dependency resolution, Dart analysis, Flutter tests, Android Debug APK, Android Release-variant QA APK, and both Android artifacts. The current Release QA APK is debug-signed and is not suitable for store publication. Production Android signing and physical-device installation/runtime acceptance remain separate gates.
+
+The optional account and notices features remain part of the Android app. The notices operator/admin experience, if shipped in Release 1, must be inside the Android app; no separate Web administration interface is required.
