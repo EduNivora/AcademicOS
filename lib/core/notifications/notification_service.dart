@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
@@ -13,16 +14,42 @@ class NotificationService {
 
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
+  static const MethodChannel _deviceTimeZoneChannel =
+      MethodChannel('edunivora/device_timezone');
 
-  Future<void> initialize() async {
-    if (kIsWeb) return;
+  bool _isInitialized = false;
+  bool _notificationsPermissionGranted = false;
 
+  bool get _canSchedule =>
+      _isInitialized && _notificationsPermissionGranted;
+
+  /// Configures the timezone calculations using Android's device IANA zone.
+  /// Unknown identifiers are rejected so a reminder is never scheduled in UTC
+  /// or an unrelated hard-coded timezone by accident.
+  static bool configureLocalTimeZone(String identifier) {
     try {
       tz.initializeTimeZones();
-      try {
-        tz.setLocalLocation(tz.getLocation('Asia/Riyadh'));
-      } catch (_) {
-        // Fallback to local timezone if the region is unavailable.
+      tz.setLocalLocation(tz.getLocation(identifier));
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> initialize() async {
+    _isInitialized = false;
+    _notificationsPermissionGranted = false;
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+      return false;
+    }
+
+    try {
+      final localTimeZone =
+          await _deviceTimeZoneChannel.invokeMethod<String>('getLocalTimeZone');
+      if (localTimeZone == null ||
+          localTimeZone.isEmpty ||
+          !configureLocalTimeZone(localTimeZone)) {
+        throw StateError('Android did not provide a valid IANA timezone.');
       }
 
       const androidInitializationSettings = AndroidInitializationSettings(
@@ -31,11 +58,16 @@ class NotificationService {
       const initializationSettings = InitializationSettings(
         android: androidInitializationSettings,
       );
-      await _plugin.initialize(initializationSettings);
+      final initialized = await _plugin.initialize(initializationSettings);
+      if (initialized == false) {
+        throw StateError('The Android notification plugin did not initialize.');
+      }
 
       final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
-      await androidPlugin?.requestNotificationsPermission();
+      if (androidPlugin == null) {
+        throw StateError('The Android notification platform is unavailable.');
+      }
 
       const taskChannel = AndroidNotificationChannel(
         'academic_os_tasks',
@@ -45,7 +77,6 @@ class NotificationService {
         playSound: true,
         enableVibration: true,
       );
-
       const courseChannel = AndroidNotificationChannel(
         'academic_os_courses',
         'Lecture reminders',
@@ -55,10 +86,19 @@ class NotificationService {
         enableVibration: true,
       );
 
-      await androidPlugin?.createNotificationChannel(taskChannel);
-      await androidPlugin?.createNotificationChannel(courseChannel);
+      await androidPlugin.createNotificationChannel(taskChannel);
+      await androidPlugin.createNotificationChannel(courseChannel);
+
+      final permissionGranted =
+          await androidPlugin.requestNotificationsPermission();
+      _notificationsPermissionGranted = permissionGranted ?? true;
+      _isInitialized = true;
+      return _notificationsPermissionGranted;
     } catch (error, stackTrace) {
       debugPrint('NotificationService.initialize error: $error\n$stackTrace');
+      _isInitialized = false;
+      _notificationsPermissionGranted = false;
+      return false;
     }
   }
 
@@ -68,7 +108,7 @@ class NotificationService {
     required DateTime? reminderDate,
     required int reminderOffsetMinutes,
   }) {
-    if (!reminderEnabled) {
+    if (!reminderEnabled || reminderOffsetMinutes < 0) {
       return null;
     }
 
@@ -141,42 +181,47 @@ class NotificationService {
     required int reminderOffsetMinutes,
   }) {
     final targetWeekday = _arabicWeekdayToDateTimeWeekday(weekdayName);
-    if (targetWeekday == null) return null;
+    if (targetWeekday == null ||
+        reminderOffsetMinutes < 0 ||
+        reminderOffsetMinutes > 10080) {
+      return null;
+    }
 
-    final timeParts = startTime.split(':');
-    final hour = int.tryParse(timeParts.first) ?? 0;
-    final minute = int.tryParse(timeParts.length > 1 ? timeParts[1] : '0') ?? 0;
-    final lectureStart = DateTime(
+    final time = RegExp(r'^(\d{1,2}):(\d{2})
+        .firstMatch(startTime.trim());
+    if (time == null) return null;
+
+    final hour = int.parse(time.group(1)!);
+    final minute = int.parse(time.group(2)!);
+    if (hour > 23 || minute > 59) return null;
+
+    var daysUntilLecture = (targetWeekday - now.weekday + 7) % 7;
+    final lectureDate = DateTime(
       now.year,
       now.month,
-      now.day,
+      now.day + daysUntilLecture,
       hour,
       minute,
     );
-
-    var diffDays = (targetWeekday - now.weekday + 7) % 7;
-    if (diffDays == 0 && lectureStart.isBefore(now)) {
-      diffDays = 7;
+    if (daysUntilLecture == 0 && !lectureDate.isAfter(now)) {
+      daysUntilLecture = 7;
     }
 
-    final nextLectureDate = now.add(Duration(days: diffDays));
-    final reminder = DateTime(
-      nextLectureDate.year,
-      nextLectureDate.month,
-      nextLectureDate.day,
+    final nextLecture = DateTime(
+      now.year,
+      now.month,
+      now.day + daysUntilLecture,
       hour,
       minute,
-    ).subtract(Duration(minutes: reminderOffsetMinutes));
-
-    return reminder.isBefore(now)
-        ? reminder.add(const Duration(days: 7))
-        : reminder;
+    );
+    final reminder =
+        nextLecture.subtract(Duration(minutes: reminderOffsetMinutes));
+    return reminder.isBefore(now) ? null : reminder;
   }
 
-  Future<void> scheduleTaskReminder(TaskEntity task) async {
-    if (kIsWeb || task.id == null) {
-      return;
-    }
+  Future<bool> scheduleTaskReminder(TaskEntity task) async {
+    if (kIsWeb || task.id == null) return false;
+    if (!task.reminderEnabled) return cancelTaskReminder(task.id!);
 
     final scheduledAt = resolveReminderDate(
       reminderEnabled: task.reminderEnabled,
@@ -184,11 +229,11 @@ class NotificationService {
       reminderDate: task.reminderDate,
       reminderOffsetMinutes: task.reminderOffsetMinutes,
     );
-
     if (scheduledAt == null || scheduledAt.isBefore(DateTime.now())) {
       await cancelTaskReminder(task.id!);
-      return;
+      return false;
     }
+    if (!_canSchedule) return false;
 
     try {
       await _plugin.zonedSchedule(
@@ -213,16 +258,19 @@ class NotificationService {
             UILocalNotificationDateInterpretation.absoluteTime,
         androidScheduleMode: await _resolveAndroidScheduleMode(),
       );
+      return true;
     } catch (error, stackTrace) {
       debugPrint(
         'NotificationService.scheduleTaskReminder error: $error\n$stackTrace',
       );
+      return false;
     }
   }
 
-  Future<void> scheduleCourseReminder(CourseEntity course) async {
-    if (kIsWeb || course.id == null) {
-      return;
+  Future<bool> scheduleCourseReminder(CourseEntity course) async {
+    if (kIsWeb || course.id == null) return false;
+    if (!course.lectureReminderEnabled) {
+      return cancelCourseReminder(course.id!);
     }
 
     final scheduledAt = resolveReminderDate(
@@ -231,11 +279,11 @@ class NotificationService {
       reminderDate: course.lectureDate,
       reminderOffsetMinutes: course.lectureReminderOffsetMinutes,
     );
-
     if (scheduledAt == null || scheduledAt.isBefore(DateTime.now())) {
       await cancelCourseReminder(course.id!);
-      return;
+      return false;
     }
+    if (!_canSchedule) return false;
 
     try {
       await _plugin.zonedSchedule(
@@ -260,34 +308,40 @@ class NotificationService {
             UILocalNotificationDateInterpretation.absoluteTime,
         androidScheduleMode: await _resolveAndroidScheduleMode(),
       );
+      return true;
     } catch (error, stackTrace) {
       debugPrint(
         'NotificationService.scheduleCourseReminder error: $error\n$stackTrace',
       );
+      return false;
     }
   }
 
-  Future<void> cancelTaskReminder(int taskId) async {
+  Future<bool> cancelTaskReminder(int taskId) async {
     try {
       await _plugin.cancel(_taskNotificationId(taskId));
+      return true;
     } catch (error, stackTrace) {
       debugPrint(
         'NotificationService.cancelTaskReminder error: $error\n$stackTrace',
       );
+      return false;
     }
   }
 
-  Future<void> cancelCourseReminder(int courseId) async {
+  Future<bool> cancelCourseReminder(int courseId) async {
     try {
       await _plugin.cancel(_courseNotificationId(courseId));
+      return true;
     } catch (error, stackTrace) {
       debugPrint(
         'NotificationService.cancelCourseReminder error: $error\n$stackTrace',
       );
+      return false;
     }
   }
 
-  Future<void> scheduleLectureReminder({
+  Future<bool> scheduleLectureReminder({
     required int id,
     required String title,
     required String weekdayName,
@@ -296,10 +350,8 @@ class NotificationService {
     String? location,
     int reminderOffsetMinutes = 15,
   }) async {
-    if (kIsWeb || !reminderEnabled) {
-      await cancelLectureReminder(id);
-      return;
-    }
+    if (kIsWeb) return false;
+    if (!reminderEnabled) return cancelLectureReminder(id);
 
     final scheduledAt = resolveLectureReminderDate(
       now: DateTime.now(),
@@ -307,11 +359,11 @@ class NotificationService {
       startTime: startTime,
       reminderOffsetMinutes: reminderOffsetMinutes,
     );
-
     if (scheduledAt == null || scheduledAt.isBefore(DateTime.now())) {
       await cancelLectureReminder(id);
-      return;
+      return false;
     }
+    if (!_canSchedule) return false;
 
     try {
       await _plugin.zonedSchedule(
@@ -320,6 +372,174 @@ class NotificationService {
         location != null && location.isNotEmpty
             ? 'الموقع: $location'
             : 'لا تنس موعد المحاضرة القادمة.',
+        tz.TZDateTime.from(scheduledAt, tz.local),
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'academic_os_courses',
+            'Lecture reminders',
+            channelDescription: 'Reminders for lectures and course deadlines',
+            importance: Importance.max,
+            priority: Priority.high,
+            playSound: true,
+            enableVibration: true,
+          ),
+        ),
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        androidScheduleMode: await _resolveAndroidScheduleMode(),
+      );
+      return true;
+    } catch (error, stackTrace) {
+      debugPrint(
+        'NotificationService.scheduleLectureReminder error: $error\n$stackTrace',
+      );
+      return false;
+    }
+  }
+
+  Future<bool> cancelLectureReminder(int scheduleId) async {
+    try {
+      await _plugin.cancel(_lectureNotificationId(scheduleId));
+      return true;
+    } catch (error, stackTrace) {
+      debugPrint(
+        'NotificationService.cancelLectureReminder error: $error\n$stackTrace',
+      );
+      return false;
+    }
+  }
+
+  Future<bool> syncReminders({
+    required List<TaskEntity> tasks,
+    required List<CourseEntity> courses,
+  }) async {
+    if (kIsWeb) return false;
+
+    var allRemindersHandled = true;
+    for (final task in tasks) {
+      if (task.id == null) continue;
+      final success = task.reminderEnabled
+          ? await scheduleTaskReminder(task)
+          : await cancelTaskReminder(task.id!);
+      allRemindersHandled = success && allRemindersHandled;
+    }
+
+    for (final course in courses) {
+      if (course.id == null) continue;
+      final success = course.lectureReminderEnabled
+          ? await scheduleCourseReminder(course)
+          : await cancelCourseReminder(course.id!);
+      allRemindersHandled = success && allRemindersHandled;
+    }
+
+    return allRemindersHandled;
+  }
+}
+)
+        .firstMatch(startTime.trim());
+    if (time == null) return null;
+
+    final hour = int.parse(time.group(1)!);
+    final minute = int.parse(time.group(2)!);
+    if (hour > 23 || minute > 59) return null;
+
+    var daysUntilLecture = (targetWeekday - now.weekday + 7) % 7;
+    final lectureDate = DateTime(
+      now.year,
+      now.month,
+      now.day + daysUntilLecture,
+      hour,
+      minute,
+    );
+    if (daysUntilLecture == 0 && !lectureDate.isAfter(now)) {
+      daysUntilLecture = 7;
+    }
+
+    final nextLecture = DateTime(
+      now.year,
+      now.month,
+      now.day + daysUntilLecture,
+      hour,
+      minute,
+    );
+    final reminder =
+        nextLecture.subtract(Duration(minutes: reminderOffsetMinutes));
+    return reminder.isBefore(now) ? null : reminder;
+  }
+
+  Future<bool> scheduleTaskReminder(TaskEntity task) async {
+    if (kIsWeb || task.id == null) return false;
+    if (!task.reminderEnabled) return cancelTaskReminder(task.id!);
+
+    final scheduledAt = resolveReminderDate(
+      reminderEnabled: task.reminderEnabled,
+      dueDate: task.dueDate,
+      reminderDate: task.reminderDate,
+      reminderOffsetMinutes: task.reminderOffsetMinutes,
+    );
+    if (scheduledAt == null || scheduledAt.isBefore(DateTime.now())) {
+      await cancelTaskReminder(task.id!);
+      return false;
+    }
+    if (!_canSchedule) return false;
+
+    try {
+      await _plugin.zonedSchedule(
+        _taskNotificationId(task.id!),
+        'تذكير: ${task.title}',
+        task.description.isNotEmpty
+            ? task.description
+            : 'لا تنسَ المهمة التي أضفتها.',
+        tz.TZDateTime.from(scheduledAt, tz.local),
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'academic_os_tasks',
+            'Task reminders',
+            channelDescription: 'Reminders for tasks and deadlines',
+            importance: Importance.max,
+            priority: Priority.high,
+            playSound: true,
+            enableVibration: true,
+          ),
+        ),
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        androidScheduleMode: await _resolveAndroidScheduleMode(),
+      );
+      return true;
+    } catch (error, stackTrace) {
+      debugPrint(
+        'NotificationService.scheduleTaskReminder error: $error\n$stackTrace',
+      );
+      return false;
+    }
+  }
+
+  Future<bool> scheduleCourseReminder(CourseEntity course) async {
+    if (kIsWeb || course.id == null) return false;
+    if (!course.lectureReminderEnabled) {
+      return cancelCourseReminder(course.id!);
+    }
+
+    final scheduledAt = resolveReminderDate(
+      reminderEnabled: course.lectureReminderEnabled,
+      dueDate: course.lectureDate,
+      reminderDate: course.lectureDate,
+      reminderOffsetMinutes: course.lectureReminderOffsetMinutes,
+    );
+    if (scheduledAt == null || scheduledAt.isBefore(DateTime.now())) {
+      await cancelCourseReminder(course.id!);
+      return false;
+    }
+    if (!_canSchedule) return false;
+
+    try {
+      await _plugin.zonedSchedule(
+        _courseNotificationId(course.id!),
+        'محاضرة قريبة: ${course.name}',
+        course.notes?.isNotEmpty == true
+            ? course.notes!
+            : 'لا تنسَ موعد المحاضرة القادمة.',
         tz.TZDateTime.from(scheduledAt, tz.local),
         const NotificationDetails(
           android: AndroidNotificationDetails(
@@ -336,49 +556,130 @@ class NotificationService {
             UILocalNotificationDateInterpretation.absoluteTime,
         androidScheduleMode: await _resolveAndroidScheduleMode(),
       );
+      return true;
+    } catch (error, stackTrace) {
+      debugPrint(
+        'NotificationService.scheduleCourseReminder error: $error\n$stackTrace',
+      );
+      return false;
+    }
+  }
+
+  Future<bool> cancelTaskReminder(int taskId) async {
+    try {
+      await _plugin.cancel(_taskNotificationId(taskId));
+      return true;
+    } catch (error, stackTrace) {
+      debugPrint(
+        'NotificationService.cancelTaskReminder error: $error\n$stackTrace',
+      );
+      return false;
+    }
+  }
+
+  Future<bool> cancelCourseReminder(int courseId) async {
+    try {
+      await _plugin.cancel(_courseNotificationId(courseId));
+      return true;
+    } catch (error, stackTrace) {
+      debugPrint(
+        'NotificationService.cancelCourseReminder error: $error\n$stackTrace',
+      );
+      return false;
+    }
+  }
+
+  Future<bool> scheduleLectureReminder({
+    required int id,
+    required String title,
+    required String weekdayName,
+    required String startTime,
+    required bool reminderEnabled,
+    String? location,
+    int reminderOffsetMinutes = 15,
+  }) async {
+    if (kIsWeb) return false;
+    if (!reminderEnabled) return cancelLectureReminder(id);
+
+    final scheduledAt = resolveLectureReminderDate(
+      now: DateTime.now(),
+      weekdayName: weekdayName,
+      startTime: startTime,
+      reminderOffsetMinutes: reminderOffsetMinutes,
+    );
+    if (scheduledAt == null || scheduledAt.isBefore(DateTime.now())) {
+      await cancelLectureReminder(id);
+      return false;
+    }
+    if (!_canSchedule) return false;
+
+    try {
+      await _plugin.zonedSchedule(
+        _lectureNotificationId(id),
+        'محاضرة قريبة: $title',
+        location != null && location.isNotEmpty
+            ? 'الموقع: $location'
+            : 'لا تنس موعد المحاضرة القادمة.',
+        tz.TZDateTime.from(scheduledAt, tz.local),
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'academic_os_courses',
+            'Lecture reminders',
+            channelDescription: 'Reminders for lectures and course deadlines',
+            importance: Importance.max,
+            priority: Priority.high,
+            playSound: true,
+            enableVibration: true,
+          ),
+        ),
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        androidScheduleMode: await _resolveAndroidScheduleMode(),
+      );
+      return true;
     } catch (error, stackTrace) {
       debugPrint(
         'NotificationService.scheduleLectureReminder error: $error\n$stackTrace',
       );
+      return false;
     }
   }
 
-  Future<void> cancelLectureReminder(int scheduleId) async {
+  Future<bool> cancelLectureReminder(int scheduleId) async {
     try {
       await _plugin.cancel(_lectureNotificationId(scheduleId));
+      return true;
     } catch (error, stackTrace) {
       debugPrint(
         'NotificationService.cancelLectureReminder error: $error\n$stackTrace',
       );
+      return false;
     }
   }
 
-  Future<void> syncReminders({
+  Future<bool> syncReminders({
     required List<TaskEntity> tasks,
     required List<CourseEntity> courses,
   }) async {
-    if (kIsWeb) return;
+    if (kIsWeb) return false;
 
+    var allRemindersHandled = true;
     for (final task in tasks) {
-      if (task.id == null) {
-        continue;
-      }
-      if (task.reminderEnabled) {
-        await scheduleTaskReminder(task);
-      } else {
-        await cancelTaskReminder(task.id!);
-      }
+      if (task.id == null) continue;
+      final success = task.reminderEnabled
+          ? await scheduleTaskReminder(task)
+          : await cancelTaskReminder(task.id!);
+      allRemindersHandled = success && allRemindersHandled;
     }
 
     for (final course in courses) {
-      if (course.id == null) {
-        continue;
-      }
-      if (course.lectureReminderEnabled) {
-        await scheduleCourseReminder(course);
-      } else {
-        await cancelCourseReminder(course.id!);
-      }
+      if (course.id == null) continue;
+      final success = course.lectureReminderEnabled
+          ? await scheduleCourseReminder(course)
+          : await cancelCourseReminder(course.id!);
+      allRemindersHandled = success && allRemindersHandled;
     }
+
+    return allRemindersHandled;
   }
 }

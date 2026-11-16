@@ -280,7 +280,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       }
 
       if (savedId != null && reminderEnabled) {
-        await NotificationService.instance.scheduleLectureReminder(
+        final scheduled =
+            await NotificationService.instance.scheduleLectureReminder(
           id: savedId,
           title: selectedCourseId != null
               ? (_courses
@@ -303,6 +304,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               : locationController.text.trim(),
           reminderOffsetMinutes: 15,
         );
+        if (!scheduled && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'تم حفظ موعد المحاضرة، لكن لم يتم تأكيد جدولة التنبيه. '
+                'تحقق من إذن الإشعارات وإعدادات الجهاز.',
+              ),
+            ),
+          );
+        }
       } else if (savedId != null) {
         await NotificationService.instance.cancelLectureReminder(savedId);
       }

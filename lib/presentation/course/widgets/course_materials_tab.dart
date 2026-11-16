@@ -3,7 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
 import '../../../data/database/database_helper.dart';
 import '../../../data/models/course_material_model.dart';
-import '../document_viewer_screen.dart';
+import '../../courses/document_viewer_screen.dart';
 
 class CourseMaterialsTab extends StatefulWidget {
   final int courseId;
@@ -27,6 +27,7 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
     setState(() => _isLoading = true);
     final rows =
         await DatabaseHelper.instance.getMaterialsByCourseId(widget.courseId);
+    if (!mounted) return;
     setState(() {
       _materials = rows.map(CourseMaterialModel.fromMap).toList();
       _isLoading = false;
@@ -120,8 +121,45 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
   }
 
   Future<void> _deleteMaterial(int id) async {
-    await DatabaseHelper.instance.deleteMaterial(id);
-    await _loadMaterials();
+    final matching = _materials.where((material) => material.id == id);
+    if (matching.isEmpty) return;
+    final material = matching.first;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('حذف المرفق؟'),
+        content: Text(
+          'سيتم حذف «${material.title}» وبيانات الملف المحفوظة على هذا الجهاز.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await DatabaseHelper.instance.deleteMaterial(id);
+      await _loadMaterials();
+    } catch (error, stackTrace) {
+      debugPrint('Deleting course attachment failed: $error\\n$stackTrace');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر حذف المرفق: $error')),
+      );
+    }
   }
 
   @override
@@ -169,8 +207,12 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
                           title: Text(m.title),
                           subtitle: Text(m.fileType.toUpperCase()),
                           trailing: IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () => _deleteMaterial(m.id!)),
+                            tooltip: 'حذف المرفق',
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: m.id == null
+                                ? null
+                                : () => _deleteMaterial(m.id!),
+                          ),
                           onTap: () => _openMaterial(m),
                         );
                       },
