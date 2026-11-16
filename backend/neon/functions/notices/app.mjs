@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 
@@ -65,13 +66,37 @@ async function ensureProfile(pool, subject) {
   return profile.rows[0] ?? null;
 }
 
-export function createApp({ pool, verifyIdentity, allowedOrigins = [] }) {
+export function createApp({
+  pool,
+  verifyIdentity,
+  allowedOrigins = [],
+  guestMetricsProxySecret = null,
+}) {
   if (!pool || typeof pool.query !== "function" || typeof pool.connect !== "function") {
     throw new TypeError("A PostgreSQL pool with query and connect methods is required");
   }
   if (typeof verifyIdentity !== "function") {
     throw new TypeError("A token verifier is required");
   }
+
+  const requireGuestMetricsProxy = async (c, next) => {
+    if (
+      typeof guestMetricsProxySecret !== "string" ||
+      Buffer.byteLength(guestMetricsProxySecret, "utf8") < 32
+    ) {
+      return jsonError(c, 503, "metrics_unavailable", "Guest metrics are temporarily unavailable.");
+    }
+
+    const supplied = c.req.header("X-EduNivora-Worker-Secret") ?? "";
+    const expectedBytes = Buffer.from(guestMetricsProxySecret, "utf8");
+    const suppliedBytes = Buffer.from(supplied, "utf8");
+    const matches = suppliedBytes.length === expectedBytes.length &&
+      timingSafeEqual(suppliedBytes, expectedBytes);
+    if (!matches) {
+      return jsonError(c, 403, "forbidden", "Worker authorization is required.");
+    }
+    await next();
+  };
 
   const app = new Hono();
 
@@ -152,7 +177,7 @@ export function createApp({ pool, verifyIdentity, allowedOrigins = [] }) {
 
   // Guest analytics store aggregate counters only. No guest id, IP address,
   // device fingerprint, or cross-session identifier is persisted.
-  app.post("/v1/announcements/:id/guest-view", async (c) => {
+  app.post("/v1/announcements/:id/guest-view", requireGuestMetricsProxy, async (c) => {
     const announcementId = c.req.param("id");
     if (!isUuid(announcementId)) {
       return jsonError(c, 400, "invalid_announcement_id", "Invalid announcement id.");
@@ -177,7 +202,7 @@ export function createApp({ pool, verifyIdentity, allowedOrigins = [] }) {
     return c.body(null, 204);
   });
 
-  app.post("/v1/announcements/:id/guest-delivered", async (c) => {
+  app.post("/v1/announcements/:id/guest-delivered", requireGuestMetricsProxy, async (c) => {
     const announcementId = c.req.param("id");
     if (!isUuid(announcementId)) {
       return jsonError(c, 400, "invalid_announcement_id", "Invalid announcement id.");
