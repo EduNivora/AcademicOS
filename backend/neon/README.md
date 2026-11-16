@@ -73,11 +73,12 @@ user-agent, device identifiers, or request bodies. A failed upstream request
 does not refund reserved quota, because Neon may have committed before a network
 failure was observed.
 
-The Worker implementation and Node tests are in
-`guest-metrics-worker/` and
-`functions/notices/guest_metrics_worker.test.mjs`. These tests exercise the
-quota algorithm and mocked Worker routing; they are not a substitute for a
-Cloudflare runtime deployment/concurrency test. Guest metrics are best-effort.
+The Worker implementation, Node routing tests, and Cloudflare Workers Vitest
+runtime tests are in `guest-metrics-worker/` and
+`functions/notices/guest_metrics_worker.test.mjs`. The runtime suite exercises
+the actual SQLite-backed Durable Object with concurrent calls and verifies
+aggregate-only storage. These tests still do not replace a live deployment
+smoke test. Guest metrics are best-effort.
 Public notice reads remain independent and must continue if the proxy is down.
 Guest metrics are disabled in the Flutter client unless
 `EDUNIVORA_GUEST_METRICS_PROXY_URL` is supplied at build time.
