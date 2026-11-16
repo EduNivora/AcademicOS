@@ -40,7 +40,7 @@ function createPool({ role = "user", failAudit = false } = {}) {
     if (sql.includes("INSERT INTO public.announcement_admin_audit")) {
       return { rowCount: 1, rows: [] };
     }
-    if (sql.includes("SELECT id, title, body, published_at")) {
+    if (sql.includes("SELECT id, title, body, published_at") && sql.includes("LIMIT 1")) {
       return {
         rowCount: 1,
         rows: [{
@@ -50,6 +50,9 @@ function createPool({ role = "user", failAudit = false } = {}) {
           published_at: "2026-11-16T12:00:00.000Z",
         }],
       };
+    }
+    if (sql.includes("SELECT id, title, body, published_at")) {
+      return { rowCount: 0, rows: [] };
     }
     if (sql.includes("SELECT 1")) return { rowCount: 1, rows: [{ "?column?": 1 }] };
     return { rowCount: 0, rows: [] };
