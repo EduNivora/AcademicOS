@@ -1,54 +1,17 @@
-name: Deploy EduNivora Web to Cloudflare Pages
+name: Deferred EduNivora Web deployment
 
+# Release 1 is Android-only. Keep this workflow inert until a future Web release
+# is explicitly approved and its browser/runtime acceptance gates are complete.
 on:
-  push:
-    branches:
-      - chore/edunivora-phase0-execution
   workflow_dispatch:
 
 permissions:
   contents: read
-  deployments: write
-
-concurrency:
-  group: edunivora-pages-production
-  cancel-in-progress: true
 
 jobs:
-  deploy:
-    name: Build and deploy Flutter Web
-    if: github.ref == 'refs/heads/chore/edunivora-phase0-execution'
+  deferred:
+    if: false
     runs-on: ubuntu-latest
-    timeout-minutes: 35
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.41.8'
-          cache: true
-
-      - name: Resolve dependencies
-        run: flutter pub get --enforce-lockfile
-
-      - name: Prepare SQLite WebAssembly runtime
-        run: dart run sqflite_common_ffi_web:setup --force --verbose
-
-      - name: Build Web release
-        run: flutter build web --release --no-pub
-
-      - name: Verify Web output
-        run: |
-          test -s build/web/index.html
-          test -d build/web
-          echo "Flutter Web release output is ready for Cloudflare Pages."
-
-      - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: d9979a917e9175a9128bd146ff88bc9d
-          command: pages deploy build/web --project-name=edunivora --branch=chore/edunivora-phase0-execution
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+      - name: Web deployment is deferred
+        run: echo "EduNivora Web deployment is deferred; Release 1 ships Android only."
