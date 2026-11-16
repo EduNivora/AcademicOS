@@ -12,6 +12,7 @@ function isUuid(value) {
   return typeof value === "string" && UUID_PATTERN.test(value);
 }
 
+// Keep each admin state change and its audit record in one atomic transaction.
 async function runAdminTransaction(pool, operation) {
   const client = await pool.connect();
   try {
