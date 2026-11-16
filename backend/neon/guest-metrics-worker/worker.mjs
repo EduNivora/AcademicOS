@@ -105,7 +105,8 @@ export async function handleGuestMetricsRequest(
     typeof upstreamSecret !== "string" ||
     upstreamSecret.length < 32 ||
     !namespace ||
-    typeof namespace.getByName !== "function"
+    typeof namespace.idFromName !== "function" ||
+    typeof namespace.get !== "function"
   ) {
     return jsonResponse(503, "metrics_unavailable", "Guest metrics are temporarily unavailable.", origin, allowedOrigins);
   }
@@ -125,10 +126,34 @@ export async function handleGuestMetricsRequest(
     ? positiveLimit(env.GUEST_METRIC_VIEWS_PER_ANNOUNCEMENT_UTC_DAY, DEFAULT_DAILY_VIEWS)
     : positiveLimit(env.GUEST_METRIC_DELIVERIES_PER_ANNOUNCEMENT_UTC_DAY, DEFAULT_DAILY_DELIVERIES);
 
+  // Confirm the announcement is currently public before allocating a
+  // Durable Object. Arbitrary UUIDs must not create unbounded quota objects.
+  const upstreamBaseUrl = upstreamBase.replace(/\\/+$/, "");
+  try {
+    const announcementUrl = new URL(
+      `/v1/announcements/${announcementId}`,
+      upstreamBaseUrl,
+    );
+    const announcementResponse = await fetchImpl(announcementUrl, {
+      method: "GET",
+      headers: { "Accept": "application/json" },
+      redirect: "manual",
+    });
+    if (announcementResponse.status === 404) {
+      return jsonResponse(404, "announcement_not_found", "Announcement not found.", origin, allowedOrigins);
+    }
+    if (announcementResponse.status !== 200) {
+      return jsonResponse(502, "metrics_upstream_failed", "Guest metrics could not be recorded.", origin, allowedOrigins);
+    }
+  } catch {
+    return jsonResponse(502, "metrics_upstream_failed", "Guest metrics could not be recorded.", origin, allowedOrigins);
+  }
+
   try {
     // One globally-coordinated Durable Object per announcement and UTC day.
     const quotaName = quotaObjectName(announcementId, metricDate);
-    const quota = namespace.getByName(quotaName);
+    const quotaId = namespace.idFromName(quotaName);
+    const quota = namespace.get(quotaId);
     const reservation = await quota.reserve(kind, limit, expiresAt);
     if (!reservation?.allowed) {
       return jsonResponse(429, "daily_quota_exceeded", "The daily guest metric limit has been reached.", origin, allowedOrigins);
