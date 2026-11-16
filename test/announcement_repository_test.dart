@@ -30,6 +30,7 @@ void main() {
         posts.add(uri);
       },
       baseUrl: 'https://api.example.test',
+      guestMetricsBaseUrl: 'https://metrics.example.test',
     );
 
     final items = await repository.fetchAnnouncements();
@@ -39,6 +40,22 @@ void main() {
     expect(items.single.title, 'Welcome');
     expect(posts, hasLength(1));
     expect(posts.single.path, endsWith('/guest-delivered'));
+  });
+
+  test('does not send guest metric writes directly to Neon when proxy is unset', () async {
+    final posts = <Uri>[];
+    final repository = AnnouncementRepository(
+      get: (_) async => jsonEncode(_payload),
+      post: (uri) async { posts.add(uri); },
+      baseUrl: 'https://api.example.test',
+    );
+
+    final items = await repository.fetchAnnouncements();
+    await repository.recordOpened(items.single.id);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(items, hasLength(1));
+    expect(posts, isEmpty);
   });
 
   test('does not count the same guest delivery again after repository restart',
@@ -53,6 +70,7 @@ void main() {
             }
           },
           baseUrl: 'https://api.example.test',
+          guestMetricsBaseUrl: 'https://metrics.example.test',
         );
 
     await createRepository().fetchAnnouncements();
@@ -80,6 +98,7 @@ void main() {
         }
       },
       baseUrl: 'https://api.example.test',
+      guestMetricsBaseUrl: 'https://metrics.example.test',
     );
 
     await repository.fetchAnnouncements();

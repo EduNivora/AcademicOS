@@ -68,6 +68,12 @@ The following approved product decisions remain the target for Release 2:
 
 Any backup-related code already present on feature branches is retained as unaccepted work-in-progress. It must not be merged into the Release 1 branch, surfaced as an available Release 1 feature, or represented as production-ready. Reassess and rebase it when Release 2 planning begins.
 
+### Release 2 — deferred production SQLite encryption
+
+Production SQLite database encryption at rest is explicitly deferred from Release 1 to Release 2. Release 1 continues to use ordinary SQLite; the application and documentation must not claim that the active database is encrypted. This is a deliberate scope decision, not a hidden implementation gap or a reason to delay Release 1.
+
+Release 2 must define and verify the encrypted database engine, per-platform key lifecycle, existing-database migration, integrity checks, crash-safe transition, rollback and recovery, wrong-key rejection, and behavior for every supported platform before enabling encryption for existing users.
+
 ## 6. Explicit exclusions
 
 The current scope excludes:
@@ -87,7 +93,7 @@ The current scope excludes:
 - Guest notice analytics are anonymous aggregates; do not retain a stable cross-session guest identifier for named tracking.
 - Use access control for operator notice tools and audit publication/report access.
 - Minimize notice event retention and document the retention period before production release.
-- Encrypting a Google Drive backup does not mean the active SQLite database is encrypted at rest. Production database encryption remains a separate release gate.
+- Active SQLite encryption is not implemented in Release 1 and is deferred to Release 2. Do not imply that the current database file is encrypted.
 - Never log OAuth access/refresh tokens, backup passwords, plaintext keys, or academic record contents.
 
 ## 8. Release acceptance gates
@@ -133,3 +139,15 @@ but real-account Android/Web end-to-end acceptance is still open. Production
 Google OAuth credentials, production SMTP, the final Web trusted origin,
 controlled first-admin bootstrap, retention policy, guest metric abuse controls,
 and end-to-end platform verification remain open gates.
+
+## 11. Release 1 platform boundary — 2026-11-16
+
+Release 1 is delivered as the **Android application only**. The complete Web application is deferred to a future release, including:
+- Student-facing Web application and browser UI.
+- Web-based notices administration.
+- Web/IndexedDB runtime acceptance and Web release artifacts.
+- Cloudflare Pages production deployment and Web-specific origins.
+
+The notices operator/admin experience required for Release 1 must be provided inside the Android application, subject to the existing server-side authorization rules. A separate Web administration interface is not a Release 1 requirement.
+
+Release 1 platform acceptance is limited to Android: offline guest-first startup, local SQLite and durable attachment storage, optional account flows, public notices and receipts, Android notifications, migrations, Debug/Release QA builds, and physical-device runtime checks. Production APK signing remains a separate release prerequisite for public distribution. Web-only pull requests must remain deferred and must not block Android release.

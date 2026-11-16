@@ -25,6 +25,7 @@ class AnnouncementRepository {
   final AnnouncementAuthenticatedPost _authenticatedPost;
   final Future<String?> Function()? _getAccessToken;
   final String _baseUrl;
+  final String _guestMetricsBaseUrl;
   final Set<String> _deliveredInSession = <String>{};
 
   AnnouncementRepository({
@@ -33,13 +34,21 @@ class AnnouncementRepository {
     AnnouncementAuthenticatedPost? authenticatedPost,
     Future<String?> Function()? getAccessToken,
     String baseUrl = EdunivoraApiConfig.noticesBaseUrl,
+    String guestMetricsBaseUrl = EdunivoraApiConfig.guestMetricsProxyBaseUrl,
   })  : _get = get ?? platformGet,
         _post = post ?? platformPost,
         _authenticatedPost = authenticatedPost ?? _platformAuthenticatedPost,
         _getAccessToken = getAccessToken,
-        _baseUrl = baseUrl.replaceFirst(RegExp(r'/+$'), '');
+        _baseUrl = baseUrl.replaceFirst(RegExp(r'/+$'), ''),
+        _guestMetricsBaseUrl =
+            guestMetricsBaseUrl.replaceFirst(RegExp(r'/+$'), '');
 
   Uri _endpoint(String path) => Uri.parse('$_baseUrl$path');
+
+  Uri? _guestMetricsEndpoint(String path) {
+    if (_guestMetricsBaseUrl.isEmpty) return null;
+    return Uri.parse('$_guestMetricsBaseUrl$path');
+  }
 
   static Future<void> _platformAuthenticatedPost(
     Uri uri,
@@ -103,9 +112,13 @@ class AnnouncementRepository {
       return;
     }
 
-    await _post(
-      _endpoint('/v1/announcements/$announcementId/guest-view'),
-    ).timeout(const Duration(seconds: 12));
+    // Guest metric writes are disabled unless the dedicated Cloudflare
+    // proxy is configured. Never fall back to the public Neon Function URL.
+    final metricEndpoint = _guestMetricsEndpoint(
+      '/v1/announcements/$announcementId/guest-view',
+    );
+    if (metricEndpoint == null) return;
+    await _post(metricEndpoint).timeout(const Duration(seconds: 12));
   }
 
   Future<void> _recordDeliveries(
@@ -145,6 +158,10 @@ class AnnouncementRepository {
   Future<void> _recordGuestDeliveries(
     List<Announcement> announcements,
   ) async {
+    // Missing proxy configuration is a deliberate no-op, not a direct Neon
+    // fallback. Feed reading and local caching are independent of metrics.
+    if (_guestMetricsBaseUrl.isEmpty) return;
+
     Set<String> persistedIds;
     try {
       final preferences = await SharedPreferences.getInstance();
@@ -169,9 +186,11 @@ class AnnouncementRepository {
     Set<String> persistedIds,
   ) async {
     try {
-      await _post(
-        _endpoint('/v1/announcements/${announcement.id}/guest-delivered'),
-      ).timeout(const Duration(seconds: 12));
+      final metricEndpoint = _guestMetricsEndpoint(
+        '/v1/announcements/${announcement.id}/guest-delivered',
+      );
+      if (metricEndpoint == null) return;
+      await _post(metricEndpoint).timeout(const Duration(seconds: 12));
     } catch (_) {
       _deliveredInSession.remove(announcement.id);
       return;

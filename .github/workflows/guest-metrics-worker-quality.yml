@@ -1,0 +1,47 @@
+name: Guest metrics Worker quality
+
+on:
+  pull_request:
+    branches:
+      - main
+      - chore/edunivora-phase0-execution
+    paths:
+      - "backend/neon/guest-metrics-worker/**"
+      - "backend/neon/functions/notices/**"
+      - "package.json"
+      - ".github/workflows/guest-metrics-worker-quality.yml"
+      - "vitest.guest-metrics.config.mjs"
+  push:
+    branches:
+      - main
+      - feat/guest-metrics-durable-quota
+    paths:
+      - "backend/neon/guest-metrics-worker/**"
+      - "backend/neon/functions/notices/**"
+      - "package.json"
+      - ".github/workflows/guest-metrics-worker-quality.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Install backend dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Check JavaScript syntax
+        run: npm run check
+      - name: Run backend and quota tests
+        run: npm test
+      - name: Validate Cloudflare Worker bundle and Durable Object bindings
+        run: npx --yes wrangler@4 deploy --dry-run --config backend/neon/guest-metrics-worker/wrangler.jsonc --outdir "$RUNNER_TEMP/guest-metrics-worker-build"
+        env:
+          CI: "true"
+      - name: Exercise Durable Object SQLite runtime and concurrency
+        run: npm run test:worker-runtime

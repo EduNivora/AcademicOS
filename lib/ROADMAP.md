@@ -8,7 +8,7 @@ Product principles:
 - Student-first: the student controls their workspace and academic structure.
 - Offline-first: core academic workflows must remain usable without a network connection.
 - Privacy-first: academic records are private and local by default.
-- Security by design: fail closed on storage/authentication errors; encrypt sensitive persisted data.
+- Security by design: fail closed on storage/authentication errors; production SQLite encryption is explicitly deferred to Release 2.
 - Modular: features remain independently testable and extensible.
 - Cross-platform: supported platforms must be explicitly declared and tested; no claim of universal support without CI/device evidence.
 
@@ -28,8 +28,8 @@ The repository is a Flutter application with a local SQLite/sqflite data layer a
 - Regression tests cover initialization, backup validation, KDF migration, auth recovery, PIN throttling, and reports.
 
 ### Explicitly not complete
-- SQLite database-at-rest encryption is not implemented. The secure-storage database key is not connected to an encrypted SQLite engine.
-- Backup currently does not package attachment bytes. Course-material metadata can contain device-local paths; that is not a portable attachment backup.
+- Production SQLite database-at-rest encryption is deferred to Release 2. Release 1 uses ordinary SQLite and must not claim that the active database is encrypted.
+- Backup UI and export/restore workflows are hidden or disabled in Release 1. Backup, restore and attachment bundling are Release 2 work; their presence in source is not an accepted feature.
 - Attachment import/export, file integrity checks, and cross-device restore are not complete.
 - Cross-platform file-picker behavior and browser persistence have not been validated on real targets.
 - CI on the newest unified head must complete analysis, all tests, and Android build before that head is considered verified.
@@ -50,18 +50,19 @@ The repository is a Flutter application with a local SQLite/sqflite data layer a
 ### Gate B — Persistence and data integrity
 - [ ] Schema migrations are versioned and tested from every supported prior schema.
 - [ ] Foreign keys, indexes, constraints, transactions, and recovery behavior are verified.
-- [ ] Database encryption at rest is implemented and cryptographically verified on each supported platform.
-- [ ] Wrong-key open fails closed; key rotation and recovery are tested.
-- [ ] Plaintext-to-encrypted migration has backup, integrity verification, atomic switch, and rollback.
+- [ ] Release 1: local SQLite persistence, migrations, transaction integrity, and restart recovery are verified on each declared supported platform.
+- [ ] Release 2 only: production database encryption, wrong-key handling, key rotation, and plaintext-to-encrypted migration are cryptographically verified with atomic rollback/recovery.
 - [ ] No database or attachment writes are silently redirected to ephemeral storage.
 
-### Gate C — Backup and restore
+### Gate C — Backup and restore (Release 2; excluded from Release 1)
 - [ ] Versioned backup format and strict schema validation.
 - [ ] Export/import through native and Web-supported file flows.
 - [ ] Package attachment bytes with safe relative paths, size limits, checksums, and MIME validation.
 - [ ] Restore stages into temporary storage, verifies all data/files/references, then atomically commits.
 - [ ] Failure injection proves original data remains intact after any interrupted restore.
 - [ ] Cross-device restore is verified, not just same-device JSON parsing.
+
+These are Release 2 acceptance gates only. Release 1 must keep backup UI hidden or disabled and must not delay release for backup completeness.
 
 ### Gate D — Identity and application security
 - [ ] Argon2id migration tests and real-device performance benchmarks.
