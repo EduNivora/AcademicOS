@@ -68,6 +68,12 @@ The following approved product decisions remain the target for Release 2:
 
 Any backup-related code already present on feature branches is retained as unaccepted work-in-progress. It must not be merged into the Release 1 branch, surfaced as an available Release 1 feature, or represented as production-ready. Reassess and rebase it when Release 2 planning begins.
 
+### Release 2 — deferred production SQLite encryption
+
+Production SQLite database encryption at rest is explicitly deferred from Release 1 to Release 2. Release 1 continues to use ordinary SQLite; the application and documentation must not claim that the active database is encrypted. This is a deliberate scope decision, not a hidden implementation gap or a reason to delay Release 1.
+
+Release 2 must define and verify the encrypted database engine, per-platform key lifecycle, existing-database migration, integrity checks, crash-safe transition, rollback and recovery, wrong-key rejection, and behavior for every supported platform before enabling encryption for existing users.
+
 ## 6. Explicit exclusions
 
 The current scope excludes:
@@ -87,7 +93,7 @@ The current scope excludes:
 - Guest notice analytics are anonymous aggregates; do not retain a stable cross-session guest identifier for named tracking.
 - Use access control for operator notice tools and audit publication/report access.
 - Minimize notice event retention and document the retention period before production release.
-- Encrypting a Google Drive backup does not mean the active SQLite database is encrypted at rest. Production database encryption remains a separate release gate.
+- Active SQLite encryption is not implemented in Release 1 and is deferred to Release 2. Do not imply that the current database file is encrypted.
 - Never log OAuth access/refresh tokens, backup passwords, plaintext keys, or academic record contents.
 
 ## 8. Release acceptance gates
