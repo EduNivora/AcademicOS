@@ -283,18 +283,16 @@ test("profile endpoint rejects missing bearer credentials", async () => {
   assert.equal(response.status, 401);
 });
 
-test("guest delivery is recorded as an aggregate event without identity", async () => {
+test("guest delivery is disabled when Worker authorization is not configured", async () => {
   const pool = createPool();
   const response = await makeApp({ pool }).request(
     `/v1/announcements/${announcementId}/guest-delivered`,
     { method: "POST" },
   );
-  assert.equal(response.status, 204);
-  const metricCall = pool.calls.find((call) =>
+  assert.equal(response.status, 503);
+  assert.equal(pool.calls.some((call) =>
     call.sql.includes("announcement_guest_daily_metrics"),
-  );
-  assert.ok(metricCall);
-  assert.equal(metricCall.params.length, 1);
+  ), false);
 });
 
 test("administrator can list drafts and filter by status", async () => {
