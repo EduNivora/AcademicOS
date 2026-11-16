@@ -2456,6 +2456,12 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                       value: widget.isDarkMode,
                       onChanged: widget.onThemeChanged,
                     ),
+                    _DrawerSwitchItem(
+                      icon: Icons.language_rounded,
+                      label: widget.isArabic ? 'العربية' : 'English',
+                      value: widget.isArabic,
+                      onChanged: widget.onLanguageChanged,
+                    ),
                     ListTile(
                       dense: true,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 8),
