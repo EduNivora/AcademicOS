@@ -6,6 +6,8 @@ import 'package:academic_os/data/database/database_helper.dart';
 import 'package:academic_os/data/models/course_material_model.dart';
 import 'package:academic_os/data/models/course_model.dart';
 import 'package:academic_os/data/models/academic_term_model.dart';
+import 'package:academic_os/data/models/task_model.dart';
+import 'package:academic_os/data/models/exam_model.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -327,6 +329,87 @@ void main() {
     });
 
 
+
+  test('deleting a course atomically deletes its linked records and attachment bytes',
+      () async {
+    final helper = DatabaseHelper.instance;
+    await helper.close();
+
+    const courseId = 987681;
+    const taskId = 987682;
+    const examId = 987683;
+    const scheduleId = 987684;
+    const materialId = 987685;
+    await helper.deleteTask(taskId);
+    await helper.deleteExam(examId);
+    await helper.deleteSchedule(scheduleId);
+    await helper.deleteMaterial(materialId);
+    await helper.deleteCourse(courseId);
+
+    final attachmentBytes = Uint8List.fromList([37, 80, 68, 70, 45, 49]);
+    try {
+      await helper.insertCourse(
+        const CourseModel(
+          id: courseId,
+          name: 'Atomic course deletion',
+          instructor: 'Instructor',
+          code: 'DEL-ATOMIC',
+          credits: 3,
+        ),
+      );
+      await helper.insertTask(
+        const TaskModel(
+          id: taskId,
+          title: 'Linked task',
+          description: 'Must be removed with the course',
+          courseId: courseId,
+          courseName: 'Atomic course deletion',
+        ),
+      );
+      await helper.insertExam(
+        ExamModel(
+          id: examId,
+          courseId: courseId,
+          title: 'Linked exam',
+          examDate: DateTime(2026, 12, 20),
+        ),
+      );
+      await helper.insertSchedule({
+        'id': scheduleId,
+        'course_id': courseId,
+        'day_of_week': 'Monday',
+        'start_time': '09:00',
+        'end_time': '10:00',
+        'location': 'Room 1',
+        'reminder_enabled': 0,
+      });
+      await helper.insertMaterial({
+        'id': materialId,
+        'course_id': courseId,
+        'title': 'linked.pdf',
+        'file_path': 'dbblob://linked',
+        'file_type': 'pdf',
+        'file_bytes': attachmentBytes,
+      });
+
+      expect(await helper.deleteCourse(courseId), 1);
+      expect(await helper.getCourseById(courseId), isNull);
+      expect(await helper.getTaskById(taskId), isNull);
+      expect(await helper.getExamById(examId), isNull);
+      expect(await helper.getMaterialById(materialId), isNull);
+      expect(
+        (await helper.getSchedules()).any((row) => row['id'] == scheduleId),
+        isFalse,
+      );
+    } finally {
+      await helper.deleteTask(taskId);
+      await helper.deleteExam(examId);
+      await helper.deleteSchedule(scheduleId);
+      await helper.deleteMaterial(materialId);
+      await helper.deleteCourse(courseId);
+      await helper.close();
+    }
+  });
 
   test(
     'academic terms enforce uniqueness, active selection, rename links and delete protection',
