@@ -784,9 +784,33 @@ class DatabaseHelper {
     );
   }
 
+  /// Deletes a course and all records that are owned by that course.
+  ///
+  /// This operation is atomic: tasks, exams, schedule entries, material
+  /// metadata and attachment BLOBs are removed in the same transaction.
+  /// The presentation layer must obtain explicit confirmation before calling.
   Future<int> deleteCourse(int id) async {
     final db = await database;
-    return await db.delete(_courseTable, where: 'id = ?', whereArgs: [id]);
+    return db.transaction((txn) async {
+      final existing = await txn.query(
+        _courseTable,
+        columns: ['id'],
+        where: 'id = ?',
+        whereArgs: [id],
+        limit: 1,
+      );
+      if (existing.isEmpty) return 0;
+
+      // Remove dependents before the parent. course_materials stores the
+      // attachment bytes in file_bytes, so deleting its row also deletes the
+      // file content rather than leaving an orphaned blob.
+      await txn.delete(_materialsTable, where: 'course_id = ?', whereArgs: [id]);
+      await txn.delete(scheduleTable, where: 'course_id = ?', whereArgs: [id]);
+      await txn.delete(_examTable, where: 'course_id = ?', whereArgs: [id]);
+      await txn.delete(_taskTable, where: 'course_id = ?', whereArgs: [id]);
+
+      return txn.delete(_courseTable, where: 'id = ?', whereArgs: [id]);
+    });
   }
 
   Future<int> updateCourseGrades(
