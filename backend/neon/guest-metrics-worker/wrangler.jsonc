@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "edunivora-guest-metrics",
-  "main": "backend/neon/guest-metrics-worker/index.mjs",
+  "main": "index.mjs",
   "compatibility_date": "2026-11-16",
   "workers_dev": true,
   "observability": {
