@@ -323,3 +323,24 @@ flutter build web --release
 ```
 
 يتحقق GitHub Actions من تجهيز runtime وبناء نسخة Web ويرفعها كـ artifact. نجاح البناء لا يثبت وحده استمرارية IndexedDB بعد إعادة التحميل، أو العمل دون اتصال، أو سلامة تعدد التبويبات؛ يلزم اختبار المتصفح لهذه السلوكيات قبل إعلان دعم Web إنتاجياً.
+
+
+## Release 1 cloud metadata backend
+
+EduNivora uses a dedicated Neon PostgreSQL project for optional account
+identity and public notices only. Academic records and attachments remain in
+local SQLite and are never uploaded by this backend. Neon Managed Auth is
+enabled; the Hono API source, migrations and tests are in
+[`backend/neon`](backend/neon/README.md). The last confirmed live Notices API
+deployment is version 7. Its health and public-feed smoke checks returned HTTP
+200, and the unauthenticated admin route returned HTTP 401. The latest reviewed
+source changes (including the current JWT and CORS handling) have not yet been
+deployed. These smoke checks do not prove real-account JWT flows, admin
+publishing, production CORS, or release readiness.
+
+The Flutter client includes the Managed Auth REST adapter and email/OTP
+screens, with unit-test coverage for the request and session flows. Real-account
+end-to-end verification on Android and Web remains outstanding. The public
+announcements feed is available to guests through the Flutter Announcements
+screen and is cached locally for offline reading; academic records and files
+are never uploaded to Neon.

@@ -100,12 +100,39 @@ class AuthSecureStorageService {
     }
   }
 
+  static const String _neonAuthCookieKey = 'academic_os_neon_auth_cookie';
+  static const String _neonAuthSessionActiveKey =
+      'academic_os_neon_auth_session_active';
+
+  Future<void> saveNeonAuthCookie(String cookie) async {
+    await _secureStorage.write(key: _neonAuthCookieKey, value: cookie);
+  }
+
+  Future<String?> getNeonAuthCookie() async =>
+      _secureStorage.read(key: _neonAuthCookieKey);
+
+  Future<void> clearNeonAuthCookie() async {
+    await _secureStorage.delete(key: _neonAuthCookieKey);
+  }
+
+  Future<void> saveNeonAuthSessionActive(bool isActive) async {
+    await _secureStorage.write(
+      key: _neonAuthSessionActiveKey,
+      value: isActive ? 'true' : 'false',
+    );
+  }
+
+  Future<bool> isNeonAuthSessionActive() async =>
+      await _secureStorage.read(key: _neonAuthSessionActiveKey) == 'true';
+
   Future<void> clearSessionData() async {
     // Persist logout intent before clearing cached identity state. Local
     // credentials remain available for an explicit username/password login.
     await _secureStorage.write(key: _authLogoutRequiredKey, value: 'true');
     await saveAuthSessionActive(false);
     await clearGoogleAccountData();
+    await clearNeonAuthCookie();
+    await saveNeonAuthSessionActive(false);
   }
 
   /// Ends any previous session before allowing guest mode.

@@ -76,7 +76,13 @@ void main() async {
 
   final authUseCases = AuthUseCases(
     loginWithUsername: LoginWithUsernameUseCase(authRepository),
+    loginWithEmail: LoginWithEmailUseCase(authRepository),
     registerLocalUser: RegisterLocalUserUseCase(authRepository),
+    registerCloudUser: RegisterCloudUserUseCase(authRepository),
+    verifyEmailOtp: VerifyEmailOtpUseCase(authRepository),
+    resendEmailVerificationOtp:
+        ResendEmailVerificationOtpUseCase(authRepository),
+    getCloudAccessToken: GetCloudAccessTokenUseCase(authRepository),
     loginWithGoogle: LoginWithGoogleUseCase(authRepository),
     loginWithCachedGoogleAccount: LoginWithCachedGoogleAccountUseCase(
       authRepository,

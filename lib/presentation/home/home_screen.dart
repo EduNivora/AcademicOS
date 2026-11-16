@@ -12,6 +12,7 @@ import '../../core/security/local_auth_service.dart';
 import '../../core/security/secure_storage_service.dart';
 import '../../domain/entities/course_entity.dart';
 import '../../domain/entities/task_entity.dart';
+import '../../domain/entities/user_entity.dart';
 import '../../domain/usecases/auth_use_cases.dart';
 import '../../domain/usecases/course_use_cases.dart';
 import '../../domain/usecases/task_use_cases.dart';
@@ -26,6 +27,8 @@ import '../course/course_detail_screen.dart';
 import '../course/course_list_screen.dart';
 import '../../core/notifications/notification_service.dart';
 import '../notifications/upcoming_notifications_screen.dart';
+import '../announcements/announcements_screen.dart';
+import '../admin/admin_announcements_screen.dart';
 import '../schedule/weekly_schedule_screen.dart';
 import '../focus/focus_timer_screen.dart';
 import '../reports/academic_reports_screen.dart';
@@ -285,6 +288,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
   String _searchQuery = '';
   String? _selectedCourseFilter;
   StudentProfile _studentProfile = StudentProfile.empty();
+  late Future<UserEntity?> _currentUserFuture;
   TaskSearchStatus _statusFilter = TaskSearchStatus.all;
   TaskSortMode _sortMode = TaskSortMode.none;
 
@@ -473,6 +477,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _currentUserFuture = widget.authUseCases.getCurrentUser.call();
     _appLockService = AppLockService(
       _authSecureStorageService,
       _localAuthService,
@@ -2249,7 +2254,55 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                         );
                       },
                     ),
+                    _DrawerItem(
+                      icon: Icons.campaign_outlined,
+                      label: widget.isArabic ? 'التعميمات' : 'Announcements',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => AnnouncementsScreen(authUseCases: widget.authUseCases),
+                          ),
+                        );
+                      },
+                    ),
                   ],
+                ),
+                FutureBuilder<UserEntity?>(
+                  future: _currentUserFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.data?.isAdmin != true) {
+                      return const SizedBox.shrink();
+                    }
+                    return Column(
+                      children: [
+                        const SizedBox(height: 8),
+                        _buildDrawerSection(
+                          title: widget.isArabic ? 'الإدارة' : 'Administration',
+                          items: [
+                            _DrawerItem(
+                              icon: Icons.admin_panel_settings_outlined,
+                              label: widget.isArabic
+                                  ? 'إدارة التعميمات'
+                                  : 'Manage announcements',
+                              onTap: () {
+                                Navigator.pop(context);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => AdminAnnouncementsScreen(
+                                      authUseCases: widget.authUseCases,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 8),
                 _buildDrawerSection(

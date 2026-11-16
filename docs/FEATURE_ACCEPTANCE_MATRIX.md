@@ -31,14 +31,20 @@
 
 | Domain | Current status | Existing evidence | Acceptance still required |
 |---|---|---|---|
-| Local account authentication | Present / partially verified | Argon2id verifier tests, legacy SHA-256 migration tests, auth cleanup tests | Real-device KDF performance, malformed/corrupt storage behavior, credential replacement, account reset and platform secure-storage tests |
-| Google sign-in/session lifecycle | Present / partially verified | Auth gate and session cleanup implementation/tests | Real OAuth configuration, revoke/sign-out semantics, cached identity recovery, network failure and physical-device testing |
+| Local account authentication | Present / partially verified (legacy compatibility) | Argon2id verifier tests, legacy SHA-256 migration tests, auth cleanup tests; local credentials remain available for existing users | Real-device KDF performance, malformed/corrupt storage behavior, credential replacement, account reset and platform secure-storage tests |
+| Neon Managed Auth — email/password + OTP | Implemented / end-to-end unverified | Flutter REST adapter, native secure session-cookie persistence, Web credential-cookie transport, sign-up/sign-in/OTP/session/token tests and email verification screens | Exact-head Flutter CI, real-account sign-up/sign-in/OTP/resend/session-restore/sign-out on Android, Web trusted-origin/CORS acceptance, offline transitions and production SMTP |
+| Google sign-in/session lifecycle | Incomplete for new cloud accounts | Legacy native Google identity code remains for cached compatibility; Google button is intentionally not presented as a working cloud sign-in | Configure the project's own Google OAuth client, validate redirect URIs/trusted origins, integrate Neon social sign-in and test sign-out/revocation on devices |
 | App lock / PIN | Present / partially verified | Argon2id PIN verification, legacy migration and throttling tests | Biometric enrollment/removal, lifecycle lock timing, device tests and clock-tampering resilience |
 | Persistent SQLite storage | Present / partially verified | Database helper, schema versioning and database tests; startup fails closed | Migration from every supported schema, crash recovery, concurrent access, corruption handling and device/browser persistence tests |
 | SQLite encryption at rest | **Not implemented** | Production database key is not connected to an encrypted SQLite engine. PR #12 remains an isolated compatibility proof only; it does not encrypt the production database. The Release 1 integration branch still uses the ordinary SQLite factories | Production driver integration, complete plugin/platform compatibility, on-disk ciphertext inspection, wrong-key rejection, key lifecycle and crash-safe migration/rollback are required before claiming encryption |
 | JSON backup validation | Present / partially verified | Strict payload validator and malformed/duplicate/orphan-reference tests | Fuzzing, schema compatibility guarantees, large payload handling and end-to-end rollback/failure injection |
 | Backup export/import | Deferred to Release 2; excluded from Release 1 | Legacy JSON export/import code and backup validation remain in the repository as unaccepted work-in-progress; backup screens must not be exposed in Release 1. PR #13 remains a separate Draft security mitigation and is not part of Release 1 acceptance | Reassess during Release 2: encrypted archive, complete database/settings/attachment payload, manifest/checksums, staged restore, rollback, cross-device recovery, cleanup and Web/browser acceptance |
 | Cloud sync and multi-device conflict resolution | **Not implemented** | No verified sync backend or conflict-resolution implementation | Product decision, threat model, sync protocol, conflict strategy, encryption/key lifecycle and offline queue semantics |
+
+| Registered announcement receipts | Implemented / end-to-end unverified | Flutter obtains Neon JWTs and sends Bearer-authenticated delivery/read receipts; repository tests cover registered-versus-guest routing | Exact-head Flutter CI, live JWT verification and idempotent database receipts, session expiry, and Web CORS |
+| Admin announcement console | Implemented / end-to-end unverified | Role-gated Flutter console supports draft list/create/edit, publish, archive and aggregate reports; role is read from authenticated `GET /v1/me` and API authorization remains server-side | Bootstrap first verified admin with the operator-only SQL script, live JWT/role checks for all actions, audit trail verification, Web CORS and device acceptance |
+| First administrator bootstrap | Implemented as controlled operator procedure / not executed | One-time SQL script verifies the target email and refuses if an admin already exists | Execute only after the intended owner account completes email OTP; confirm admin role and test unauthorized account remains blocked |
+| Guest announcement metrics | Present / partially verified | Anonymous aggregate counters; no guest ID/IP/device fingerprint; persistent local delivery dedupe and retry tests | Abuse controls, rate limiting, retention/purge policy, and exact-head platform acceptance |
 
 ## Build, platform and operational acceptance
 
@@ -104,3 +110,45 @@ Notice delivery is not guaranteed while a device is offline or notifications are
 Google Drive backup, encrypted archive export/import, upload/download and backup-specific UI are **deferred to Release 2**. They are not Release 1 acceptance gates and must not delay the core academic application, optional accounts, public notices, local persistence, security hardening or Release 1 validation.
 
 Existing PRs/branches for backup are parked as draft work. Do not merge them into the Release 1 integration branch. Reassess their code, dependencies and security assumptions during Release 2 planning; passing isolated tests does not change the release boundary.
+
+
+## Neon account and public-notice backend — implementation status (2026-11-15)
+
+| Area | Current status | Remaining acceptance evidence |
+|---|---|---|
+| Neon PostgreSQL project | **Provisioned and inspected** — dedicated `edunivora` project, PostgreSQL 17, Frankfurt region | Monitor actual free-tier consumption and verify production quotas |
+| Neon Managed Auth | **Enabled/configured** — email/password with mandatory OTP email verification; organization plugin disabled | Flutter client integration, sign-up/sign-in/sign-out/session restoration tests, production SMTP, production Google OAuth credentials and trusted origins |
+| Cloud schema | **Provisioned and inspected** — profile projection, notices, registered delivery/read receipts, anonymous daily guest counters, admin audit | Migration CI on a clean child branch, retention policy and production data-access review |
+| Notices API | **Deployed; smoke-tested** — Hono/Node.js 24 Function; health and public feed return HTTP 200; unauthenticated admin route returns HTTP 401 | Verify JWT acceptance, registered delivery/read idempotency, admin publish/report, guest POST metrics, CORS for production Web origin and abuse controls against the live branch |
+| Flutter account integration | **Implemented / end-to-end unverified** — Neon Managed Auth REST adapter, email/password, OTP verification, native cookie persistence, browser credential-cookie transport, session restore, and JWT retrieval are present with unit tests | Exact-head Flutter CI; real-account sign-up, sign-in, OTP, session restore/sign-out and offline transitions on Android/Web; production trusted origin and credentialed CORS acceptance |
+| Operator bootstrap | **Procedure implemented / not executed** — protected SQL bootstrap and role-gated admin console are present | Run only after owner account email verification; confirm first admin and prove ordinary users remain denied |
+| Guest analytics | **Schema/API implementation** — aggregate counters only; no guest identifier persisted | Verify aggregate semantics, abuse controls and approved retention period |
+
+The current Neon Auth configuration reports a shared Google OAuth provider and
+shared SMTP sender. These are development configuration only; production
+release requires the project's own Google OAuth client credentials, verified
+redirect/trusted origins, and a production SMTP sender. Do not report Google
+or email sign-in as production-ready until the Flutter flows and delivery are
+tested end to end.
+
+| Flutter public notices feed | **Implemented in branch** — public feed screen, offline cache, guest delivery/view aggregate events | Flutter analyze/tests, Android/Web builds, live CORS from actual Web origin, offline cache behavior and API error handling |
+
+## Execution addendum — 2026-11-15 21:54 UTC
+
+This addendum supersedes stale CI/PR references above where they conflict with the current Release 1 execution branch.
+
+- Repository: `EduNivora/AcademicOS`
+- PR: #21, base `chore/edunivora-phase0-execution`, head `feat/neon-managed-auth-and-notices`
+- Exact latest source SHA at this audit: `f0c9f9c11b6001e4366208080ac1210fef35d975`
+- PR state: open, Draft, not merged; 82 commits and 48 changed files at the time of inspection.
+- Backend quality on exact SHA: run `43765880243` completed successfully (dependency install, syntax check, backend tests).
+- Neon Function bundle on exact SHA: run `43765875238` completed successfully; artifact `notices-function-bundle-f0c9f9c11b6001e4366208080ac1210fef35d975` was produced.
+- Flutter quality on exact SHA: run `43765880248` was pending/queued at this audit. The preceding SHA `bd6f6f5a04ac31ae5ecdc98f5bfb43257be4c606` passed Dart analysis and Flutter tests, and had reached Android Debug APK build; Android and Web build completion were not yet observed.
+- Flutter workflow concurrency now uses `cancel-in-progress: false` so an active quality run is not terminated by a newer commit. This serializes runs and can delay the newest run until the active one finishes.
+- API source changes for explicit CORS allowlisting and normalized JWT verifier failures are in the exact SHA above. The live Neon Function remains deployment ID 7; this source bundle has not been deployed. Live `/v1/me`, real JWT, receipts, admin publishing, and production CORS are therefore not accepted.
+- Neon Auth config inspection confirms email/password with required email verification configured as OTP, but no production trusted origins, no project-owned Google OAuth credentials, and a shared development email sender. Flutter auth tests are adapter-level mocks, not real-account end-to-end tests.
+- The first-admin bootstrap SQL is an operator-only procedure and has not been executed. No admin account or app user records were present at the last database inspection.
+- Guest analytics remain aggregate event counters, not unique guest counts. Rate limiting/abuse controls and retention/purge policy remain incomplete.
+- Google Drive backup, encrypted archive, restore and scheduled backup remain deferred to Release 2 by approved scope. Production SQLite encryption is not accepted for Release 1.
+
+Do not mark Release 1 ready from the backend or bundle checks alone. The exact-head Flutter gate, real auth/JWT flows, deployed API verification, Web origin/CORS, first-admin bootstrap, and platform runtime acceptance remain release blockers.

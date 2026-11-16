@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../domain/usecases/auth_use_cases.dart';
 import 'register_screen.dart';
+import 'email_verification_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final AuthUseCases authUseCases;
@@ -47,10 +48,16 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final success = await widget.authUseCases.loginWithUsername.call(
-        _usernameController.text.trim(),
-        _passwordController.text,
-      );
+      final identity = _usernameController.text.trim();
+      final success = identity.contains('@')
+          ? await widget.authUseCases.loginWithEmail.call(
+              identity,
+              _passwordController.text,
+            )
+          : await widget.authUseCases.loginWithUsername.call(
+              identity,
+              _passwordController.text,
+            );
 
       if (!mounted) return;
       if (!success) {
@@ -62,41 +69,29 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       await widget.onLoginSuccess();
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
-      setState(() {
-        _errorMessage = 'تعذّر إكمال تسجيل الدخول. حاول مرة أخرى.';
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _loginWithGoogle() async {
-    if (_isLoading) return;
-    FocusScope.of(context).unfocus();
-
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final success = await widget.authUseCases.loginWithGoogle.call();
-      if (!mounted) return;
-
-      if (!success) {
-        setState(() {
-          _errorMessage = 'تعذّر تسجيل الدخول عبر Google. حاول مجدداً.';
-          _isLoading = false;
-        });
+      final identity = _usernameController.text.trim();
+      final message = error.toString().toLowerCase();
+      final verificationRequired = identity.contains('@') &&
+          (message.contains('email_not_verified') ||
+              message.contains('email not verified') ||
+              message.contains('email verification'));
+      if (verificationRequired) {
+        setState(() => _isLoading = false);
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => EmailVerificationScreen(
+              email: identity,
+              authUseCases: widget.authUseCases,
+              onVerificationSuccess: widget.onLoginSuccess,
+            ),
+          ),
+        );
         return;
       }
-
-      await widget.onLoginSuccess();
-    } catch (_) {
-      if (!mounted) return;
       setState(() {
-        _errorMessage = 'حدث خطأ أثناء الاتصال بـ Google. حاول لاحقاً.';
+        _errorMessage = 'تعذّر إكمال تسجيل الدخول. تحقق من بياناتك وحاول مرة أخرى.';
         _isLoading = false;
       });
     }
@@ -264,15 +259,15 @@ class _LoginScreenState extends State<LoginScreen> {
                               controller: _usernameController,
                               enabled: !_isLoading,
                               textInputAction: TextInputAction.next,
-                              keyboardType: TextInputType.text,
+                              keyboardType: TextInputType.emailAddress,
                               autocorrect: false,
                               decoration: _inputDecoration(
-                                label: 'اسم المستخدم',
+                                label: 'البريد الإلكتروني أو اسم المستخدم',
                                 icon: Icons.person_outline_rounded,
                               ),
                               validator: (value) {
                                 if (value == null || value.trim().isEmpty) {
-                                  return 'أدخل اسم المستخدم';
+                                  return 'أدخل بريدك الإلكتروني أو اسم المستخدم';
                                 }
                                 return null;
                               },
@@ -376,15 +371,11 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                             const SizedBox(height: 14),
-                            OutlinedButton.icon(
-                              onPressed: _isLoading ? null : _loginWithGoogle,
-                              icon: const Icon(Icons.g_mobiledata_rounded, size: 25),
-                              label: const Text('المتابعة باستخدام Google'),
-                              style: OutlinedButton.styleFrom(
-                                minimumSize: const Size.fromHeight(50),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
+                            Text(
+                              'تسجيل الدخول عبر Google سيُفعّل بعد إعداد OAuth الخاص بالتطبيق.',
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colors.onSurfaceVariant,
                               ),
                             ),
                           ],
