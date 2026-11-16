@@ -19,15 +19,15 @@ class MemorySql {
 
   exec(statement, ...params) {
     if (statement.includes("CREATE TABLE")) {
-      return { one: () => null };
+      return { toArray: () => [] };
     }
     if (statement.includes("INSERT INTO guest_metric_quotas")) {
       const [kind, limit] = params;
       const used = this.rows.get(kind) ?? 0;
-      if (used >= limit) return { one: () => null };
+      if (used >= limit) return { toArray: () => [] };
       const next = used + 1;
       this.rows.set(kind, next);
-      return { one: () => ({ used_count: next }) };
+      return { toArray: () => [{ used_count: next }] };
     }
     if (statement.includes("DELETE FROM guest_metric_quotas")) {
       this.rows.clear();
@@ -41,16 +41,19 @@ function createNamespace() {
   const objects = new Map();
   return {
     objects,
-    getByName(name) {
-      if (!objects.has(name)) {
+    idFromName(name) {
+      return name;
+    },
+    get(id) {
+      if (!objects.has(id)) {
         const sql = new MemorySql();
         ensureQuotaSchema(sql);
-        objects.set(name, {
+        objects.set(id, {
           reserve: async (kind, limit) => reserveDailyQuota(sql, kind, limit),
           sql,
         });
       }
-      return objects.get(name);
+      return objects.get(id);
     },
   };
 }
@@ -93,7 +96,10 @@ test("concurrent bursts cannot exceed the atomic global quota", async () => {
   const namespace = createNamespace();
   const env = makeEnv({ limit: 7, namespace });
   let upstreamWrites = 0;
-  const fetchImpl = async () => {
+  const fetchImpl = async (_url, options) => {
+    if (options.method === "GET") {
+      return new Response(JSON.stringify({ item: { id: announcementId } }), { status: 200 });
+    }
     upstreamWrites += 1;
     return new Response(null, { status: 204 });
   };
@@ -119,7 +125,10 @@ test("separate Worker instances share the same announcement-day Durable Object",
   const envA = makeEnv({ limit: 1, namespace });
   const envB = makeEnv({ limit: 1, namespace });
   let upstreamWrites = 0;
-  const fetchImpl = async () => {
+  const fetchImpl = async (_url, options) => {
+    if (options.method === "GET") {
+      return new Response(JSON.stringify({ item: { id: announcementId } }), { status: 200 });
+    }
     upstreamWrites += 1;
     return new Response(null, { status: 204 });
   };
@@ -162,7 +171,10 @@ test("UTC date boundary creates a fresh daily quota object", async () => {
 test("upstream failure returns 502 and does not refund a possibly committed write", async () => {
   const env = makeEnv({ limit: 1 });
   let upstreamCalls = 0;
-  const fetchImpl = async () => {
+  const fetchImpl = async (_url, options) => {
+    if (options.method === "GET") {
+      return new Response(JSON.stringify({ item: { id: announcementId } }), { status: 200 });
+    }
     upstreamCalls += 1;
     return new Response("internal detail must not be exposed", { status: 500 });
   };
@@ -176,12 +188,40 @@ test("upstream failure returns 502 and does not refund a possibly committed writ
   assert.doesNotMatch(await first.text(), /internal detail/);
 });
 
+test("unknown announcement IDs do not allocate quota objects", async () => {
+  const namespace = createNamespace();
+  const env = makeEnv({ namespace });
+  const invalidId = "11111111-1111-4111-8111-111111111111";
+  let postWrites = 0;
+  const response = await handleGuestMetricsRequest(
+    new Request(`https://metrics.example.test/v1/announcements/${invalidId}/guest-view`, {
+      method: "POST",
+      headers: { Origin: "https://edunivora.pages.dev" },
+    }),
+    env,
+    {
+      fetchImpl: async (_url, options) => {
+        if (options.method === "GET") return new Response(null, { status: 404 });
+        postWrites += 1;
+        return new Response(null, { status: 204 });
+      },
+    },
+  );
+
+  assert.equal(response.status, 404);
+  assert.equal(namespace.objects.size, 0);
+  assert.equal(postWrites, 0);
+});
+
 test("misconfigured proxy is unavailable before it can reserve quota", async () => {
   const namespace = createNamespace();
   const env = makeEnv({ namespace, NEON_GUEST_METRICS_SECRET: "" });
   let upstreamCalls = 0;
   const response = await handleGuestMetricsRequest(metricRequest(), env, {
-    fetchImpl: async () => {
+    fetchImpl: async (_url, options) => {
+      if (options.method === "GET") {
+        return new Response(JSON.stringify({ item: { id: announcementId } }), { status: 200 });
+      }
       upstreamCalls += 1;
       return new Response(null, { status: 204 });
     },
@@ -209,6 +249,9 @@ test("Worker never forwards client tracking headers or a request body", async ()
 
   const response = await handleGuestMetricsRequest(request, env, {
     fetchImpl: async (url, options) => {
+      if (options.method === "GET") {
+        return new Response(JSON.stringify({ item: { id: announcementId } }), { status: 200 });
+      }
       captured = { url: url.toString(), options };
       return new Response(null, { status: 204 });
     },
