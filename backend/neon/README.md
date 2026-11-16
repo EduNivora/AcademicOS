@@ -37,6 +37,7 @@ was introduced.
 - `GET /health`
 - `GET /v1/me` — authenticated app profile and server-owned role projection used to gate the admin console.
 - `GET /v1/announcements?limit=20&before=<ISO timestamp>` — public, guest-safe feed.
+- `GET /v1/announcements/:id` — public details for one published announcement.
 - `POST /v1/announcements/:id/guest-view` — Worker-authorized aggregate daily view counter.
 - `POST /v1/announcements/:id/guest-delivered` — Worker-authorized aggregate daily delivery counter.
 - `POST /v1/announcements/:id/delivered` — authenticated registered delivery acknowledgement.
