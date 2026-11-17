@@ -336,7 +336,7 @@ publishing, production CORS, or release readiness.
 
 The Flutter client includes the Managed Auth REST adapter and email/OTP
 screens, with unit-test coverage for the request and session flows. Real-account
-end-to-end verification on Android and Web remains outstanding. The public
+end-to-end verification on Android remains outstanding. Web is deferred and is not a Release 1 acceptance gate. The public
 announcements feed is available to guests through the Flutter Announcements
 screen and is cached locally for offline reading; academic records and files
 are never uploaded to Neon.
