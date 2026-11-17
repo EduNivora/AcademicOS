@@ -6,7 +6,7 @@ import { createApp } from "./app.mjs";
 const announcementId = "f7d0b52a-4a36-4fd9-9ad5-8cbbece8f3d1";
 const userId = "9c6d51f0-78b9-4b3e-8a3b-5cb08d0a29a0";
 
-function createPool({ role = "user", failAudit = false } = {}) {
+function createPool({ role = "user", failAudit = false, authUserAvailable = true, authUserBanned = false } = {}) {
   const calls = [];
   const query = async (sql, params = []) => {
     calls.push({ sql, params });
@@ -17,7 +17,8 @@ function createPool({ role = "user", failAudit = false } = {}) {
       return { rowCount: null, rows: [] };
     }
     if (sql.includes('FROM neon_auth."user"')) {
-      return { rowCount: 1, rows: [{ id: userId, name: "Test User", email: "test@example.com" }] };
+      if (!authUserAvailable || authUserBanned) return { rowCount: 0, rows: [] };
+      return { rowCount: 1, rows: [{ id: userId, name: "Test User", email: "test@example.com", banned: false }] };
     }
     if (sql.includes("INSERT INTO public.app_users")) {
       return { rowCount: 1, rows: [{ id: userId, display_name: "Test User", email: "test@example.com", role }] };
@@ -281,6 +282,29 @@ test("authenticated profile endpoint returns the server-owned role", async () =>
 test("profile endpoint rejects missing bearer credentials", async () => {
   const response = await makeApp({ pool: createPool() }).request("/v1/me");
   assert.equal(response.status, 401);
+});
+
+test("profile endpoint rejects an invalid JWT", async () => {
+  const response = await makeApp({ pool: createPool() }).request("/v1/me", {
+    headers: { Authorization: "Bearer invalid-token" },
+  });
+  assert.equal(response.status, 401);
+});
+
+test("profile endpoint rejects a disabled Managed Auth account", async () => {
+  const response = await makeApp({ pool: createPool({ authUserBanned: true }) }).request("/v1/me", {
+    headers: { Authorization: "Bearer valid" },
+  });
+  assert.equal(response.status, 401);
+  assert.equal((await response.json()).error.code, "account_unavailable");
+});
+
+test("profile endpoint rejects an identity without a Managed Auth user profile", async () => {
+  const response = await makeApp({ pool: createPool({ authUserAvailable: false }) }).request("/v1/me", {
+    headers: { Authorization: "Bearer valid" },
+  });
+  assert.equal(response.status, 401);
+  assert.equal((await response.json()).error.code, "account_unavailable");
 });
 
 test("guest delivery is disabled when Worker authorization is not configured", async () => {
