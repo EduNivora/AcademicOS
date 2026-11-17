@@ -92,7 +92,7 @@ Current limitations and security boundaries:
 - New JSON backup schema v3 serializes attachment bytes as base64 and validates/decodes them before the database transaction. Export refuses to label a backup complete when any legacy attachment has no stored bytes.
 - PDF preview currently materializes a short-lived temporary copy from the persisted database bytes for the native viewer; that temporary preview is not the source of truth. Web document preview remains unsupported.
 - The Release 1 integration branch passed its Flutter quality gate on exact head `8904bf0af783c7f01d24bbbd70922a69af680e15` (run `43753940254`): dependency resolution, Dart analysis, Flutter tests, Android Debug APK build, and artifact upload all succeeded. This CI result does not validate backup workflows or platform runtime behavior. Google Drive folder creation/upload, password-based archive encryption, checksums/manifest, encrypted restore staging/rollback, and end-to-end platform/failure-injection coverage remain Release 2 work.
-- Cross-device and real-browser file picker behavior still require platform validation.
+- Cross-device and real-browser file picker behavior are deferred and are not Release 1 acceptance gates.
 
 A JSON export must not be represented as a complete device backup until its referenced attachment files are included and verified.
 
@@ -199,7 +199,7 @@ feed smoke tests pass; unauthenticated admin access is rejected. The API source,
 tests and deployment artifact are on `feat/neon-managed-auth-and-notices`.
 The Flutter client now contains the Managed Auth REST adapter and email/OTP
 screens, with unit tests for request routing and session handling. Real-account
-end-to-end tests on Android and Web remain unaccepted. Production OAuth/SMTP,
+end-to-end tests on Android remain unaccepted. Web is deferred and not a Release 1 gate. Production OAuth/SMTP,
 trusted origins, admin bootstrap, guest-metric abuse controls, and receipt
 retention policy remain open release gates. Guest academic use remains available
 offline.
