@@ -12,6 +12,16 @@ function isUuid(value) {
   return typeof value === "string" && UUID_PATTERN.test(value);
 }
 
+function constantTimeEquals(expected, actual) {
+  if (typeof expected !== "string" || typeof actual !== "string") return false;
+  let mismatch = expected.length ^ actual.length;
+  const length = Math.max(expected.length, actual.length);
+  for (let index = 0; index < length; index += 1) {
+    mismatch |= (expected.charCodeAt(index) || 0) ^ (actual.charCodeAt(index) || 0);
+  }
+  return mismatch === 0;
+}
+
 // Keep each admin state change and its audit record in one atomic transaction.
 async function runAdminTransaction(pool, operation) {
   const client = await pool.connect();
@@ -65,7 +75,12 @@ async function ensureProfile(pool, subject) {
   return profile.rows[0] ?? null;
 }
 
-export function createApp({ pool, verifyIdentity, allowedOrigins = [] }) {
+export function createApp({
+  pool,
+  verifyIdentity,
+  allowedOrigins = [],
+  guestMetricsSecret,
+}) {
   if (!pool || typeof pool.query !== "function" || typeof pool.connect !== "function") {
     throw new TypeError("A PostgreSQL pool with query and connect methods is required");
   }
@@ -149,6 +164,24 @@ export function createApp({ pool, verifyIdentity, allowedOrigins = [] }) {
       },
     });
   });
+
+  // Guest metrics are accepted only through the Cloudflare edge gateway.
+  // The shared secret is server-to-server and is never exposed to Flutter.
+  const requireGuestMetricsGateway = async (c, next) => {
+    const supplied = c.req.header("X-EduNivora-Worker-Secret") ?? "";
+    if (!guestMetricsSecret || !constantTimeEquals(guestMetricsSecret, supplied)) {
+      return jsonError(
+        c,
+        403,
+        "metrics_gateway_required",
+        "Guest metrics must be submitted through the trusted edge gateway.",
+      );
+    }
+    await next();
+  };
+
+  app.use("/v1/announcements/:id/guest-view", requireGuestMetricsGateway);
+  app.use("/v1/announcements/:id/guest-delivered", requireGuestMetricsGateway);
 
   // Guest analytics store aggregate counters only. No guest id, IP address,
   // device fingerprint, or cross-session identifier is persisted.
