@@ -2,9 +2,9 @@ name: Flutter quality gate
 
 on:
   pull_request:
-    branches: [main, chore/edunivora-phase0-execution, feat/durable-attachment-storage]
+    branches: [main, chore/edunivora-phase0-execution, "release1/**"]
   push:
-    branches: [main]
+    branches: [main, chore/edunivora-phase0-execution, "release1/**"]
 
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
   quality:
     name: Analyze, test, and build
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -60,8 +60,8 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get --enforce-lockfile
 
-      - name: Prepare SQLite WebAssembly runtime
-        run: dart run sqflite_common_ffi_web:setup --force --verbose
+      - name: Verify Dart formatting
+        run: dart format --output=none --set-exit-if-changed lib test
 
       - name: Analyze Dart sources
         shell: bash
@@ -126,23 +126,71 @@ jobs:
           df -h /
 
       - name: Build Android debug APK
-        run: flutter build apk --debug --no-pub
+        run: flutter build apk --debug --no-pub --dart-define=EDUNIVORA_GUEST_METRICS_PROXY_URL=${{ vars.EDUNIVORA_GUEST_METRICS_PROXY_URL }}
 
-      - name: Build Web release
-        run: flutter build web --release --no-pub
+      # QA remains debug-signed unless the separate production signing inputs
+      # are explicitly supplied to the optional production build below.
+      - name: Build Android release variant (QA; debug-signed)
+        run: flutter build apk --release --no-pub --dart-define=EDUNIVORA_GUEST_METRICS_PROXY_URL=${{ vars.EDUNIVORA_GUEST_METRICS_PROXY_URL }}
 
       - name: Upload Android debug APK
         uses: actions/upload-artifact@v4
         with:
           name: academicos-android-debug-apk
-          path: build/app/outputs/flutter-apk/*.apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload Web release
+      - name: Upload Android release QA APK (debug-signed; not for store)
         uses: actions/upload-artifact@v4
         with:
-          name: academicos-web-release
-          path: build/web/
+          name: academicos-android-release-qa-debug-signed
+          path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
+          retention-days: 14
+
+      - name: Build production-signed Android APK (optional owner configuration)
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.EDUNIVORA_ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.EDUNIVORA_ANDROID_STORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.EDUNIVORA_ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.EDUNIVORA_ANDROID_KEY_PASSWORD }}
+          GUEST_METRICS_PROXY_URL: ${{ vars.EDUNIVORA_GUEST_METRICS_PROXY_URL }}
+        run: |
+          set -euo pipefail
+          configured=0
+          for value in "$ANDROID_KEYSTORE_BASE64" "$ANDROID_STORE_PASSWORD" "$ANDROID_KEY_ALIAS" "$ANDROID_KEY_PASSWORD"; do
+            if [ -n "$value" ]; then configured=$((configured + 1)); fi
+          done
+
+          if [ "$configured" -eq 0 ]; then
+            echo "::notice::Production Android signing secrets are not configured; QA APKs remain available."
+            exit 0
+          fi
+
+          if [ "$configured" -ne 4 ]; then
+            echo "::error::Production Android signing is partially configured. Configure all four EDUNIVORA_ANDROID_* secrets."
+            exit 1
+          fi
+
+          keystore_path="$RUNNER_TEMP/edunivora-upload-key.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore_path"
+          test -s "$keystore_path"
+
+          export EDUNIVORA_ANDROID_KEYSTORE_PATH="$keystore_path"
+          export EDUNIVORA_ANDROID_STORE_PASSWORD="$ANDROID_STORE_PASSWORD"
+          export EDUNIVORA_ANDROID_KEY_ALIAS="$ANDROID_KEY_ALIAS"
+          export EDUNIVORA_ANDROID_KEY_PASSWORD="$ANDROID_KEY_PASSWORD"
+
+          flutter build apk --release --no-pub --dart-define=EDUNIVORA_GUEST_METRICS_PROXY_URL="$GUEST_METRICS_PROXY_URL"
+          mkdir -p "$RUNNER_TEMP/edunivora-production"
+          cp build/app/outputs/flutter-apk/app-release.apk "$RUNNER_TEMP/edunivora-production/edunivora-release.apk"
+
+      - name: Upload production-signed Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: academicos-android-production-signed-apk
+          path: ${{ runner.temp }}/edunivora-production/edunivora-release.apk
+          if-no-files-found: ignore
           retention-days: 14

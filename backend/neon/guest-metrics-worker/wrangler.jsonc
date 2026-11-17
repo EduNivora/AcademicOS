@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "edunivora-guest-metrics",
+  "main": "index.mjs",
+  "compatibility_date": "2026-11-16",
+  "workers_dev": true,
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "NEON_NOTICES_BASE_URL": "https://br-late-bread-bajll3is-notices.compute.c-8.eu-central-1.aws.neon.tech",
+    "GUEST_METRIC_VIEWS_PER_ANNOUNCEMENT_UTC_DAY": "5000",
+    "GUEST_METRIC_DELIVERIES_PER_ANNOUNCEMENT_UTC_DAY": "5000"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "ANNOUNCEMENT_METRIC_QUOTAS",
+        "class_name": "AnnouncementMetricQuota"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["AnnouncementMetricQuota"]
+    }
+  ]
+}

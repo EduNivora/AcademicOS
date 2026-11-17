@@ -6,7 +6,7 @@ import { createApp } from "./app.mjs";
 const announcementId = "f7d0b52a-4a36-4fd9-9ad5-8cbbece8f3d1";
 const userId = "9c6d51f0-78b9-4b3e-8a3b-5cb08d0a29a0";
 
-function createPool({ role = "user", failAudit = false } = {}) {
+function createPool({ role = "user", failAudit = false, authUserAvailable = true, authUserBanned = false } = {}) {
   const calls = [];
   const query = async (sql, params = []) => {
     calls.push({ sql, params });
@@ -17,7 +17,8 @@ function createPool({ role = "user", failAudit = false } = {}) {
       return { rowCount: null, rows: [] };
     }
     if (sql.includes('FROM neon_auth."user"')) {
-      return { rowCount: 1, rows: [{ id: userId, name: "Test User", email: "test@example.com" }] };
+      if (!authUserAvailable || authUserBanned) return { rowCount: 0, rows: [] };
+      return { rowCount: 1, rows: [{ id: userId, name: "Test User", email: "test@example.com", banned: false }] };
     }
     if (sql.includes("INSERT INTO public.app_users")) {
       return { rowCount: 1, rows: [{ id: userId, display_name: "Test User", email: "test@example.com", role }] };
@@ -39,6 +40,17 @@ function createPool({ role = "user", failAudit = false } = {}) {
     }
     if (sql.includes("INSERT INTO public.announcement_admin_audit")) {
       return { rowCount: 1, rows: [] };
+    }
+    if (sql.includes("SELECT id, title, body, published_at") && sql.includes("LIMIT 1")) {
+      return {
+        rowCount: 1,
+        rows: [{
+          id: announcementId,
+          title: "Welcome",
+          body: "Welcome to EduNivora.",
+          published_at: "2026-11-16T12:00:00.000Z",
+        }],
+      };
     }
     if (sql.includes("SELECT id, title, body, published_at")) {
       return { rowCount: 0, rows: [] };
@@ -62,6 +74,7 @@ function makeApp(options = {}) {
       ? { sub: userId, iss: "https://auth.example.test" }
       : null),
     allowedOrigins: ["https://app.example.test"],
+    guestMetricsProxySecret: options.guestMetricsProxySecret,
   });
 }
 
@@ -78,16 +91,61 @@ test("public announcement feed is available without authentication", async () =>
   assert.deepEqual(await response.json(), { items: [] });
 });
 
+test("public announcement detail is available without authentication", async () => {
+  const response = await makeApp().request(`/v1/announcements/${announcementId}`);
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).item.id, announcementId);
+});
+
+test("public announcement detail rejects invalid ids", async () => {
+  const response = await makeApp().request("/v1/announcements/not-a-uuid");
+  assert.equal(response.status, 400);
+});
+
 test("public feed rejects malformed pagination cursor", async () => {
   const response = await makeApp().request("/v1/announcements?before=not-a-date");
   assert.equal(response.status, 400);
 });
 
-test("guest view stores aggregate metric without identity", async () => {
+test("guest metric writes are disabled when Worker authorization is not configured", async () => {
   const pool = createPool();
   const response = await makeApp({ pool }).request(
     `/v1/announcements/${announcementId}/guest-view`,
     { method: "POST" },
+  );
+  assert.equal(response.status, 503);
+  assert.equal(pool.calls.some((call) =>
+    call.sql.includes("announcement_guest_daily_metrics"),
+  ), false);
+});
+
+test("direct public guest metric writes are rejected without Worker authorization", async () => {
+  const pool = createPool();
+  const response = await makeApp({
+    pool,
+    guestMetricsProxySecret: "x".repeat(48),
+  }).request(
+    `/v1/announcements/${announcementId}/guest-view`,
+    { method: "POST" },
+    );
+  assert.equal(response.status, 403);
+  assert.equal(pool.calls.some((call) =>
+    call.sql.includes("announcement_guest_daily_metrics"),
+  ), false);
+});
+
+test("authorized Worker can increment an aggregate guest view counter", async () => {
+  const pool = createPool();
+  const secret = "x".repeat(48);
+  const response = await makeApp({
+    pool,
+    guestMetricsProxySecret: secret,
+  }).request(
+    `/v1/announcements/${announcementId}/guest-view`,
+    {
+      method: "POST",
+      headers: { "X-EduNivora-Worker-Secret": secret },
+    },
   );
   assert.equal(response.status, 204);
   const metricCall = pool.calls.find((call) =>
@@ -95,6 +153,25 @@ test("guest view stores aggregate metric without identity", async () => {
   );
   assert.ok(metricCall);
   assert.equal(metricCall.params.length, 1);
+});
+
+test("authorized Worker can increment an aggregate guest delivery counter", async () => {
+  const pool = createPool();
+  const secret = "y".repeat(48);
+  const response = await makeApp({
+    pool,
+    guestMetricsProxySecret: secret,
+  }).request(
+    `/v1/announcements/${announcementId}/guest-delivered`,
+    {
+      method: "POST",
+      headers: { "X-EduNivora-Worker-Secret": secret },
+    },
+  );
+  assert.equal(response.status, 204);
+  assert.ok(pool.calls.some((call) =>
+    call.sql.includes("announcement_guest_daily_metrics"),
+  ));
 });
 
 test("registered delivery endpoint rejects requests without bearer token", async () => {
@@ -207,18 +284,39 @@ test("profile endpoint rejects missing bearer credentials", async () => {
   assert.equal(response.status, 401);
 });
 
-test("guest delivery is recorded as an aggregate event without identity", async () => {
+test("profile endpoint rejects an invalid JWT", async () => {
+  const response = await makeApp({ pool: createPool() }).request("/v1/me", {
+    headers: { Authorization: "Bearer invalid-token" },
+  });
+  assert.equal(response.status, 401);
+});
+
+test("profile endpoint rejects a disabled Managed Auth account", async () => {
+  const response = await makeApp({ pool: createPool({ authUserBanned: true }) }).request("/v1/me", {
+    headers: { Authorization: "Bearer valid" },
+  });
+  assert.equal(response.status, 401);
+  assert.equal((await response.json()).error.code, "account_unavailable");
+});
+
+test("profile endpoint rejects an identity without a Managed Auth user profile", async () => {
+  const response = await makeApp({ pool: createPool({ authUserAvailable: false }) }).request("/v1/me", {
+    headers: { Authorization: "Bearer valid" },
+  });
+  assert.equal(response.status, 401);
+  assert.equal((await response.json()).error.code, "account_unavailable");
+});
+
+test("guest delivery is disabled when Worker authorization is not configured", async () => {
   const pool = createPool();
   const response = await makeApp({ pool }).request(
     `/v1/announcements/${announcementId}/guest-delivered`,
     { method: "POST" },
   );
-  assert.equal(response.status, 204);
-  const metricCall = pool.calls.find((call) =>
+  assert.equal(response.status, 503);
+  assert.equal(pool.calls.some((call) =>
     call.sql.includes("announcement_guest_daily_metrics"),
-  );
-  assert.ok(metricCall);
-  assert.equal(metricCall.params.length, 1);
+  ), false);
 });
 
 test("administrator can list drafts and filter by status", async () => {

@@ -1,32 +1,24 @@
 import 'package:flutter/foundation.dart';
 
 import '../../data/database/database_helper.dart';
-import '../platform/app_platform.dart';
-import '../security/secure_storage_service.dart';
 
-/// Initializes the durable storage required by the application.
+/// Initializes the durable local database before any data-dependent UI loads.
 ///
-/// Initialization failures are intentionally propagated. The app must not
-/// continue into data-dependent screens when its persistent database is
-/// unavailable.
+/// Account identity and app-lock storage are optional. They initialize lazily
+/// when an account feature is explicitly opened and must never gate local use.
 class AppInitializer {
   AppInitializer({
     Future<void> Function()? initializeDatabase,
     Future<void> Function()? initializeSecurity,
   })  : _initializeDatabase =
             initializeDatabase ?? _initializePersistentDatabase,
-        _initializeSecurity =
-            initializeSecurity ?? _initializeSecureStorage;
+        _initializeSecurity = initializeSecurity ?? _skipOptionalSecurityWarmup;
 
   final Future<void> Function() _initializeDatabase;
   final Future<void> Function() _initializeSecurity;
 
-  static Future<void> _initializeSecureStorage() async {
-    if (AppPlatform.shouldUseNativeSecurity()) {
-      await SecureStorageService().getDatabasePassword();
-    } else {
-      debugPrint('Web mode detected: skipping native secure storage initialization.');
-    }
+  static Future<void> _skipOptionalSecurityWarmup() async {
+    // Authentication secure storage is initialized at the point of use.
   }
 
   static Future<void> _initializePersistentDatabase() async {
@@ -35,12 +27,10 @@ class AppInitializer {
 
   Future<void> initialize() async {
     try {
-      await _initializeSecurity();
       await _initializeDatabase();
-      debugPrint('Application storage initialized successfully.');
     } catch (error, stackTrace) {
       debugPrint(
-        'Application storage initialization failed: $error\n$stackTrace',
+        'Persistent academic database initialization failed: $error\\n$stackTrace',
       );
       Error.throwWithStackTrace(
         AppInitializationException(
@@ -50,6 +40,19 @@ class AppInitializer {
         stackTrace,
       );
     }
+
+    // Optional secure-storage warm-up is best-effort and occurs only after
+    // durable SQLite is available.
+    try {
+      await _initializeSecurity();
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Optional security warm-up unavailable; local workspace remains usable: '
+        '$error\\n$stackTrace',
+      );
+    }
+
+    debugPrint('Persistent academic database initialized successfully.');
   }
 }
 

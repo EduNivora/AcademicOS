@@ -251,24 +251,17 @@ flutter pub get
 flutter run
 ```
 
-### 4. التشغيل على منصات محددة
+### 4. منصة الإصدار
 
-#### Android
+Release 1 مخصص لـ Android فقط:
+
 ```bash
 flutter run -d android
+flutter build apk --debug
+flutter build apk --release
 ```
 
-#### Web
-```bash
-flutter run -d chrome
-```
-
-#### Windows
-```bash
-flutter run -d windows
-```
-
-المنصات المهيأة حالياً داخل المستودع هي Android وWeb وWindows. مجلدات iOS وmacOS وLinux غير موجودة حالياً، فلا تُعد هذه المنصات مدعومة في إعدادات المستودع الحالية.
+نسخة Release الحالية مخصصة لاختبار QA وتستخدم توقيع debug؛ ليست نسخة إنتاجية أو جاهزة لـ Play Store. وجود مجلدات Web أو Windows في المستودع لا يجعلها ضمن نطاق الإصدار الأول. لا تُشغّل Web أو Cloudflare Pages ضمن بوابة Release 1.
 
 ### 5. التحقق من الجودة
 
@@ -312,18 +305,21 @@ Academic terms, courses, schedules, tasks, exams, notes, materials, attachments,
 Institutional portals, lecturer/student administration, official university attendance integration, institutional messaging, fees/payments, university dashboards, and academic cloud synchronization are outside the current product scope. See [docs/PRODUCT_SCOPE.md](docs/PRODUCT_SCOPE.md) for the authoritative product specification and [ARCHITECTURE.md](ARCHITECTURE.md) for technical boundaries.
 
 
-## تجهيز وبناء نسخة Web
+## بناء Android — Release 1
 
-يحتاج SQLite على Web إلى ملفات WebAssembly وShared Worker التي يوفرها `sqflite_common_ffi_web`. بعد تثبيت Flutter والتبعيات، جهّز runtime ثم ابنِ نسخة Web:
+Release 1 يستهدف Android فقط. بعد تثبيت Flutter والتبعيات:
 
 ```bash
 flutter pub get
-dart run sqflite_common_ffi_web:setup --force --verbose
-flutter build web --release
+flutter analyze
+flutter test
+flutter build apk --debug
+flutter build apk --release
 ```
 
-يتحقق GitHub Actions من تجهيز runtime وبناء نسخة Web ويرفعها كـ artifact. نجاح البناء لا يثبت وحده استمرارية IndexedDB بعد إعادة التحميل، أو العمل دون اتصال، أو سلامة تعدد التبويبات؛ يلزم اختبار المتصفح لهذه السلوكيات قبل إعلان دعم Web إنتاجياً.
+نسخة `--release` الحالية مخصصة لاختبار QA وتستخدم إعداد توقيع debug؛ ليست موقعة إنتاجياً ولا جاهزة للنشر في Play Store. يتطلب النشر توقيع Android مملوكاً للمشروع واختبارات جهاز فعلية.
 
+ملفات Web الموجودة في المستودع لا تعني أن Web جزء من Release 1؛ لا تُبنى ولا تُنشر ضمن بوابة الإصدار الحالية. Web وCloudflare Pages مؤجلان.
 
 ## Release 1 cloud metadata backend
 
@@ -340,9 +336,14 @@ publishing, production CORS, or release readiness.
 
 The Flutter client includes the Managed Auth REST adapter and email/OTP
 screens, with unit-test coverage for the request and session flows. Real-account
-end-to-end verification on Android and Web remains outstanding. The public
+end-to-end verification on Android remains outstanding. Web is deferred and is not a Release 1 acceptance gate. The public
 announcements feed is available to guests through the Flutter Announcements
 screen and is cached locally for offline reading; academic records and files
 are never uploaded to Neon.
 
 > **Release 1 delivery scope:** EduNivora ships as an Android application only. The Web application, Web administration, and Cloudflare Pages deployment are deferred to a future release. Google Drive backup/restore and production SQLite encryption are also deferred to Release 2. Do not treat the existing Web or backup source files as supported Release 1 delivery features.
+
+
+## EduNivora Release 1 scope
+
+Release 1 is an **Android application only**. It is guest-first and local-first, with optional account identity, public notices, registered notice delivery/read receipts, and anonymous aggregate guest metrics. Courses, terms, schedules, tasks, exams, grades, notes, study plans, materials, attachments, and academic reports remain on the device. No academic cloud synchronization is implemented. There is no Release 1 student Web app, Web admin interface, browser persistence requirement, or Cloudflare Pages deployment. Google Drive backup/restore, backup encryption/key management, and production SQLite encryption are deferred to Release 2.

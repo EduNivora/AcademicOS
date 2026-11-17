@@ -6,11 +6,12 @@
     "node": ">=24"
   },
   "scripts": {
-    "test": "node --test backend/neon/functions/notices/*.test.mjs",
-    "check": "node --check backend/neon/functions/notices/app.mjs && node --check backend/neon/functions/notices/index.mjs && node --check backend/neon/functions/notices/token_verifier.mjs && node --check backend/neon/functions/notices/app.test.mjs && node --check backend/neon/functions/notices/token_verifier.test.mjs",
+    "test": "node --test backend/neon/functions/notices/*.test.mjs backend/neon/migrations/*.test.mjs",
+    "check": "node --check backend/neon/functions/notices/app.mjs && node --check backend/neon/functions/notices/index.mjs && node --check backend/neon/functions/notices/token_verifier.mjs && node --check backend/neon/functions/notices/app.test.mjs && node --check backend/neon/functions/notices/token_verifier.test.mjs && node --check backend/neon/functions/notices/guest_metrics_worker.test.mjs && node --check backend/neon/guest-metrics-worker/quota.mjs && node --check backend/neon/guest-metrics-worker/worker.mjs && node --check backend/neon/guest-metrics-worker/index.mjs && node --check backend/neon/guest-metrics-worker/worker.runtime.test.mjs && node --check backend/neon/migrations/migrations.test.mjs",
     "neon:dev": "neon dev",
     "neon:deploy": "neon deploy",
-    "build:function": "esbuild backend/neon/functions/notices/index.mjs --bundle --platform=node --format=esm --target=node24 --outfile=backend/neon/dist/notices.mjs --external:node:* --external:pg --external:@neon/functions --external:pg-native"
+    "build:function": "esbuild backend/neon/functions/notices/index.mjs --bundle --platform=node --format=esm --target=node24 --outfile=backend/neon/dist/notices.mjs --external:node:* --external:pg --external:@neon/functions --external:pg-native",
+    "test:worker-runtime": "vitest run --config vitest.guest-metrics.config.mjs"
   },
   "dependencies": {
     "@neon/config": "^1.14.0",
@@ -20,6 +21,8 @@
     "pg": "^8.16.3"
   },
   "devDependencies": {
-    "esbuild": "^0.25.10"
+    "esbuild": "^0.25.10",
+    "@cloudflare/vitest-plugin": "^1.0.0",
+    "vitest": "^4.1.0"
   }
 }

@@ -10,6 +10,8 @@ on:
       - main
       - chore/edunivora-phase0-execution
       - feat/neon-managed-auth-and-notices
+      - feat/guest-metrics-durable-quota
+      - release1/**
     paths:
       - "backend/neon/functions/notices/**"
       - "package.json"
