@@ -60,6 +60,9 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get 2>&1 | tee pub-get.log
 
+      - name: Generate Android and iOS launcher icons from approved brand asset
+        run: dart run flutter_launcher_icons
+
       - name: Prepare SQLite WebAssembly runtime
         run: dart run sqflite_common_ffi_web:setup --force --verbose
 
@@ -99,7 +102,7 @@ jobs:
           ):
               assert (root / "drawable" / name).is_file()
 
-          brand = pathlib.Path("assets/branding/edunivora_icon_1024.png")
+          brand = pathlib.Path("assets/branding/edunivora_app_icon.png")
           assert brand.is_file() and brand.stat().st_size > 100_000
           print("Android launcher icon: manifest, five densities, adaptive and monochrome assets verified.")
           PY
