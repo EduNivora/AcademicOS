@@ -26,7 +26,7 @@ A status is not promoted to verified merely because source exists. CI claims mus
 | Anonymous guest metrics Worker and Durable Object | IN PROGRESS | Source implements per-notice/per-UTC-day atomic quotas, published-notice validation, aggregate-only Durable Object storage, minimal upstream headers and fail-closed secret checks. Node and Cloudflare runtime/concurrency suites must pass on this exact head. |
 | Guest metrics production protection | BLOCKED — EXTERNAL INPUT REQUIRED | No Worker deployment or matching production secret provisioning is authorized by this order. Requires explicit owner approval and one random secret (at least 32 bytes) installed as Worker `NEON_GUEST_METRICS_SECRET` and Neon `GUEST_METRICS_PROXY_SECRET`. Deployment and smoke-test procedure is documented. |
 | Neon Function production deployment | BLOCKED — EXTERNAL INPUT REQUIRED | Existing deployment 7 predates the current reviewed source and does not establish current JWT/guest-metric enforcement. A reviewed bundle, owner approval, verified environment values, deployment and live smoke tests are required. No deployment is performed here. |
-| Backend Node quality gate | IN PROGRESS | Workflow runs install, syntax checks and Node tests without production secrets. Exact-head CI result must be recorded after the PR head is created. |
+| Exact-head GitHub Actions runner execution | BLOCKED — EXTERNAL INPUT REQUIRED | Exact-head runs #44048929777 (Neon), #44048929607 (Worker), and #44048929645 (Flutter) were created for `691a4bae38d1bde506254c3f8e498a85dfbf620e` but failed before runner allocation: each job reports `runner_id: 0`, has no steps, and exposes no job log. No install, test, Wrangler, Flutter, or APK command ran. Owner must restore GitHub Actions runner/billing availability and rerun these exact-head checks. |
 | Worker Durable Object quality gate | IN PROGRESS | Workflow runs Node tests, Wrangler dry-run and Cloudflare Vitest runtime tests. Exact-head CI result must be recorded after the PR head is created. |
 | Flutter Android quality workflow | IN PROGRESS | Workflow is configured for dependency resolution, Dart formatting/analyzer, Flutter tests, Android Debug APK, Android Release QA APK, and separate artifact uploads. Release QA APK uses debug signing and is not production-signed. Exact-head CI must pass. |
 | Production Android signing | BLOCKED — EXTERNAL INPUT REQUIRED | Requires project-owned keystore, store password, key alias and key password provisioned as protected GitHub secrets, plus owner approval. No fake signing credentials or keystore are created. |
@@ -34,6 +34,14 @@ A status is not promoted to verified merely because source exists. CI claims mus
 | Web app, Web admin, browser persistence and Cloudflare Pages | DEFERRED — RELEASE 2 | No Web application, Web admin, browser persistence, Web artifact or Pages deployment is a Release 1 acceptance requirement. Do not add Pages origins or activate Web deployment. |
 | Google Drive backup/restore, backup encryption/key management, production SQLite encryption, academic cloud sync | DEFERRED — RELEASE 2 | These are explicitly excluded. No academic payload or attachment bytes may be added to Neon. |
 | Track A Flutter source and acceptance | NOT VERIFIED | Track B does not modify `lib/**`, `android/**`, `test/**`, `integration_test/**`, Flutter assets, `pubspec.yaml`, or `pubspec.lock`. Do not mark Track A items complete without its exact commit and exact-head CI evidence. |
+
+## Exact-head CI evidence
+
+- [Neon backend run #44048929777](https://github.com/EduNivora/AcademicOS/actions/runs/44048929777) — failed before runner allocation; zero steps.
+- [Guest metrics Worker run #44048929607](https://github.com/EduNivora/AcademicOS/actions/runs/44048929607) — failed before runner allocation; zero steps.
+- [Flutter/Android run #44048929645](https://github.com/EduNivora/AcademicOS/actions/runs/44048929645) — failed before runner allocation; zero steps.
+
+These are not code-test failures and are not passing checks. They provide no evidence about source correctness. Resolve runner availability and rerun on the updated exact head.
 
 ## Production safety boundary
 
