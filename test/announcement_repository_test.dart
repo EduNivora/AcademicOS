@@ -211,7 +211,9 @@ void main() {
     final posts = <Uri>[];
     final repository = AnnouncementRepository(
       get: (_) async => jsonEncode(_payload),
-      post: (uri) async { posts.add(uri); },
+      post: (uri) async {
+        posts.add(uri);
+      },
       baseUrl: 'https://api.example.test',
       guestMetricsBaseUrl: '',
     );

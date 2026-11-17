@@ -40,7 +40,8 @@ class AnnouncementRepository {
         _authenticatedPost = authenticatedPost ?? _platformAuthenticatedPost,
         _getAccessToken = getAccessToken,
         _baseUrl = baseUrl.replaceFirst(RegExp(r'/+$'), ''),
-        _guestMetricsBaseUrl = guestMetricsBaseUrl.replaceFirst(RegExp(r'/+$'), '');
+        _guestMetricsBaseUrl =
+            guestMetricsBaseUrl.replaceFirst(RegExp(r'/+$'), '');
 
   Uri _endpoint(String path) => Uri.parse('$_baseUrl$path');
 
