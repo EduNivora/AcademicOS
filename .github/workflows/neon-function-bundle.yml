@@ -9,6 +9,7 @@ on:
     branches:
       - main
       - chore/edunivora-phase0-execution
+      - feat/guest-metrics-edge-gateway
       - feat/neon-managed-auth-and-notices
     paths:
       - "backend/neon/functions/notices/**"
