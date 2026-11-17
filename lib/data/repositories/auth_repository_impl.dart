@@ -1,3 +1,5 @@
+import 'package:google_sign_in/google_sign_in.dart';
+
 import '../../core/security/auth_secure_storage_service.dart';
 import '../../domain/entities/user_entity.dart';
 import '../../domain/repositories/auth_repository.dart';
@@ -137,11 +139,11 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   Future<bool> _completeGoogleSignIn(
-    dynamic account,
+    GoogleSignInAccount account,
   ) async {
     final authentication = await account.authentication;
-    final idToken = authentication.idToken as String?;
-    final accessToken = authentication.accessToken as String?;
+    final idToken = authentication.idToken;
+    final accessToken = authentication.accessToken;
     if (idToken == null || idToken.isEmpty) {
       throw StateError(
         'Google did not return an ID token. Check GOOGLE_SERVER_CLIENT_ID.',
@@ -166,11 +168,11 @@ class AuthRepositoryImpl implements AuthRepository {
     }
 
     await _secureStorageService.saveGoogleAccountData(
-      id: account.id as String,
-      email: account.email as String,
-      name: (account.displayName as String?) ?? account.email as String,
+      id: account.id,
+      email: account.email,
+      name: account.displayName ?? account.email,
     );
-    await _secureStorageService.saveAuthUsername(account.email as String);
+    await _secureStorageService.saveAuthUsername(account.email);
     await _secureStorageService.saveNeonAuthSessionActive(true);
     await _secureStorageService.saveAuthSessionActive(true);
     return true;
