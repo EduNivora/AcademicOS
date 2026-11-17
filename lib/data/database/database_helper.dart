@@ -5,7 +5,8 @@ import 'package:path/path.dart';
 // Use sqflite's platform factory on Android/iOS. FFI factories are
 // selected explicitly only for desktop and Web.
 import 'package:sqflite/sqflite.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart' show databaseFactoryFfi;
+import 'package:sqflite_common_ffi/sqflite_ffi.dart'
+    show databaseFactoryFfi, sqfliteFfiInit;
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart'
     show databaseFactoryFfiWeb;
 import '../models/academic_term_model.dart';
@@ -30,6 +31,7 @@ class DatabaseHelper {
   }
 
   static bool _initializeNativeFactory() {
+    sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
     debugPrint('SQLite FFI native factory initialized once.');
     return true;
