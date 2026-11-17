@@ -79,9 +79,8 @@ class DatabaseHelper {
       } else if (!kIsWeb &&
           _shouldUseNativeFactory() &&
           !_nativeFactoryInitialized) {
-        databaseFactory = databaseFactoryFfi;
+        _initializeNativeFactory();
         _nativeFactoryInitialized = true;
-        debugPrint('[SQLite] Desktop FFI database factory initialized.');
       }
 
       final platform = kIsWeb ? 'web' : Platform.operatingSystem;
