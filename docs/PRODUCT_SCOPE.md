@@ -112,27 +112,11 @@ Google Drive backup, encrypted archives, upload and restore are Release 2 accept
 
 ## 10.1 Release 1 cloud provider decision — 2026-11-15
 
-The Release 1 cloud metadata provider is the dedicated Neon project `edunivora`
-(PostgreSQL 17, AWS Europe Central / Frankfurt). Neon Managed Auth (Better Auth)
-is enabled for optional identity. This provider decision does not change the
-local-first rule: academic records and files remain in local SQLite.
+The dedicated Neon project `edunivora` is the selected PostgreSQL provider for optional identity and public notices. Neon Managed Auth owns authentication and session lifecycle. This provider decision does not change the local-first rule: academic records and files remain on the Android device.
 
-The app-owned cloud schema is restricted to profile/role projection, public
-announcements, registered delivery/read receipts, anonymous daily guest event
-counters, and notice-admin audit metadata. Password hashes, OAuth credentials,
-academic records, attachments, and academic reports are not stored in the
-app-owned tables.
+The only approved app-owned cloud data is minimal profile/role projection, public notices, registered delivery/read acknowledgements, anonymous daily guest event counters, and narrow notice-operator audit metadata. Passwords, provider credentials, academic records, attachment bytes, and academic reports are not stored in app-owned tables.
 
-Implementation status must be reported accurately: Neon Auth and the schema are
-provisioned, and the Notices API is deployed to the Neon default branch with
-health, public-feed and unauthenticated-admin smoke checks passing. The Flutter
-client now contains the Neon email/password and OTP authentication adapter,
-native secure session-cookie storage, Web credential-cookie transport, and
-Bearer-token receipt integration. These client paths have automated unit tests,
-but real-account Android/Web end-to-end acceptance is still open. Production
-Google OAuth credentials, production SMTP, the final Web trusted origin,
-controlled first-admin bootstrap, retention policy, guest metric abuse controls,
-and end-to-end platform verification remain open gates.
+Backend source and migrations exist in `backend/neon`; this is not evidence that the current source is deployed. The last known production deployment is historical and predates the Track B changes. Production SMTP, project-owned Google OAuth, first-admin bootstrap, guest Worker deployment/secrets, retention policy, and live Android end-to-end verification remain separate release gates. Do not claim production readiness from source or old smoke checks.
 
 ## 11. Release 1 platform boundary — 2026-11-16
 

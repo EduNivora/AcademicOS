@@ -2,9 +2,9 @@ name: Flutter quality gate
 
 on:
   pull_request:
-    branches: [main, chore/edunivora-phase0-execution, feat/durable-attachment-storage]
+    branches: [main, chore/edunivora-phase0-execution, "release1/**"]
   push:
-    branches: [main]
+    branches: [main, chore/edunivora-phase0-execution, "release1/**"]
 
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
   quality:
     name: Analyze, test, and build
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -60,8 +60,8 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get --enforce-lockfile
 
-      - name: Prepare SQLite WebAssembly runtime
-        run: dart run sqflite_common_ffi_web:setup --force --verbose
+      - name: Verify Dart formatting
+        run: dart format --output=none --set-exit-if-changed lib test
 
       - name: Analyze Dart sources
         shell: bash
@@ -128,21 +128,24 @@ jobs:
       - name: Build Android debug APK
         run: flutter build apk --debug --no-pub
 
-      - name: Build Web release
-        run: flutter build web --release --no-pub
+      # This validates the Android Release variant only. Gradle currently uses
+      # the debug signing config; this artifact is not production-signed.
+      - name: Build Android release variant (QA; debug-signed)
+        run: flutter build apk --release --no-pub
 
       - name: Upload Android debug APK
         uses: actions/upload-artifact@v4
         with:
           name: academicos-android-debug-apk
-          path: build/app/outputs/flutter-apk/*.apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload Web release
+      - name: Upload Android release QA APK (debug-signed; not for store)
         uses: actions/upload-artifact@v4
         with:
-          name: academicos-web-release
-          path: build/web/
+          name: academicos-android-release-qa-debug-signed
+          path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 14
+
