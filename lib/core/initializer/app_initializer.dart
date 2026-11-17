@@ -1,33 +1,19 @@
 import 'package:flutter/foundation.dart';
 
 import '../../data/database/database_helper.dart';
-import '../platform/app_platform.dart';
-import '../security/secure_storage_service.dart';
 
 /// Initializes the durable storage required by the application.
 ///
-/// Initialization failures are intentionally propagated. The app must not
-/// continue into data-dependent screens when its persistent database is
-/// unavailable.
+/// Startup is gated only by the actual persistent academic database. The old
+/// database-password preflight was removed because that password is not
+/// consumed by the current SQLite engine; allowing an unrelated Keystore
+/// failure to block startup incorrectly reported healthy SQLite as unavailable.
 class AppInitializer {
-  AppInitializer({
-    Future<void> Function()? initializeDatabase,
-    Future<void> Function()? initializeSecurity,
-  })  : _initializeDatabase =
-            initializeDatabase ?? _initializePersistentDatabase,
-        _initializeSecurity =
-            initializeSecurity ?? _initializeSecureStorage;
+  AppInitializer({Future<void> Function()? initializeDatabase})
+    : _initializeDatabase =
+          initializeDatabase ?? _initializePersistentDatabase;
 
   final Future<void> Function() _initializeDatabase;
-  final Future<void> Function() _initializeSecurity;
-
-  static Future<void> _initializeSecureStorage() async {
-    if (AppPlatform.shouldUseNativeSecurity()) {
-      await SecureStorageService().getDatabasePassword();
-    } else {
-      debugPrint('Web mode detected: skipping native secure storage initialization.');
-    }
-  }
 
   static Future<void> _initializePersistentDatabase() async {
     await DatabaseHelper.instance.database;
@@ -35,12 +21,12 @@ class AppInitializer {
 
   Future<void> initialize() async {
     try {
-      await _initializeSecurity();
       await _initializeDatabase();
-      debugPrint('Application storage initialized successfully.');
+      debugPrint('Application persistent database initialized successfully.');
     } catch (error, stackTrace) {
       debugPrint(
-        'Application storage initialization failed: $error\n$stackTrace',
+        'Application persistent database initialization failed: '
+        '${error.runtimeType}: $error\n$stackTrace',
       );
       Error.throwWithStackTrace(
         AppInitializationException(
