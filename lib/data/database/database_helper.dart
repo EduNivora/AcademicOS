@@ -2,8 +2,12 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
+// Use sqflite's platform factory on Android/iOS. FFI factories are
+// selected explicitly only for desktop and Web.
+import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart' show databaseFactoryFfi;
+import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart'
+    show databaseFactoryFfiWeb;
 import '../models/academic_term_model.dart';
 import '../models/course_material_model.dart';
 import '../models/course_model.dart';
@@ -67,36 +71,64 @@ class DatabaseHelper {
   Future<Database> _initDatabase() async {
     try {
       if (kIsWeb && !_webFactoryInitialized) {
-        _webFactoryInitialized = _initializeWebFactory();
+        databaseFactory = databaseFactoryFfiWeb;
+        _webFactoryInitialized = true;
+        debugPrint('[SQLite] Web database factory initialized.');
+      } else if (!kIsWeb &&
+          _shouldUseNativeFactory() &&
+          !_nativeFactoryInitialized) {
+        databaseFactory = databaseFactoryFfi;
+        _nativeFactoryInitialized = true;
+        debugPrint('[SQLite] Desktop FFI database factory initialized.');
       }
 
-      if (!kIsWeb && _shouldUseNativeFactory() && !_nativeFactoryInitialized) {
-        _nativeFactoryInitialized = _initializeNativeFactory();
-      }
-    } catch (error, stackTrace) {
-      Error.throwWithStackTrace(
-        StateError('Unable to initialize the SQLite database factory: $error'),
-        stackTrace,
+      final platform = kIsWeb ? 'web' : Platform.operatingSystem;
+      debugPrint(
+        '[SQLite] platform=$platform factory=${databaseFactory.runtimeType}',
       );
-    }
 
-    final dbPath = await getDatabasesPath();
-    if (!kIsWeb) {
-      await Directory(dbPath).create(recursive: true);
-    }
-    final path = join(dbPath, _databaseName);
+      final dbPath = await getDatabasesPath();
+      debugPrint('[SQLite] databasesPath=$dbPath');
 
-    // Never replace persistent storage with an in-memory database.
-    // A failed open must be surfaced to startup so the user is not led to
-    // believe that writes are durable when they can disappear on refresh.
-    return await openDatabase(
-      path,
-      version: _databaseVersion,
-      onConfigure: _onConfigure,
-      onCreate: _onCreateDatabase,
-      onUpgrade: _onUpgradeDatabase,
-      onOpen: _migrateLegacyMaterialFiles,
-    );
+      if (!kIsWeb) {
+        final directory = Directory(dbPath);
+        await directory.create(recursive: true);
+
+        // Verify the app-owned database directory is writable before opening
+        // the real database. The probe is a temporary empty directory and
+        // never touches the user's database or academic records.
+        final writeProbe = await directory.createTemp(
+          '.edunivora_sqlite_write_probe_',
+        );
+        await writeProbe.delete();
+        debugPrint('[SQLite] database directory writable=true');
+      }
+
+      final path = join(dbPath, _databaseName);
+      debugPrint('[SQLite] persistent database path=$path');
+
+      // Never replace persistent storage with an in-memory database. A failed
+      // open must be surfaced to startup so the user is not led to believe
+      // that writes are durable when they can disappear on refresh.
+      final db = await openDatabase(
+        path,
+        version: _databaseVersion,
+        onConfigure: _onConfigure,
+        onCreate: _onCreateDatabase,
+        onUpgrade: _onUpgradeDatabase,
+        onOpen: _migrateLegacyMaterialFiles,
+      );
+      debugPrint(
+        '[SQLite] persistent database opened; inMemory=${db.path == inMemoryDatabasePath}',
+      );
+      return db;
+    } catch (error, stackTrace) {
+      debugPrint(
+        '[SQLite] initialization failed: ${error.runtimeType}: $error',
+      );
+      debugPrint('[SQLite] original stack trace:\n$stackTrace');
+      Error.throwWithStackTrace(error, stackTrace);
+    }
   }
 
   Future<void> _migrateLegacyMaterialFiles(Database db) async {
