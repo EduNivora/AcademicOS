@@ -79,6 +79,25 @@ class NeonAuthDataSource {
     });
   }
 
+  /// Exchanges a Google ID token for a first-party Neon Auth session.
+  /// Better Auth verifies the token server-side and sets the session cookie.
+  Future<Map<String, dynamic>> signInWithGoogle({
+    required String idToken,
+    String? accessToken,
+  }) {
+    if (idToken.trim().isEmpty) {
+      throw ArgumentError.value(idToken, 'idToken', 'Must not be empty.');
+    }
+    return _send('/sign-in/social', method: 'POST', body: {
+      'provider': 'google',
+      'idToken': {
+        'token': idToken,
+        if (accessToken != null && accessToken.isNotEmpty)
+          'accessToken': accessToken,
+      },
+    });
+  }
+
   Future<Map<String, dynamic>> sendEmailVerificationOtp(String email) {
     return _send('/email-otp/send-verification-otp', method: 'POST', body: {
       'email': email.trim().toLowerCase(),
