@@ -39,7 +39,7 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           accept-android-sdk-licenses: true
-          packages: 'ndk;27.0.12077973'
+          packages: 'ndk;28.2.13676358'
 
       - name: Install required CMake
         run: |
@@ -110,6 +110,16 @@ jobs:
 
       - name: Run tests
         run: flutter test --no-pub
+
+      - name: Verify native SQLite on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: flutter test integration_test/database_android_integration_test.dart --no-pub
 
       - name: Free unused runner disk space
         run: |
