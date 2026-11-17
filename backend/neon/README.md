@@ -26,7 +26,7 @@ Guest events are aggregate event counts, not unique visitors. No guest ID, IP ad
 
 Email/password and OTP are implemented against Neon Managed Auth, but production email verification is blocked until the owner supplies and verifies project-owned SMTP configuration. Production Google OAuth is blocked until the owner supplies the project-owned Google OAuth client ID/secret and approves exact redirect/trusted-origin configuration. Do not use shared development OAuth/SMTP credentials as production configuration. No credentials belong in source, Flutter assets, logs, or chat.
 
-The Android client does not require browser CORS origins. Keep `APP_ORIGINS` and `EDUNIVORA_APP_ORIGINS` unset/empty unless a separately approved origin is required. Do not configure Pages or Web origins for Release 1.
+The Android client does not require browser CORS origins. Keep `APP_ORIGINS` and `EDUNIVORA_APP_ORIGINS` unset/empty unless a separately approved origin is required. Do not configure Pages or Web origins for Release 1. The Android build may set `EDUNIVORA_GUEST_METRICS_PROXY_URL` to the verified Worker base URL using `--dart-define`; if unset, guest metric writes remain disabled and public notice reading continues.
 
 ## Worker secret provisioning and deployment order
 
