@@ -312,18 +312,21 @@ Academic terms, courses, schedules, tasks, exams, notes, materials, attachments,
 Institutional portals, lecturer/student administration, official university attendance integration, institutional messaging, fees/payments, university dashboards, and academic cloud synchronization are outside the current product scope. See [docs/PRODUCT_SCOPE.md](docs/PRODUCT_SCOPE.md) for the authoritative product specification and [ARCHITECTURE.md](ARCHITECTURE.md) for technical boundaries.
 
 
-## تجهيز وبناء نسخة Web
+## بناء Android — Release 1
 
-يحتاج SQLite على Web إلى ملفات WebAssembly وShared Worker التي يوفرها `sqflite_common_ffi_web`. بعد تثبيت Flutter والتبعيات، جهّز runtime ثم ابنِ نسخة Web:
+Release 1 يستهدف Android فقط. بعد تثبيت Flutter والتبعيات:
 
 ```bash
 flutter pub get
-dart run sqflite_common_ffi_web:setup --force --verbose
-flutter build web --release
+flutter analyze
+flutter test
+flutter build apk --debug
+flutter build apk --release
 ```
 
-يتحقق GitHub Actions من تجهيز runtime وبناء نسخة Web ويرفعها كـ artifact. نجاح البناء لا يثبت وحده استمرارية IndexedDB بعد إعادة التحميل، أو العمل دون اتصال، أو سلامة تعدد التبويبات؛ يلزم اختبار المتصفح لهذه السلوكيات قبل إعلان دعم Web إنتاجياً.
+نسخة `--release` الحالية مخصصة لاختبار QA وتستخدم إعداد توقيع debug؛ ليست موقعة إنتاجياً ولا جاهزة للنشر في Play Store. يتطلب النشر توقيع Android مملوكاً للمشروع واختبارات جهاز فعلية.
 
+ملفات Web الموجودة في المستودع لا تعني أن Web جزء من Release 1؛ لا تُبنى ولا تُنشر ضمن بوابة الإصدار الحالية. Web وCloudflare Pages مؤجلان.
 
 ## Release 1 cloud metadata backend
 
