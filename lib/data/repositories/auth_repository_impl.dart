@@ -124,29 +124,54 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<bool> loginWithGoogle() async {
-    await _secureStorageService.clearNeonAuthCookie();
-    await _secureStorageService.saveNeonAuthSessionActive(false);
     final account = await _googleDataSource.signIn();
     if (account == null) return false;
-    await _secureStorageService.saveGoogleAccountData(
-      id: account.id,
-      email: account.email,
-      name: account.displayName ?? account.email,
-    );
-    await _secureStorageService.saveAuthUsername(account.email);
-    await _secureStorageService.saveAuthSessionActive(true);
-    return true;
+    return _completeGoogleSignIn(account);
   }
 
   @override
   Future<bool> loginWithCachedGoogleAccount() async {
+    final account = await _googleDataSource.signInSilently();
+    if (account == null) return false;
+    return _completeGoogleSignIn(account);
+  }
+
+  Future<bool> _completeGoogleSignIn(
+    dynamic account,
+  ) async {
+    final authentication = await account.authentication;
+    final idToken = authentication.idToken as String?;
+    final accessToken = authentication.accessToken as String?;
+    if (idToken == null || idToken.isEmpty) {
+      throw StateError(
+        'Google did not return an ID token. Check GOOGLE_SERVER_CLIENT_ID.',
+      );
+    }
+
+    // A Google account selection alone is not an application session. Only
+    // activate the local session after Neon Auth accepts the ID token.
     await _secureStorageService.clearNeonAuthCookie();
     await _secureStorageService.saveNeonAuthSessionActive(false);
-    final cached = await _secureStorageService.getGoogleAccountData();
-    final email = cached['email'];
-    final id = cached['id'];
-    if (email == null || id == null) return false;
-    await _secureStorageService.saveAuthUsername(email);
+    final result = await _neonAuthDataSource.signInWithGoogle(
+      idToken: idToken,
+      accessToken: accessToken,
+    );
+    final user = result['user'];
+    if (result['redirect'] != false || user is! Map) {
+      throw StateError('Neon Auth did not create a Google session.');
+    }
+    if (user['banned'] == true) {
+      await _neonAuthDataSource.signOut();
+      throw StateError('account_unavailable');
+    }
+
+    await _secureStorageService.saveGoogleAccountData(
+      id: account.id as String,
+      email: account.email as String,
+      name: (account.displayName as String?) ?? account.email as String,
+    );
+    await _secureStorageService.saveAuthUsername(account.email as String);
+    await _secureStorageService.saveNeonAuthSessionActive(true);
     await _secureStorageService.saveAuthSessionActive(true);
     return true;
   }
