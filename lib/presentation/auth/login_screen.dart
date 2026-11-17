@@ -97,6 +97,36 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _loginWithGoogle() async {
+    if (_isLoading) return;
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final success = await widget.authUseCases.loginWithGoogle.call();
+      if (!mounted) return;
+      if (!success) {
+        setState(() {
+          _errorMessage = 'لم يتم اختيار حساب Google.';
+          _isLoading = false;
+        });
+        return;
+      }
+      await widget.onLoginSuccess();
+    } catch (error) {
+      if (!mounted) return;
+      final message = error.toString();
+      setState(() {
+        _errorMessage = message.contains('GOOGLE_SERVER_CLIENT_ID')
+            ? 'إعداد Google غير مكتمل. يرجى إكمال إعداد OAuth أولاً.'
+            : 'تعذّر تسجيل الدخول باستخدام Google. حاول مرة أخرى.';
+        _isLoading = false;
+      });
+    }
+  }
+
   Future<void> _continueAsGuest() async {
     if (_isLoading || widget.onContinueAsGuest == null) return;
     setState(() => _isLoading = true);
@@ -371,11 +401,20 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                             const SizedBox(height: 14),
-                            Text(
-                              'تسجيل الدخول عبر Google سيُفعّل بعد إعداد OAuth الخاص بالتطبيق.',
-                              textAlign: TextAlign.center,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: colors.onSurfaceVariant,
+                            SizedBox(
+                              height: 52,
+                              child: OutlinedButton.icon(
+                                onPressed: _isLoading ? null : _loginWithGoogle,
+                                icon: const Icon(Icons.g_mobiledata_rounded, size: 28),
+                                label: const Text(
+                                  'المتابعة باستخدام Google',
+                                  style: TextStyle(fontWeight: FontWeight.w700),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                ),
                               ),
                             ),
                           ],
