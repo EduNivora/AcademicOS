@@ -10,7 +10,14 @@ class AuthGoogleDataSourceImpl implements AuthGoogleDataSource {
   final GoogleSignIn _googleSignIn;
 
   AuthGoogleDataSourceImpl({GoogleSignIn? googleSignIn})
-    : _googleSignIn = googleSignIn ?? GoogleSignIn();
+    : _googleSignIn = googleSignIn ??
+          GoogleSignIn(
+            serverClientId: const String.fromEnvironment(
+              'GOOGLE_SERVER_CLIENT_ID',
+            ).isEmpty
+                ? null
+                : const String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID'),
+          );
 
   @override
   Future<GoogleSignInAccount?> signIn() async {
