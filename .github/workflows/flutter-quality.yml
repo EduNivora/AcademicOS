@@ -58,7 +58,7 @@ jobs:
           ls "$ANDROID_HOME/ndk" || true
 
       - name: Resolve dependencies
-        run: flutter pub get --enforce-lockfile
+        run: flutter pub get
 
       - name: Prepare SQLite WebAssembly runtime
         run: dart run sqflite_common_ffi_web:setup --force --verbose
