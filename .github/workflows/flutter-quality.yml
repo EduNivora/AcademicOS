@@ -63,6 +63,47 @@ jobs:
       - name: Prepare SQLite WebAssembly runtime
         run: dart run sqflite_common_ffi_web:setup --force --verbose
 
+      - name: Validate Android launcher icon resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import pathlib
+          import xml.etree.ElementTree as ET
+
+          root = pathlib.Path("android/app/src/main/res")
+          manifest = ET.parse("android/app/src/main/AndroidManifest.xml").getroot()
+          app = manifest.find("application")
+          android = "{http://schemas.android.com/apk/res/android}"
+          assert app is not None
+          assert app.get(android + "icon") == "@mipmap/ic_launcher"
+          assert app.get(android + "roundIcon") == "@mipmap/ic_launcher_round"
+
+          for density in ("mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"):
+              for name in ("ic_launcher.png", "ic_launcher_round.png"):
+                  path = root / f"mipmap-{density}" / name
+                  assert path.is_file() and path.stat().st_size > 1000, path
+
+          for name in ("ic_launcher.xml", "ic_launcher_round.xml"):
+              path = root / "mipmap-anydpi-v26" / name
+              icon = ET.parse(path).getroot()
+              assert icon.tag == "adaptive-icon"
+              assert icon.find("background") is not None
+              assert icon.find("foreground") is not None
+              assert icon.find("monochrome") is not None
+
+          for name in (
+              "ic_launcher_background.xml",
+              "ic_launcher_foreground.xml",
+              "ic_launcher_monochrome.xml",
+          ):
+              assert (root / "drawable" / name).is_file()
+
+          brand = pathlib.Path("assets/branding/edunivora_icon_1024.png")
+          assert brand.is_file() and brand.stat().st_size > 100_000
+          print("Android launcher icon: manifest, five densities, adaptive and monochrome assets verified.")
+          PY
+
       - name: Analyze Dart sources
         shell: bash
         run: |
@@ -140,6 +181,20 @@ jobs:
 
       - name: Build Web release
         run: flutter build web --release --no-pub 2>&1 | tee web-build.log
+
+      - name: Verify Android APK package and launcher icon
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="build/app/outputs/flutter-apk/app-debug.apk"
+          test -s "$apk"
+          aapt="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          test -x "$aapt"
+          "$aapt" dump badging "$apk" | tee apk-badging.txt
+          grep -q "package: name='com.arfatalkamli.academicos'" apk-badging.txt
+          grep -q "application-label:'EduNivora'" apk-badging.txt
+          grep -q "application-icon-" apk-badging.txt
+          sha256sum "$apk" | tee apk-sha256.txt
 
       - name: Upload Android debug APK
         uses: actions/upload-artifact@v4
