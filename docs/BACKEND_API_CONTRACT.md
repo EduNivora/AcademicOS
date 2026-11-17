@@ -17,7 +17,7 @@ Do not expose SQL errors, stack traces, tokens, secret values, or provider inter
 - Public endpoints: no Authorization header required.
 - Registered receipt and `GET /v1/me`: `Authorization: Bearer <Neon Managed Auth access JWT>`.
 - Operator endpoints: same Bearer JWT plus a server-side `app_users.role = 'admin'` projection. Never accept a role or `isAdmin` value from the request body.
-- Guest metric writes: Android clients call the configured Cloudflare Worker URL, not the Neon Function. The Worker calls the Neon Function with `X-EduNivora-Worker-Secret`; direct guest metric writes are rejected. If the Worker URL is not configured, guest metrics are disabled and public notice reading continues.
+- Guest metric writes: Android clients call the configured Cloudflare Worker URL, not the Neon Function. Track A must configure `EDUNIVORA_GUEST_METRICS_PROXY_URL` at build time using `--dart-define`; the default is empty, which disables guest metric writes without disabling public notices. The Worker calls the Neon Function with `X-EduNivora-Worker-Secret`; direct guest metric writes are rejected. If the Worker URL is not configured, guest metrics are disabled and public notice reading continues.
 
 ## Endpoints
 
