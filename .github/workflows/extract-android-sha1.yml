@@ -1,0 +1,30 @@
+name: Temporary Android SHA-1 Extraction
+
+on:
+  push:
+    branches:
+      - feat/google-neon-auth-native
+    paths:
+      - ".github/workflows/extract-android-sha1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  extract-debug-sha1:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Make Gradle wrapper executable
+        run: chmod +x android/gradlew
+      - name: Extract Android signing fingerprints
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon :app:signingReport
