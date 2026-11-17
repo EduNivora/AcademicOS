@@ -36,7 +36,7 @@ Database implementation: `lib/data/database/database_helper.dart`.
 - Foreign-key enforcement and WAL journal mode are enabled in database configuration.
 - Schema creation and upgrades are versioned in `DatabaseHelper`.
 
-The repository currently declares Android, Web, and Windows as configured targets in its README. Other platform directories/builds must be verified before claiming support.
+Legacy Web and Windows source/configuration may remain in the repository, but Release 1 acceptance and delivery are Android-only. Do not add Web builds, browser persistence, or Pages deployment to Release 1 CI.
 
 ## 4. Data model and integrity
 
