@@ -3,23 +3,23 @@ import 'package:academic_os/core/initializer/app_initializer.dart';
 
 void main() {
   group('AppInitializer', () {
-    test('initializes secure storage before the persistent database', () async {
-      final calls = <String>[];
+    test('initializes the persistent database before completing startup', () async {
+      var databaseInitialized = false;
       final initializer = AppInitializer(
-        initializeSecurity: () async => calls.add('security'),
-        initializeDatabase: () async => calls.add('database'),
+        initializeDatabase: () async {
+          databaseInitialized = true;
+        },
       );
 
       await initializer.initialize();
 
-      expect(calls, ['security', 'database']);
+      expect(databaseInitialized, isTrue);
     });
 
-    test('propagates database initialization failures', () async {
+    test('propagates persistent database initialization failures', () async {
       final initializer = AppInitializer(
-        initializeSecurity: () async {},
         initializeDatabase: () async {
-          throw StateError('persistent storage unavailable');
+          throw StateError('persistent SQLite unavailable');
         },
       );
 
@@ -33,24 +33,6 @@ void main() {
           ),
         ),
       );
-    });
-
-    test('does not continue to database when secure storage fails', () async {
-      var databaseInitialized = false;
-      final initializer = AppInitializer(
-        initializeSecurity: () async {
-          throw StateError('secure storage unavailable');
-        },
-        initializeDatabase: () async {
-          databaseInitialized = true;
-        },
-      );
-
-      await expectLater(
-        initializer.initialize(),
-        throwsA(isA<AppInitializationException>()),
-      );
-      expect(databaseInitialized, isFalse);
     });
   });
 }
