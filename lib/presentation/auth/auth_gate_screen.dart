@@ -135,15 +135,40 @@ class _AuthGateScreenState extends State<AuthGateScreen> {
     });
   }
 
-  Future<void> _handleContinueAsGuest() async {
-    await _secureStorageService.continueAsGuest();
+  void _handleOpenLocalWorkspace() {
     if (!mounted) return;
     setState(() {
       _requiresLogin = false;
       _authStateUnavailable = false;
       _isLoggedIn = false;
       _isAppLocked = false;
+      _isLoading = false;
     });
+  }
+
+  Future<void> _handleContinueAsGuest() async {
+    var sessionCleared = true;
+    try {
+      await _secureStorageService.continueAsGuest();
+    } catch (error, stackTrace) {
+      sessionCleared = false;
+      debugPrint(
+        'Could not clear optional account session while entering guest mode: '
+        '$error\\n$stackTrace',
+      );
+    }
+
+    _handleOpenLocalWorkspace();
+    if (!sessionCleared && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'تعذر تنظيف جلسة الحساب المخزنة. المساحة المحلية متاحة، '
+            'لكن لم يتم تأكيد تسجيل الخروج من الحساب.',
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> _handleAppLockVerified() async {
@@ -186,9 +211,9 @@ class _AuthGateScreenState extends State<AuthGateScreen> {
                     ),
                     const SizedBox(height: 10),
                     const Text(
-                      'لم نتمكن من قراءة بيانات المصادقة الآمنة. '
-                      'أوقفنا الوصول إلى المساحة الأكاديمية حتى لا نعرض '
-                      'بيانات جلسة سابقة بالخطأ.',
+                      'تعذر قراءة حالة الحساب الآمنة. يمكنك متابعة استخدام '
+                      'مساحتك الأكاديمية المحلية دون تسجيل الدخول. لن نغيّر '
+                      'بيانات الحساب أو الجلسة المخزنة عند اختيار هذا الخيار.',
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 20),
@@ -196,6 +221,12 @@ class _AuthGateScreenState extends State<AuthGateScreen> {
                       onPressed: _retryAuthentication,
                       icon: const Icon(Icons.refresh_rounded),
                       label: const Text('إعادة المحاولة'),
+                    ),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: _handleOpenLocalWorkspace,
+                      icon: const Icon(Icons.offline_bolt_outlined),
+                      label: const Text('المتابعة إلى المساحة المحلية كزائر'),
                     ),
                   ],
                 ),

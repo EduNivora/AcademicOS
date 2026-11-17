@@ -234,13 +234,25 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
 
       final tasks = await widget.useCases.getTasks();
       final courses = await widget.courseUseCases.getCourses();
-      await NotificationService.instance.syncReminders(
+      final remindersScheduled =
+          await NotificationService.instance.syncReminders(
         tasks: tasks,
         courses: courses,
       );
 
       if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
       Navigator.pop(context, true);
+      if (!remindersScheduled) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'تم حفظ المهمة، لكن لم يتم تأكيد جدولة جميع التذكيرات. '
+              'تحقق من إذن الإشعارات وإعدادات الجهاز.',
+            ),
+          ),
+        );
+      }
     } catch (error, stackTrace) {
       debugPrint('AddEditTaskScreen._saveTask error: $error\n$stackTrace');
       if (!mounted) return;

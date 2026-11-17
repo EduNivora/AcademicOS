@@ -45,11 +45,25 @@ class DatabaseHelper {
   static const String scheduleTable = 'schedule';
 
   Database? _database;
+  Future<Database>? _databaseOpening;
 
   Future<Database> get database async {
     if (_database != null && _database!.isOpen) return _database!;
-    _database = await _initDatabase();
-    return _database!;
+
+    final opening = _databaseOpening;
+    if (opening != null) return opening;
+
+    final nextOpening = _initDatabase();
+    _databaseOpening = nextOpening;
+    try {
+      final opened = await nextOpening;
+      _database = opened;
+      return opened;
+    } finally {
+      if (identical(_databaseOpening, nextOpening)) {
+        _databaseOpening = null;
+      }
+    }
   }
 
   Future<Database> _initDatabase() async {
@@ -784,9 +798,33 @@ class DatabaseHelper {
     );
   }
 
+  /// Deletes a course and all records that are owned by that course.
+  ///
+  /// This operation is atomic: tasks, exams, schedule entries, material
+  /// metadata and attachment BLOBs are removed in the same transaction.
+  /// The presentation layer must obtain explicit confirmation before calling.
   Future<int> deleteCourse(int id) async {
     final db = await database;
-    return await db.delete(_courseTable, where: 'id = ?', whereArgs: [id]);
+    return db.transaction((txn) async {
+      final existing = await txn.query(
+        _courseTable,
+        columns: ['id'],
+        where: 'id = ?',
+        whereArgs: [id],
+        limit: 1,
+      );
+      if (existing.isEmpty) return 0;
+
+      // Remove dependents before the parent. course_materials stores the
+      // attachment bytes in file_bytes, so deleting its row also deletes the
+      // file content rather than leaving an orphaned blob.
+      await txn.delete(_materialsTable, where: 'course_id = ?', whereArgs: [id]);
+      await txn.delete(scheduleTable, where: 'course_id = ?', whereArgs: [id]);
+      await txn.delete(_examTable, where: 'course_id = ?', whereArgs: [id]);
+      await txn.delete(_taskTable, where: 'course_id = ?', whereArgs: [id]);
+
+      return txn.delete(_courseTable, where: 'id = ?', whereArgs: [id]);
+    });
   }
 
   Future<int> updateCourseGrades(
