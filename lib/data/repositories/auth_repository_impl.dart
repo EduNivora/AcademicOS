@@ -152,8 +152,6 @@ class AuthRepositoryImpl implements AuthRepository {
 
     // A Google account selection alone is not an application session. Only
     // activate the local session after Neon Auth accepts the ID token.
-    await _secureStorageService.clearNeonAuthCookie();
-    await _secureStorageService.saveNeonAuthSessionActive(false);
     final result = await _neonAuthDataSource.signInWithGoogle(
       idToken: idToken,
       accessToken: accessToken,
@@ -165,6 +163,10 @@ class AuthRepositoryImpl implements AuthRepository {
     if (user['banned'] == true) {
       await _neonAuthDataSource.signOut();
       throw StateError('account_unavailable');
+    }
+    if (user['emailVerified'] != true) {
+      await _neonAuthDataSource.signOut();
+      throw StateError('google_email_not_verified');
     }
 
     await _secureStorageService.saveGoogleAccountData(
