@@ -58,7 +58,7 @@ jobs:
           ls "$ANDROID_HOME/ndk" || true
 
       - name: Resolve dependencies
-        run: flutter pub get
+        run: flutter pub get 2>&1 | tee pub-get.log
 
       - name: Prepare SQLite WebAssembly runtime
         run: dart run sqflite_common_ffi_web:setup --force --verbose
@@ -109,7 +109,7 @@ jobs:
           fi
 
       - name: Run tests
-        run: flutter test --no-pub
+        run: flutter test --no-pub 2>&1 | tee flutter-test.log
 
       - name: Verify native SQLite on Android emulator
         uses: reactivecircus/android-emulator-runner@v2
@@ -136,10 +136,10 @@ jobs:
           df -h /
 
       - name: Build Android debug APK
-        run: flutter build apk --debug --no-pub
+        run: flutter build apk --debug --no-pub 2>&1 | tee android-build.log
 
       - name: Build Web release
-        run: flutter build web --release --no-pub
+        run: flutter build web --release --no-pub 2>&1 | tee web-build.log
 
       - name: Upload Android debug APK
         uses: actions/upload-artifact@v4
@@ -156,3 +156,17 @@ jobs:
           path: build/web/
           if-no-files-found: error
           retention-days: 14
+
+      - name: Upload Flutter quality diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-quality-diagnostics
+          path: |
+            pub-get.log
+            flutter-analyze.machine.log
+            flutter-test.log
+            android-build.log
+            web-build.log
+          if-no-files-found: ignore
+          retention-days: 7
