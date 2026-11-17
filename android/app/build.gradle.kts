@@ -9,7 +9,7 @@ android {
 
     namespace = "com.arfatalkamli.academicos"
     compileSdk = flutter.compileSdkVersion
-    // NDK references removed — this project does not use native C++ code.
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         // Required by flutter_local_notifications for Java API desugaring.
@@ -46,6 +46,7 @@ dependencies {
     // Required by flutter_local_notifications for Java API desugaring.
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     implementation("androidx.appcompat:appcompat:1.7.1")
+    implementation("androidx.browser:browser:1.8.0")
 }
 
 flutter {

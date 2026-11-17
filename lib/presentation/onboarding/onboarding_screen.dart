@@ -156,15 +156,15 @@ class _StudentProfileSetupScreenState extends State<StudentProfileSetupScreen> {
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 colors: [
-                                  primary.withOpacity(0.18),
-                                  primary.withOpacity(0.06),
+                                  primary.withValues(alpha: 0.18),
+                                  primary.withValues(alpha: 0.06),
                                 ],
                                 begin: Alignment.topRight,
                                 end: Alignment.bottomLeft,
                               ),
                               borderRadius: BorderRadius.circular(30),
                               border: Border.all(
-                                color: primary.withOpacity(0.25),
+                                color: primary.withValues(alpha: 0.25),
                                 width: 1.2,
                               ),
                             ),
@@ -178,7 +178,7 @@ class _StudentProfileSetupScreenState extends State<StudentProfileSetupScreen> {
                                     gradient: LinearGradient(
                                       colors: [
                                         primary,
-                                        primary.withOpacity(0.75),
+                                        primary.withValues(alpha: 0.75),
                                       ],
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
@@ -198,7 +198,7 @@ class _StudentProfileSetupScreenState extends State<StudentProfileSetupScreen> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'Academic OS',
+                                        'EduNivora',
                                         style: Theme.of(context)
                                             .textTheme
                                             .headlineSmall
@@ -214,7 +214,8 @@ class _StudentProfileSetupScreenState extends State<StudentProfileSetupScreen> {
                                             .textTheme
                                             .bodyLarge
                                             ?.copyWith(
-                                              color: textColor.withOpacity(0.8),
+                                              color:
+                                                  textColor.withValues(alpha: 0.8),
                                               fontSize: 15,
                                             ),
                                       ),
@@ -231,7 +232,7 @@ class _StudentProfileSetupScreenState extends State<StudentProfileSetupScreen> {
                               color: cardColor,
                               borderRadius: BorderRadius.circular(24),
                               border: Border.all(
-                                color: primary.withOpacity(0.12),
+                                color: primary.withValues(alpha: 0.12),
                               ),
                             ),
                             child: Column(
@@ -254,7 +255,8 @@ class _StudentProfileSetupScreenState extends State<StudentProfileSetupScreen> {
                                       .textTheme
                                       .bodyMedium
                                       ?.copyWith(
-                                        color: textColor.withOpacity(0.72),
+                                        color:
+                                            textColor.withValues(alpha: 0.72),
                                         height: 1.6,
                                       ),
                                 ),
@@ -346,7 +348,7 @@ class _StudentProfileSetupScreenState extends State<StudentProfileSetupScreen> {
                               color: cardColor,
                               borderRadius: BorderRadius.circular(24),
                               border: Border.all(
-                                color: primary.withOpacity(0.12),
+                                color: primary.withValues(alpha: 0.12),
                               ),
                             ),
                             child: Column(
@@ -386,7 +388,7 @@ class _StudentProfileSetupScreenState extends State<StudentProfileSetupScreen> {
                                         height: 64,
                                         decoration: BoxDecoration(
                                           color: selected
-                                              ? primary.withOpacity(0.12)
+                                              ? primary.withValues(alpha: 0.12)
                                               : Theme.of(context)
                                                   .scaffoldBackgroundColor,
                                           borderRadius:
@@ -428,7 +430,7 @@ class _StudentProfileSetupScreenState extends State<StudentProfileSetupScreen> {
                                 boxShadow: _isHoveringAction
                                     ? [
                                         BoxShadow(
-                                          color: primary.withOpacity(0.25),
+                                          color: primary.withValues(alpha: 0.25),
                                           blurRadius: 20,
                                           offset: const Offset(0, 8),
                                         ),
@@ -492,7 +494,7 @@ class _StudentProfileSetupScreenState extends State<StudentProfileSetupScreen> {
           fontWeight: FontWeight.w600,
         ),
         prefixIcon: prefix != null
-            ? Icon(prefix, color: primary.withOpacity(0.9))
+            ? Icon(prefix, color: primary.withValues(alpha: 0.9))
             : null,
         filled: true,
         fillColor: Theme.of(context).cardColor,
@@ -501,7 +503,7 @@ class _StudentProfileSetupScreenState extends State<StudentProfileSetupScreen> {
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide(
-            color: primary.withOpacity(0.12),
+            color: primary.withValues(alpha: 0.12),
             width: 1,
           ),
         ),

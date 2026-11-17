@@ -156,7 +156,8 @@ class _AppLockSettingsScreenState extends State<AppLockSettingsScreen> {
             ),
             const SizedBox(height: 24),
             DropdownButtonFormField<int>(
-              value: _lockTimeout,
+              key: ValueKey(_lockTimeout),
+              initialValue: _lockTimeout,
               decoration: const InputDecoration(
                 labelText: 'مهلة القفل (دقائق)',
               ),

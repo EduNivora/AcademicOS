@@ -102,8 +102,9 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
       if (!mounted) return;
       setState(() => _errorMessage = 'فشل تحميل بيانات المقرر.');
     } finally {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -179,6 +180,8 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
       },
     );
 
+    if (!mounted) return;
+
     if (chosen == 'task') {
       await _openTaskEditor();
       return;
@@ -217,12 +220,12 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                             lastDate:
                                 DateTime.now().add(const Duration(days: 3650)),
                           );
-                          if (date == null) return;
+                          if (date == null || !dialogContext.mounted) return;
                           final time = await showTimePicker(
                             context: dialogContext,
                             initialTime: TimeOfDay.fromDateTime(selectedDate),
                           );
-                          if (time == null) return;
+                          if (time == null || !dialogContext.mounted) return;
                           setStateDialog(() {
                             selectedDate = DateTime(
                               date.year,
@@ -277,7 +280,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
         },
       );
 
-      if (confirmed != true) return;
+      if (confirmed != true || !mounted) return;
       final title = titleController.text.trim();
       if (title.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -483,7 +486,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(

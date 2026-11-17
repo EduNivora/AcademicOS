@@ -77,8 +77,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _errorMessage = error.toString().contains('409')
             ? 'هذا البريد مسجل بالفعل. جرّب تسجيل الدخول.'
             : 'تعذّر إنشاء الحساب أو إرسال رسالة التحقق. تحقق من اتصالك وحاول مجدداً.';
-        _isLoading = false;
       });
+    } finally {
+      if (mounted && _isLoading) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 

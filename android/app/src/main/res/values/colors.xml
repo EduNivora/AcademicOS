@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="edunivora_splash_bg">#0B1220</color>
+    <color name="edunivora_icon_bg_start">#0B1220</color>
+    <color name="edunivora_icon_bg_center">#1E1B4B</color>
+    <color name="edunivora_icon_bg_end">#2563EB</color>
+</resources>

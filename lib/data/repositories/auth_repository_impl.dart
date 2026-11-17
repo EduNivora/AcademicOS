@@ -1,5 +1,3 @@
-import 'package:google_sign_in/google_sign_in.dart';
-
 import '../../core/security/auth_secure_storage_service.dart';
 import '../../domain/entities/user_entity.dart';
 import '../../domain/repositories/auth_repository.dart';
@@ -126,39 +124,38 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<bool> loginWithGoogle() async {
-    final account = await _googleDataSource.signIn();
-    if (account == null) return false;
-    return _completeGoogleSignIn(account);
-  }
+    final oauthResult =
+        await _googleDataSource.authenticateWithNeon(_neonAuthDataSource);
 
-  @override
-  Future<bool> loginWithCachedGoogleAccount() async {
-    final account = await _googleDataSource.signInSilently();
-    if (account == null) return false;
-    return _completeGoogleSignIn(account);
-  }
-
-  Future<bool> _completeGoogleSignIn(
-    GoogleSignInAccount account,
-  ) async {
-    final authentication = await account.authentication;
-    final idToken = authentication.idToken;
-    final accessToken = authentication.accessToken;
-    if (idToken == null || idToken.isEmpty) {
-      throw StateError(
-        'Google did not return an ID token. Check GOOGLE_SERVER_CLIENT_ID.',
-      );
+    if (oauthResult.status == GoogleOAuthStatus.cancelled) {
+      return false;
+    }
+    if (oauthResult.status != GoogleOAuthStatus.verifierReceived ||
+        oauthResult.verifier == null ||
+        oauthResult.verifier!.isEmpty) {
+      throw StateError(oauthResult.errorCode ?? 'google_oauth_failed');
     }
 
-    // A Google account selection alone is not an application session. Only
-    // activate the local session after Neon Auth accepts the ID token.
-    final result = await _neonAuthDataSource.signInWithGoogle(
-      idToken: idToken,
-      accessToken: accessToken,
+    // Never treat the arrival of a callback/deep link as authentication.
+    // Exchange the one-time verifier with Neon Auth and verify the resulting
+    // session cookie before activating any local session state.
+    final exchangeResult = await _neonAuthDataSource.completeOAuthSession(
+      verifier: oauthResult.verifier!,
+      challengeCookieHeader: oauthResult.challengeCookieHeader ?? '',
+      origin: oauthResult.origin ?? '',
     );
-    final user = result['user'];
-    if (result['redirect'] != false || user is! Map) {
-      throw StateError('Neon Auth did not create a Google session.');
+
+    final persistedCookie = await _secureStorageService.getNeonAuthCookie();
+    if (persistedCookie == null || persistedCookie.isEmpty) {
+      await _secureStorageService.clearNeonAuthCookie();
+      throw StateError('neon_session_cookie_missing');
+    }
+
+    final verifiedSession = await _neonAuthDataSource.getSession();
+    final user = verifiedSession?['user'] ?? exchangeResult['user'];
+    if (verifiedSession == null || user is! Map) {
+      await _neonAuthDataSource.signOut();
+      throw StateError('neon_session_verification_failed');
     }
     if (user['banned'] == true) {
       await _neonAuthDataSource.signOut();
@@ -169,15 +166,29 @@ class AuthRepositoryImpl implements AuthRepository {
       throw StateError('google_email_not_verified');
     }
 
-    await _secureStorageService.saveGoogleAccountData(
-      id: account.id,
-      email: account.email,
-      name: account.displayName ?? account.email,
-    );
-    await _secureStorageService.saveAuthUsername(account.email);
+    final email = (user['email']?.toString() ?? '').trim().toLowerCase();
+    final id = user['id']?.toString() ?? email;
+    final name = (user['name']?.toString() ?? '').trim();
+
+    if (email.isNotEmpty) {
+      await _secureStorageService.saveGoogleAccountData(
+        id: id,
+        email: email,
+        name: name.isNotEmpty ? name : email,
+      );
+      await _secureStorageService.saveAuthUsername(email);
+    }
     await _secureStorageService.saveNeonAuthSessionActive(true);
     await _secureStorageService.saveAuthSessionActive(true);
     return true;
+  }
+
+  @override
+  Future<bool> loginWithCachedGoogleAccount() async {
+    // Active Neon Auth sessions are restored by isLoggedIn() from the verified
+    // session cookie in secure storage. Do not trigger silent legacy Google
+    // Sign-In outside Neon Auth.
+    return false;
   }
 
   @override

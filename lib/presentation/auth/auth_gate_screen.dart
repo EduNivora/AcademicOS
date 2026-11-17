@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import '../../core/config/edunivora_identity.dart';
 import '../../core/platform/app_platform.dart';
 import '../../core/security/app_lock_service.dart';
 import '../../core/security/auth_secure_storage_service.dart';
 import '../../core/security/local_auth_service.dart';
+import '../../core/widgets/edunivora_ui.dart';
 import '../../domain/usecases/auth_use_cases.dart';
 import '../../domain/usecases/course_use_cases.dart';
 import '../../domain/usecases/task_use_cases.dart';
@@ -54,8 +56,7 @@ class _AuthGateScreenState extends State<AuthGateScreen> {
 
   Future<void> _checkAuthentication() async {
     try {
-      final logoutRequired =
-          await _secureStorageService.isAuthLogoutRequired();
+      final logoutRequired = await _secureStorageService.isAuthLogoutRequired();
       if (logoutRequired) {
         if (!mounted) return;
         setState(() {
@@ -90,8 +91,10 @@ class _AuthGateScreenState extends State<AuthGateScreen> {
         return;
       }
 
-      final cachedGoogle =
-          await widget.authUseCases.loginWithCachedGoogleAccount.call();
+      final cachedGoogle = await widget
+          .authUseCases
+          .loginWithCachedGoogleAccount
+          .call();
       if (!mounted) return;
       final locked = cachedGoogle
           ? (await _appLockService?.shouldLockApp() ?? false)
@@ -156,8 +159,45 @@ class _AuthGateScreenState extends State<AuthGateScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const EduBrandMark(size: 84, borderRadius: 24),
+                  const SizedBox(height: 18),
+                  Text(
+                    EdunivoraIdentity.appName,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    EdunivoraIdentity.officialTagline,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(strokeWidth: 2.8),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
     }
 
     if (_authStateUnavailable) {
@@ -171,31 +211,33 @@ class _AuthGateScreenState extends State<AuthGateScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
-                      Icons.lock_outline_rounded,
-                      size: 48,
-                    ),
+                    const Icon(Icons.lock_outline_rounded, size: 48),
                     const SizedBox(height: 16),
-                    const Text(
-                      'تعذّر التحقق من حالة الدخول',
+                    Text(
+                      widget.isArabic
+                          ? 'تعذّر التحقق من حالة الدخول'
+                          : 'Unable to verify sign-in state',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 10),
-                    const Text(
-                      'لم نتمكن من قراءة بيانات المصادقة الآمنة. '
-                      'أوقفنا الوصول إلى المساحة الأكاديمية حتى لا نعرض '
-                      'بيانات جلسة سابقة بالخطأ.',
+                    Text(
+                      widget.isArabic
+                          ? 'لم نتمكن من قراءة بيانات المصادقة الآمنة. '
+                                'أوقفنا الوصول إلى المساحة الأكاديمية حتى لا نعرض '
+                                'بيانات جلسة سابقة بالخطأ.'
+                          : 'We could not read secure authentication state. '
+                                'Access to the academic workspace is paused to protect your session.',
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 20),
                     FilledButton.icon(
                       onPressed: _retryAuthentication,
                       icon: const Icon(Icons.refresh_rounded),
-                      label: const Text('إعادة المحاولة'),
+                      label: Text(widget.isArabic ? 'إعادة المحاولة' : 'Retry'),
                     ),
                   ],
                 ),

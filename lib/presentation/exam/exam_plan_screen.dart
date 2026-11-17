@@ -126,7 +126,7 @@ class _ExamPlanScreenState extends ConsumerState<ExamPlanScreen> {
       firstDate: now.subtract(const Duration(days: 3650)),
       lastDate: now.add(const Duration(days: 3650)),
     );
-    if (date == null) return;
+    if (date == null || !mounted) return;
     final time = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(initialDate),
@@ -170,7 +170,7 @@ class _ExamPlanScreenState extends ConsumerState<ExamPlanScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       DropdownButtonFormField<int?>(
-                        value: selectedCourse,
+                        initialValue: selectedCourse,
                         decoration: const InputDecoration(labelText: 'المادة'),
                         items: [
                           const DropdownMenuItem<int?>(
@@ -251,7 +251,7 @@ class _ExamPlanScreenState extends ConsumerState<ExamPlanScreen> {
       },
     );
 
-    if (shouldSave != true) return;
+    if (shouldSave != true || !mounted) return;
     final title = controllerTitle.text.trim();
     if (title.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(

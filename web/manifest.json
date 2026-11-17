@@ -1,11 +1,11 @@
 {
-    "name": "academic_os",
-    "short_name": "academic_os",
+    "name": "EduNivora",
+    "short_name": "EduNivora",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0B1220",
+    "theme_color": "#5B6CFF",
+    "description": "EduNivora — The Intelligent Academic Ecosystem",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

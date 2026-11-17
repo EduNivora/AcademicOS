@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import '../models/academic_term_model.dart';
@@ -45,11 +44,24 @@ class DatabaseHelper {
   static const String scheduleTable = 'schedule';
 
   Database? _database;
+  Future<Database>? _openingDatabase;
 
   Future<Database> get database async {
     if (_database != null && _database!.isOpen) return _database!;
-    _database = await _initDatabase();
-    return _database!;
+    final inFlight = _openingDatabase;
+    if (inFlight != null) return inFlight;
+
+    final openFuture = _initDatabase();
+    _openingDatabase = openFuture;
+    try {
+      final db = await openFuture;
+      _database = db;
+      return db;
+    } finally {
+      if (identical(_openingDatabase, openFuture)) {
+        _openingDatabase = null;
+      }
+    }
   }
 
   Future<Database> _initDatabase() async {
@@ -58,9 +70,7 @@ class DatabaseHelper {
         _webFactoryInitialized = _initializeWebFactory();
       }
 
-      if (!kIsWeb &&
-          _shouldUseNativeFactory() &&
-          !_nativeFactoryInitialized) {
+      if (!kIsWeb && _shouldUseNativeFactory() && !_nativeFactoryInitialized) {
         _nativeFactoryInitialized = _initializeNativeFactory();
       }
     } catch (error, stackTrace) {
@@ -71,6 +81,9 @@ class DatabaseHelper {
     }
 
     final dbPath = await getDatabasesPath();
+    if (!kIsWeb) {
+      await Directory(dbPath).create(recursive: true);
+    }
     final path = join(dbPath, _databaseName);
 
     // Never replace persistent storage with an in-memory database.
@@ -89,7 +102,9 @@ class DatabaseHelper {
   Future<void> _migrateLegacyMaterialFiles(Database db) async {
     if (kIsWeb) return;
 
-    final legacyRoot = Directory(join(Directory.systemTemp.path, 'academic_os_materials'));
+    final legacyRoot = Directory(
+      join(Directory.systemTemp.path, 'academic_os_materials'),
+    );
     if (!await legacyRoot.exists()) return;
 
     String canonicalRoot;
@@ -118,7 +133,9 @@ class DatabaseHelper {
         final canonicalFile = await source.resolveSymbolicLinks();
         if (!isWithin(canonicalRoot, canonicalFile) ||
             canonicalFile == canonicalRoot) {
-          debugPrint('Rejected legacy attachment outside owned temporary root: $id');
+          debugPrint(
+            'Rejected legacy attachment outside owned temporary root: $id',
+          );
           continue;
         }
 
@@ -126,10 +143,7 @@ class DatabaseHelper {
         if (bytes.isEmpty || bytes.length > 50 * 1024 * 1024) continue;
         final migrated = await db.update(
           _materialsTable,
-          {
-            'file_bytes': bytes,
-            'file_path': 'dbblob://legacy-$id',
-          },
+          {'file_bytes': bytes, 'file_path': 'dbblob://legacy-$id'},
           where: 'id = ? AND file_bytes IS NULL',
           whereArgs: [id],
         );
@@ -145,8 +159,26 @@ class DatabaseHelper {
 
   Future<void> _onConfigure(Database db) async {
     await db.execute('PRAGMA foreign_keys = ON');
-    await db.execute('PRAGMA journal_mode = WAL');
+    // PRAGMA journal_mode = WAL returns a result row. On Android's native
+    // SQLiteDatabase.execSQL (used by sqflite's execute()), any statement that
+    // returns rows throws SQLiteException. Use rawQuery() and guard gracefully
+    // so devices or storage modes that restrict WAL in onConfigure stay usable.
+    try {
+      await db.rawQuery('PRAGMA journal_mode = WAL');
+    } catch (error) {
+      debugPrint('SQLite WAL journal mode could not be enabled: $error');
+    }
   }
+
+  @visibleForTesting
+  Future<void> configureDatabaseForTest(Database db) => _onConfigure(db);
+
+  @visibleForTesting
+  Future<void> upgradeDatabaseForTest(
+    Database db,
+    int oldVersion,
+    int newVersion,
+  ) => _onUpgradeDatabase(db, oldVersion, newVersion);
 
   Future<void> _ensureColumn(
     Database db,
@@ -277,43 +309,6 @@ class DatabaseHelper {
     int oldVersion,
     int newVersion,
   ) async {
-    if (oldVersion < 10) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS $_materialsTable (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          course_id INTEGER NOT NULL,
-          title TEXT NOT NULL,
-          file_path TEXT NOT NULL,
-          file_type TEXT NOT NULL,
-          created_at TEXT
-        )
-      ''');
-    }
-    if (oldVersion < 11) {
-      await _ensureColumn(db, _materialsTable, 'file_bytes', 'BLOB');
-    }
-    if (oldVersion < 12) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS academic_terms (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL,
-          start_date TEXT NOT NULL,
-          end_date TEXT NOT NULL,
-          is_active INTEGER NOT NULL DEFAULT 0,
-          created_at TEXT NOT NULL,
-          CHECK (length(trim(name)) BETWEEN 1 AND 80),
-          CHECK (start_date <= end_date)
-        )
-      ''');
-      await db.execute(
-        'CREATE UNIQUE INDEX IF NOT EXISTS idx_academic_terms_name '
-        'ON academic_terms(name COLLATE NOCASE)',
-      );
-      await db.execute(
-        'CREATE UNIQUE INDEX IF NOT EXISTS idx_academic_terms_single_active '
-        'ON academic_terms(is_active) WHERE is_active = 1',
-      );
-    }
     if (oldVersion < 2) {
       await _ensureColumn(
         db,
@@ -390,12 +385,7 @@ class DatabaseHelper {
       );
       await _ensureColumn(db, _taskTable, 'start_date_time', 'TEXT');
       await _ensureColumn(db, _taskTable, 'end_date_time', 'TEXT');
-      await _ensureColumn(
-        db,
-        _taskTable,
-        'notes',
-        "TEXT NOT NULL DEFAULT ''",
-      );
+      await _ensureColumn(db, _taskTable, 'notes', "TEXT NOT NULL DEFAULT ''");
     }
     if (oldVersion < 7) {
       await db.execute(
@@ -433,6 +423,43 @@ class DatabaseHelper {
         )
       ''');
     }
+    if (oldVersion < 10) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS $_materialsTable (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          course_id INTEGER NOT NULL,
+          title TEXT NOT NULL,
+          file_path TEXT NOT NULL,
+          file_type TEXT NOT NULL,
+          created_at TEXT
+        )
+      ''');
+    }
+    if (oldVersion < 11) {
+      await _ensureColumn(db, _materialsTable, 'file_bytes', 'BLOB');
+    }
+    if (oldVersion < 12) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS academic_terms (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          start_date TEXT NOT NULL,
+          end_date TEXT NOT NULL,
+          is_active INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL,
+          CHECK (length(trim(name)) BETWEEN 1 AND 80),
+          CHECK (start_date <= end_date)
+        )
+      ''');
+      await db.execute(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_academic_terms_name '
+        'ON academic_terms(name COLLATE NOCASE)',
+      );
+      await db.execute(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_academic_terms_single_active '
+        'ON academic_terms(is_active) WHERE is_active = 1',
+      );
+    }
 
     await _ensureColumn(
       db,
@@ -441,30 +468,10 @@ class DatabaseHelper {
       'INTEGER NOT NULL DEFAULT 15',
     );
 
-    await _ensureColumn(
-      db,
-      _courseTable,
-      'mid_grade',
-      'REAL DEFAULT 0',
-    );
-    await _ensureColumn(
-      db,
-      _courseTable,
-      'practical_grade',
-      'REAL DEFAULT 0',
-    );
-    await _ensureColumn(
-      db,
-      _courseTable,
-      'final_grade',
-      'REAL DEFAULT 0',
-    );
-    await _ensureColumn(
-      db,
-      _courseTable,
-      'credit_hours',
-      'INTEGER DEFAULT 3',
-    );
+    await _ensureColumn(db, _courseTable, 'mid_grade', 'REAL DEFAULT 0');
+    await _ensureColumn(db, _courseTable, 'practical_grade', 'REAL DEFAULT 0');
+    await _ensureColumn(db, _courseTable, 'final_grade', 'REAL DEFAULT 0');
+    await _ensureColumn(db, _courseTable, 'credit_hours', 'INTEGER DEFAULT 3');
   }
 
   /// Replaces all student academic records as one atomic database operation.
@@ -485,8 +492,10 @@ class DatabaseHelper {
       // materials only when their course references remain valid.
       if (materials == null) {
         final currentMaterials = await txn.query(_materialsTable);
-        final incomingCourseIds =
-            courses.map((course) => course.id).whereType<int>().toSet();
+        final incomingCourseIds = courses
+            .map((course) => course.id)
+            .whereType<int>()
+            .toSet();
         final hasOrphanedMaterial = currentMaterials.any((material) {
           final courseId = material['course_id'];
           return courseId is! int || !incomingCourseIds.contains(courseId);
@@ -499,13 +508,15 @@ class DatabaseHelper {
         }
       }
 
-      if (materials != null && materials.any((material) => material.fileBytes == null)) {
+      if (materials != null &&
+          materials.any((material) => material.fileBytes == null)) {
         final existingRows = await txn.query(
           _materialsTable,
           columns: ['file_bytes'],
         );
         final wouldDiscardStoredBytes = existingRows.any(
-          (row) => row['file_bytes'] is List<int> &&
+          (row) =>
+              row['file_bytes'] is List<int> &&
               (row['file_bytes'] as List<int>).isNotEmpty,
         );
         if (wouldDiscardStoredBytes) {
@@ -570,7 +581,6 @@ class DatabaseHelper {
     final db = await database;
     return db.query(_materialsTable, orderBy: 'created_at DESC');
   }
-
 
   /// Returns all student-defined academic terms in chronological order.
   Future<List<AcademicTermModel>> getAcademicTerms() async {
@@ -654,10 +664,7 @@ class DatabaseHelper {
   Future<void> setActiveAcademicTerm(int id) async {
     final db = await database;
     await db.transaction((txn) async {
-      await txn.update(
-        'academic_terms',
-        {'is_active': 0},
-      );
+      await txn.update('academic_terms', {'is_active': 0});
       final selected = await txn.update(
         'academic_terms',
         {'is_active': 1},
@@ -694,15 +701,12 @@ class DatabaseHelper {
           'لا يمكن حذف هذا الفصل لأنه مرتبط بمقررات. انقل المقررات إلى فصل آخر أولاً.',
         );
       }
-      return txn.delete(
-        'academic_terms',
-        where: 'id = ?',
-        whereArgs: [id],
-      );
+      return txn.delete('academic_terms', where: 'id = ?', whereArgs: [id]);
     });
   }
 
   Future<void> close() async {
+    _openingDatabase = null;
     if (_database != null && _database!.isOpen) {
       await _database!.close();
       _database = null;
@@ -885,17 +889,23 @@ class DatabaseHelper {
   // Course materials CRUD
   Future<int> insertMaterial(Map<String, dynamic> material) async {
     final db = await database;
-    return await db.insert(_materialsTable, material,
-        conflictAlgorithm: ConflictAlgorithm.replace);
+    return await db.insert(
+      _materialsTable,
+      material,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   Future<List<Map<String, dynamic>>> getMaterialsByCourseId(
-      int courseId) async {
+    int courseId,
+  ) async {
     final db = await database;
-    return await db.query(_materialsTable,
-        where: 'course_id = ?',
-        whereArgs: [courseId],
-        orderBy: 'created_at DESC');
+    return await db.query(
+      _materialsTable,
+      where: 'course_id = ?',
+      whereArgs: [courseId],
+      orderBy: 'created_at DESC',
+    );
   }
 
   Future<int> deleteMaterial(int id) async {

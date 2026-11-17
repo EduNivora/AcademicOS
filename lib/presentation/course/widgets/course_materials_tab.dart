@@ -27,6 +27,7 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
     setState(() => _isLoading = true);
     final rows =
         await DatabaseHelper.instance.getMaterialsByCourseId(widget.courseId);
+    if (!mounted) return;
     setState(() {
       _materials = rows.map(CourseMaterialModel.fromMap).toList();
       _isLoading = false;
@@ -39,7 +40,7 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
       allowedExtensions: ['pdf', 'doc', 'docx', 'txt'],
       withData: true,
     );
-    if (result == null) return;
+    if (result == null || !mounted) return;
     final file = result.files.first;
     final bytes = file.bytes;
     if (bytes == null || bytes.isEmpty) {

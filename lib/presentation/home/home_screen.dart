@@ -21,7 +21,10 @@ import '../../core/widgets/academic_scaffold_background.dart';
 import '../auth/auth_gate_screen.dart';
 import '../auth/pin_lock_screen.dart';
 import '../ai_assistant/academic_ai_screen.dart';
+import '../about/about_app_screen.dart';
 import '../about/about_screen.dart';
+import '../about/help_center_screen.dart';
+import '../settings/settings_screen.dart';
 import '../course/add_edit_course_screen.dart';
 import '../course/course_detail_screen.dart';
 import '../course/course_list_screen.dart';
@@ -672,10 +675,11 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
   void _showAboutDialog(BuildContext context) {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
+    final isAr = widget.isArabic;
 
     showDialog<void>(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return AlertDialog(
           backgroundColor: theme.cardColor,
           shape:
@@ -691,28 +695,37 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                     children: [
                       CircleAvatar(
                         radius: 28,
-                        backgroundColor: primary.withOpacity(0.12),
-                        child: Icon(Icons.school, size: 40, color: primary),
+                        backgroundColor: primary.withValues(alpha: 0.12),
+                        child: Icon(Icons.school, size: 36, color: primary),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Academic OS',
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                    fontSize: 20, fontWeight: FontWeight.bold)),
+                            Text(
+                              'EduNivora',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                             const SizedBox(height: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 6),
+                                horizontal: 8,
+                                vertical: 5,
+                              ),
                               decoration: BoxDecoration(
-                                color: primary.withOpacity(0.08),
+                                color: primary.withValues(alpha: 0.08),
                                 borderRadius: BorderRadius.circular(999),
                               ),
-                              child: const Text(
-                                  'الإصدار 1.0.0 (Offline-First Edition)',
-                                  style: TextStyle(fontSize: 12)),
+                              child: Text(
+                                isAr
+                                    ? 'الإصدار 1.0.0+2 (Offline-First)'
+                                    : 'Version 1.0.0+2 (Offline-First)',
+                                style: const TextStyle(fontSize: 12),
+                              ),
                             ),
                           ],
                         ),
@@ -721,62 +734,139 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Academic OS هي بيئة تشغيل وإنتاجية أكاديمية متكاملة مصممة خصيصاً لطلاب الجامعات لتنظيم وإدارة مسيرتهم الدراسية بكفاءة واحترافية، وجمع كافة الأدوات الأكاديمية في منصة واحدة تعمل دون اتصال بالإنترنت مع خصوصية تامة.',
+                    isAr
+                        ? 'EduNivora هي بيئة تشغيل وإنتاجية أكاديمية متكاملة مصممة خصيصاً لطلاب الجامعات لتنظيم وإدارة مسيرتهم الدراسية بكفاءة واحترافية، وجمع كافة الأدوات الأكاديمية في منصة واحدة تعمل دون اتصال بالإنترنت مع خصوصية تامة.'
+                        : 'EduNivora is an all-in-one offline-first academic productivity platform crafted for university students to manage courses, tasks, schedules, grades, and focus sessions with full privacy.',
                     style: theme.textTheme.bodyMedium,
                   ),
-                  const SizedBox(height: 12),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 14),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(children: [
                         const Text('📚  ', style: TextStyle(fontSize: 18)),
                         Expanded(
-                            child: Text(
-                                'إدارة المقررات: متابعة تفاصيل المواد، المحاضرين، والساعات المعتمدة.'))
+                          child: Text(
+                            isAr
+                                ? 'إدارة المقررات: متابعة تفاصيل المواد، المحاضرين، والساعات المعتمدة.'
+                                : 'Courses: track subjects, instructors, materials, and credits.',
+                          ),
+                        ),
                       ]),
                       const SizedBox(height: 8),
                       Row(children: [
                         const Text('📝  ', style: TextStyle(fontSize: 18)),
                         Expanded(
-                            child: Text(
-                                'إدارة المهام: تنظيم الواجبات والتكاليف ومواعيد التسليم حسب الأولوية.'))
+                          child: Text(
+                            isAr
+                                ? 'إدارة المهام: تنظيم الواجبات والتكاليف ومواعيد التسليم حسب الأولوية.'
+                                : 'Tasks: organize assignments and deadlines by priority.',
+                          ),
+                        ),
                       ]),
                       const SizedBox(height: 8),
                       Row(children: [
                         const Text('📅  ', style: TextStyle(fontSize: 18)),
                         Expanded(
-                            child: Text(
-                                'الجدول الدراسي: تتبع أوقات المحاضرات، القاعات والمعامل، والمحاضرات النشطة.'))
+                          child: Text(
+                            isAr
+                                ? 'الجدول الدراسي: تتبع أوقات المحاضرات، القاعات والمعامل، والمحاضرات النشطة.'
+                                : 'Weekly Schedule: track lecture times, rooms, and active sessions.',
+                          ),
+                        ),
                       ]),
                       const SizedBox(height: 8),
                       Row(children: [
                         const Text('📊  ', style: TextStyle(fontSize: 18)),
                         Expanded(
-                            child: Text(
-                                'توزيع الدرجات والمعدل: رصد درجات النظري والعملي واحتساب المعدل الفعلي ومؤشرات التقدم.'))
+                          child: Text(
+                            isAr
+                                ? 'توزيع الدرجات والمعدل: رصد درجات النظري والعملي واحتساب المعدل الفعلي ومؤشرات التقدم.'
+                                : 'Grades & GPA: track scores and calculate your GPA progress.',
+                          ),
+                        ),
                       ]),
                       const SizedBox(height: 8),
                       Row(children: [
                         const Text('⏱️  ', style: TextStyle(fontSize: 18)),
                         Expanded(
-                            child: Text(
-                                'أدوات الإنتاجية: جلسات التركيز والتقارير الأكاديمية المحلية.'))
+                          child: Text(
+                            isAr
+                                ? 'أدوات الإنتاجية: جلسات التركيز والتقارير الأكاديمية المحلية.'
+                                : 'Productivity: focus sessions and local academic reports.',
+                          ),
+                        ),
                       ]),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  Text('تطوير: عرفات عبدالله حسين الكاملي',
-                      style: theme.textTheme.bodySmall),
-                  Text('التخصص: أمن سيبراني وشبكات',
-                      style: theme.textTheme.bodySmall),
-                  const SizedBox(height: 16),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('إغلاق'),
+                  const SizedBox(height: 14),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: primary.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: primary.withValues(alpha: 0.16),
+                      ),
                     ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isAr
+                              ? 'تأسيس وتطوير: محمد غالب العصيمي وعرفات الكاملي'
+                              : 'Founders & Developers: Mohammed Ghaleb Alaosimi & Arfat Alkamly',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'EduNivora\nFounded & Developed by\nMohammed Ghaleb Alaosimi & Arfat Alkamly',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.end,
+                    children: [
+                      TextButton.icon(
+                        onPressed: () {
+                          Navigator.pop(dialogContext);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const AboutAppScreen(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.info_outline_rounded, size: 18),
+                        label: Text(isAr ? 'عن التطبيق' : 'About App'),
+                      ),
+                      TextButton.icon(
+                        onPressed: () {
+                          Navigator.pop(dialogContext);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const AboutScreen(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.groups_rounded, size: 18),
+                        label:
+                            Text(isAr ? 'الفريق والمؤسسون' : 'Team & Founders'),
+                      ),
+                      OutlinedButton(
+                        onPressed: () => Navigator.pop(dialogContext),
+                        child: Text(isAr ? 'إغلاق' : 'Close'),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1028,7 +1118,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'مرحباً بك في Academic OS',
+                  widget.isArabic
+                      ? 'مرحباً بك في EduNivora'
+                      : 'Welcome to EduNivora',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
@@ -1998,7 +2090,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                     Text(
                       _studentProfile.fullName.isNotEmpty
                           ? _studentProfile.fullName
-                          : 'Academic OS',
+                          : 'EduNivora',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -2158,7 +2250,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                       Text(
                         _studentProfile.fullName.isNotEmpty
                             ? _studentProfile.fullName
-                            : 'Academic OS',
+                            : 'EduNivora',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 20,
@@ -2372,7 +2464,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                 ),
                 const SizedBox(height: 8),
                 _buildDrawerSection(
-                  title: 'إدارة الحساب',
+                  title: widget.isArabic ? 'إدارة الحساب' : 'Account',
                   items: [
                     _DrawerItem(
                       icon: Icons.person_2_rounded,
@@ -2390,19 +2482,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                       onTap: () {
                         Navigator.pop(context);
                         _showProfileEditor();
-                      },
-                    ),
-                    _DrawerItem(
-                      icon: Icons.info_rounded,
-                      label: widget.isArabic ? 'عن المطور' : 'About developer',
-                      onTap: () {
-                        Navigator.pop(context);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const AboutScreen(),
-                          ),
-                        );
                       },
                     ),
                     _DrawerItem(
@@ -2448,7 +2527,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                 ),
                 const SizedBox(height: 8),
                 _buildDrawerSection(
-                  title: 'التفضيلات والنظام',
+                  title: widget.isArabic
+                      ? 'التفضيلات والنظام'
+                      : 'Preferences & System',
                   items: [
                     _DrawerSwitchItem(
                       icon: Icons.dark_mode_rounded,
@@ -2462,23 +2543,66 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                       value: widget.isArabic,
                       onChanged: widget.onLanguageChanged,
                     ),
-                    ListTile(
-                      dense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                      leading: const Icon(Icons.info_outline, size: 22),
-                      title: const Text(
-                        'عن النظام والمنظومة',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w600, fontSize: 15),
-                      ),
-                      subtitle: const Text(
-                        'نبذة عن Academic OS ورؤيته الأكاديمية',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                      trailing: const Icon(Icons.chevron_left, size: 18),
+                    _DrawerItem(
+                      icon: Icons.settings_rounded,
+                      label: widget.isArabic ? 'الإعدادات' : 'Settings',
                       onTap: () {
                         Navigator.pop(context);
-                        _showAboutDialog(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => SettingsScreen(
+                              isDarkMode: widget.isDarkMode,
+                              onThemeChanged: widget.onThemeChanged,
+                              isArabic: widget.isArabic,
+                              onLanguageChanged: widget.onLanguageChanged,
+                              appLockService: _appLockService,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    _DrawerItem(
+                      icon: Icons.info_outline_rounded,
+                      label: widget.isArabic
+                          ? 'عن تطبيق EduNivora'
+                          : 'About EduNivora',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AboutAppScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    _DrawerItem(
+                      icon: Icons.groups_rounded,
+                      label: widget.isArabic
+                          ? 'الفريق والمؤسسون'
+                          : 'Team & Founders',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AboutScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    _DrawerItem(
+                      icon: Icons.help_outline_rounded,
+                      label: widget.isArabic ? 'مركز المساعدة' : 'Help Center',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const HelpCenterScreen(),
+                          ),
+                        );
                       },
                     ),
                   ],
@@ -2684,8 +2808,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                                   ),
                                   _buildServiceCard(
                                     icon: Icons.timer_outlined,
-                                    title: 'وضع التركيز',
-                                    subtitle: 'جلسات بومودورو',
+                                    title: widget.isArabic ? 'وضع التركيز' : 'Focus Mode',
+                                    subtitle: widget.isArabic ? 'جلسات بومودورو' : 'Pomodoro sessions',
                                     onTap: () {
                                       Navigator.push(
                                         context,
@@ -2698,8 +2822,10 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                                   ),
                                   _buildServiceCard(
                                     icon: Icons.menu_book_outlined,
-                                    title: 'الكورسات',
-                                    subtitle: 'المقررات والمواد الدراسية',
+                                    title: widget.isArabic ? 'الكورسات' : 'Courses',
+                                    subtitle: widget.isArabic
+                                        ? 'المقررات والمواد الدراسية'
+                                        : 'Subjects & study materials',
                                     onTap: () {
                                       Navigator.push(
                                         context,
@@ -2717,8 +2843,10 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                                   ),
                                   _buildServiceCard(
                                     icon: Icons.smart_toy_outlined,
-                                    title: 'المساعد الذكي',
-                                    subtitle: 'خطة ذكية ومشورة أكاديمية',
+                                    title: widget.isArabic ? 'المساعد الذكي' : 'Smart Assistant',
+                                    subtitle: widget.isArabic
+                                        ? 'خطة ذكية ومشورة أكاديمية'
+                                        : 'Study plan & academic tips',
                                     onTap: () {
                                       Navigator.push(
                                         context,
@@ -2734,8 +2862,10 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                                   ),
                                   _buildServiceCard(
                                     icon: Icons.calendar_month_outlined,
-                                    title: 'الفصول الدراسية',
-                                    subtitle: 'إنشاء الفصول وتحديد الفصل النشط',
+                                    title: widget.isArabic ? 'الفصول الدراسية' : 'Academic Terms',
+                                    subtitle: widget.isArabic
+                                        ? 'إنشاء الفصول وتحديد الفصل النشط'
+                                        : 'Manage & activate terms',
                                     onTap: () {
                                       Navigator.push(
                                         context,
@@ -2748,8 +2878,10 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                                   ),
                                   _buildServiceCard(
                                     icon: Icons.auto_stories_outlined,
-                                    title: 'خطة المذاكرة',
-                                    subtitle: 'خطة أسبوعية للمواد',
+                                    title: widget.isArabic ? 'خطة المذاكرة' : 'Study Planner',
+                                    subtitle: widget.isArabic
+                                        ? 'خطة أسبوعية للمواد'
+                                        : 'Weekly study plan',
                                     onTap: () {
                                       Navigator.push(
                                         context,
@@ -2764,8 +2896,10 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                                   ),
                                   _buildServiceCard(
                                     icon: Icons.assessment_outlined,
-                                    title: 'التقارير الأكاديمية',
-                                    subtitle: 'ملخص الأداء والمهام والاختبارات',
+                                    title: widget.isArabic ? 'التقارير الأكاديمية' : 'Academic Reports',
+                                    subtitle: widget.isArabic
+                                        ? 'ملخص الأداء والمهام والاختبارات'
+                                        : 'Performance & progress summary',
                                     onTap: () {
                                       Navigator.push(
                                         context,
@@ -2778,8 +2912,10 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                                   ),
                                   _buildServiceCard(
                                     icon: Icons.notifications_active_outlined,
-                                    title: 'التذكيرات',
-                                    subtitle: 'مهام قادمة ومواعيدك',
+                                    title: widget.isArabic ? 'التذكيرات' : 'Reminders',
+                                    subtitle: widget.isArabic
+                                        ? 'مهام قادمة ومواعيدك'
+                                        : 'Upcoming tasks & deadlines',
                                     onTap: () {
                                       Navigator.push(
                                         context,
@@ -2829,7 +2965,11 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                                             padding: const EdgeInsets.symmetric(
                                                 horizontal: 24),
                                             child: Text(
-                                              '${tasks.length} ${widget.isArabic ? 'مهمة' : 'task'}${tasks.length == 1 ? '' : widget.isArabic ? 'ات' : 's'}',
+                                              widget.isArabic
+                                                  ? (tasks.length == 1
+                                                      ? 'مهمة واحدة'
+                                                      : '${tasks.length} مهام')
+                                                  : '${tasks.length} ${tasks.length == 1 ? 'task' : 'tasks'}',
                                               style: TextStyle(
                                                   color: Theme.of(context)
                                                       .textTheme
@@ -2857,7 +2997,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
             borderRadius: BorderRadius.circular(22),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.08),
+                color: Colors.black.withValues(alpha: 0.08),
                 blurRadius: 16,
                 offset: const Offset(0, 8),
               ),
@@ -2870,45 +3010,48 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
               backgroundColor: Theme.of(context).cardColor,
               surfaceTintColor: Colors.transparent,
               selectedIndex: _selectedBottomNav,
-              onDestinationSelected: (index) {
+              onDestinationSelected: (index) async {
                 setState(() => _selectedBottomNav = index);
                 switch (index) {
                   case 1:
-                    Navigator.push(
+                    await Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => const ScheduleScreen()),
                     );
+                    if (mounted) setState(() => _selectedBottomNav = 0);
                     break;
                   case 2:
-                    _navigateToAddEdit(null);
+                    await _navigateToAddEdit(null);
+                    if (mounted) setState(() => _selectedBottomNav = 0);
                     break;
                   case 3:
-                    _showProfileEditor();
+                    await _showProfileEditor();
+                    if (mounted) setState(() => _selectedBottomNav = 0);
                     break;
                   default:
                     break;
                 }
               },
-              destinations: const [
+              destinations: [
                 NavigationDestination(
-                  icon: Icon(Icons.home_outlined),
-                  selectedIcon: Icon(Icons.home_rounded),
-                  label: 'الرئيسية',
+                  icon: const Icon(Icons.home_outlined),
+                  selectedIcon: const Icon(Icons.home_rounded),
+                  label: widget.isArabic ? 'الرئيسية' : 'Home',
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.calendar_month_outlined),
-                  selectedIcon: Icon(Icons.calendar_month_rounded),
-                  label: 'الجداول',
+                  icon: const Icon(Icons.calendar_month_outlined),
+                  selectedIcon: const Icon(Icons.calendar_month_rounded),
+                  label: widget.isArabic ? 'الجداول' : 'Schedule',
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.task_alt_outlined),
-                  selectedIcon: Icon(Icons.task_alt_rounded),
-                  label: 'المهام',
+                  icon: const Icon(Icons.task_alt_outlined),
+                  selectedIcon: const Icon(Icons.task_alt_rounded),
+                  label: widget.isArabic ? 'المهام' : 'Tasks',
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.person_outline_rounded),
-                  selectedIcon: Icon(Icons.person_rounded),
-                  label: 'الملف الشخصي',
+                  icon: const Icon(Icons.person_outline_rounded),
+                  selectedIcon: const Icon(Icons.person_rounded),
+                  label: widget.isArabic ? 'الملف الشخصي' : 'Profile',
                 ),
               ],
             ),

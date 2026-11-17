@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'core/security/auth_secure_storage_service.dart';
 import 'data/database/database_helper.dart';
@@ -35,7 +34,8 @@ void main() async {
       await NotificationService.instance.initialize();
     } catch (error, stackTrace) {
       debugPrint(
-          'NotificationService initialization failed: $error\n$stackTrace');
+        'NotificationService initialization failed: $error\n$stackTrace',
+      );
     }
   }
 
@@ -43,15 +43,20 @@ void main() async {
     await appInitializer.initialize();
   } catch (error, stackTrace) {
     debugPrint('AppInitializer failed during startup: $error\n$stackTrace');
-    runApp(_StartupFailureApp(onRetry: main));
+    runApp(
+      _StartupFailureApp(
+        onRetry: () async {
+          await databaseHelper.close();
+          main();
+        },
+      ),
+    );
     return;
   }
 
   final authSecureStorageService = AuthSecureStorageService();
   final authLocalDataSource = AuthLocalDataSourceImpl(authSecureStorageService);
-  final authGoogleDataSource = AuthGoogleDataSourceImpl(
-    googleSignIn: GoogleSignIn(),
-  );
+  final authGoogleDataSource = AuthGoogleDataSourceImpl();
   final authRepository = AuthRepositoryImpl(
     authLocalDataSource,
     authGoogleDataSource,
@@ -84,8 +89,9 @@ void main() async {
     registerLocalUser: RegisterLocalUserUseCase(authRepository),
     registerCloudUser: RegisterCloudUserUseCase(authRepository),
     verifyEmailOtp: VerifyEmailOtpUseCase(authRepository),
-    resendEmailVerificationOtp:
-        ResendEmailVerificationOtpUseCase(authRepository),
+    resendEmailVerificationOtp: ResendEmailVerificationOtpUseCase(
+      authRepository,
+    ),
     getCloudAccessToken: GetCloudAccessTokenUseCase(authRepository),
     loginWithGoogle: LoginWithGoogleUseCase(authRepository),
     loginWithCachedGoogleAccount: LoginWithCachedGoogleAccountUseCase(
@@ -117,6 +123,15 @@ class _StartupFailureApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      title: 'EduNivora',
+      theme: AppTheme.lightTheme(),
+      darkTheme: AppTheme.darkTheme(),
+      builder: (context, child) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       home: Scaffold(
         body: SafeArea(
           child: Center(
@@ -130,7 +145,7 @@ class _StartupFailureApp extends StatelessWidget {
                     const Icon(
                       Icons.storage_rounded,
                       size: 52,
-                      color: Colors.orange,
+                      color: AppTheme.warning,
                     ),
                     const SizedBox(height: 20),
                     const Text(
@@ -144,7 +159,7 @@ class _StartupFailureApp extends StatelessWidget {
                     const SizedBox(height: 12),
                     const Text(
                       'لم نتمكن من فتح قاعدة البيانات الدائمة. أوقفنا تشغيل '
-                      'التطبيق لحماية بياناتك من الحفظ المؤقت أو الفقدان. '
+                      'EduNivora لحماية بياناتك من الحفظ المؤقت أو الفقدان. '
                       'تحقق من مساحة التخزين ثم أعد المحاولة.',
                       textAlign: TextAlign.center,
                     ),
@@ -182,7 +197,8 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  static const String _languagePreferenceKey = 'edunivora_language_is_arabic_v1';
+  static const String _languagePreferenceKey =
+      'edunivora_language_is_arabic_v1';
 
   bool _isDarkMode = false;
   bool _isArabic = true;
@@ -226,7 +242,7 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Academic OS',
+      title: 'EduNivora',
       locale: appLocaleForLanguage(_isArabic),
       supportedLocales: const [Locale('ar', 'SA'), Locale('en', 'US')],
       localizationsDelegates: const [
