@@ -1,6 +1,11 @@
 name: Temporary Android SHA-1 Extraction
 
 on:
+  pull_request:
+    branches:
+      - chore/edunivora-phase0-execution
+    paths:
+      - ".github/workflows/extract-android-sha1.yml"
   push:
     branches:
       - feat/google-neon-auth-native
