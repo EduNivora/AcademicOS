@@ -346,3 +346,8 @@ screen and is cached locally for offline reading; academic records and files
 are never uploaded to Neon.
 
 > **Release 1 delivery scope:** EduNivora ships as an Android application only. The Web application, Web administration, and Cloudflare Pages deployment are deferred to a future release. Google Drive backup/restore and production SQLite encryption are also deferred to Release 2. Do not treat the existing Web or backup source files as supported Release 1 delivery features.
+
+
+## EduNivora Release 1 scope
+
+Release 1 is an **Android application only**. It is guest-first and local-first, with optional account identity, public notices, registered notice delivery/read receipts, and anonymous aggregate guest metrics. Courses, terms, schedules, tasks, exams, grades, notes, study plans, materials, attachments, and academic reports remain on the device. No academic cloud synchronization is implemented. There is no Release 1 student Web app, Web admin interface, browser persistence requirement, or Cloudflare Pages deployment. Google Drive backup/restore, backup encryption/key management, and production SQLite encryption are deferred to Release 2.

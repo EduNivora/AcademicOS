@@ -12,6 +12,7 @@ on:
       - main
       - chore/edunivora-phase0-execution
       - feat/neon-managed-auth-and-notices
+      - release1/**
     paths:
       - "backend/neon/**"
       - "neon.ts"

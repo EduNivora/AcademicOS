@@ -29,4 +29,13 @@ const allowedOrigins = (process.env.APP_ORIGINS ?? "")
   .map((origin) => origin.trim())
   .filter(Boolean);
 
-export default createApp({ pool, verifyIdentity, allowedOrigins });
+// Guest metrics remain disabled until an operator installs the matching
+// Worker-only secret on this Neon Function deployment.
+const guestMetricsProxySecret = process.env.GUEST_METRICS_PROXY_SECRET ?? null;
+
+export default createApp({
+  pool,
+  verifyIdentity,
+  allowedOrigins,
+  guestMetricsProxySecret,
+});

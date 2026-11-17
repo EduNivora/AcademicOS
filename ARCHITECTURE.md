@@ -206,3 +206,8 @@ offline.
 
 Google Drive backup remains deferred to Release 2. No academic cloud sync is
 introduced by this backend.
+
+
+## 13. Release 1 delivery boundary — Android only
+
+Release 1 ships the Flutter Android application only. Do not build or deploy a student Web application, Web admin interface, browser persistence runtime, or Cloudflare Pages application for this release. The notice operator capability, if shipped, is exposed inside Android and remains protected by server-side role checks. Academic records remain on-device; the Neon backend stores only optional account identity, public notices, registered notice receipts, anonymous aggregate guest counters, and minimal notice-operation audit metadata. Google Drive backup/restore and production SQLite encryption are deferred to Release 2.

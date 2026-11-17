@@ -152,3 +152,8 @@ This addendum supersedes stale CI/PR references above where they conflict with t
 - Google Drive backup, encrypted archive, restore and scheduled backup remain deferred to Release 2 by approved scope. Production SQLite encryption is not accepted for Release 1.
 
 Do not mark Release 1 ready from the backend or bundle checks alone. The exact-head Flutter gate, real auth/JWT flows, deployed API verification, Web origin/CORS, first-admin bootstrap, and platform runtime acceptance remain release blockers.
+
+
+## Release 1 platform and cloud boundary
+
+Release 1 acceptance is Android-only. The mobile application is guest-first and local-first; accounts are optional. The cloud backend is restricted to account identity, public notices, registered delivery/read receipts, anonymous aggregate guest notice counters, and minimal notice-operator audit records. Academic terms, courses, schedules, tasks, exams, grades, notes, study plans, materials, attachment bytes, and academic reports remain on-device. There is no academic cloud synchronization. No student Web application, Web admin interface, browser persistence, Web build artifact, or Cloudflare Pages deployment is required. Google Drive backup/restore, backup encryption/key management, and production SQLite encryption are Release 2 work.
