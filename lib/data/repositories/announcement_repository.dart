@@ -110,7 +110,9 @@ class AnnouncementRepository {
       return;
     }
 
-    final endpoint = _guestEndpoint('/v1/announcements/$announcementId/guest-view');
+    final endpoint = _guestEndpoint(
+      '/v1/announcements/$announcementId/guest-view',
+    );
     if (endpoint == null) return;
     await _post(endpoint).timeout(const Duration(seconds: 12));
   }
@@ -177,7 +179,9 @@ class AnnouncementRepository {
     Set<String> persistedIds,
   ) async {
     try {
-      final endpoint = _guestEndpoint('/v1/announcements/${announcement.id}/guest-delivered');
+      final endpoint = _guestEndpoint(
+        '/v1/announcements/${announcement.id}/guest-delivered',
+      );
       if (endpoint == null) return;
       await _post(endpoint).timeout(const Duration(seconds: 12));
     } catch (_) {

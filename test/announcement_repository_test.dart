@@ -82,6 +82,7 @@ void main() {
         }
       },
       baseUrl: 'https://api.example.test',
+      guestMetricsBaseUrl: 'https://worker.example.test',
     );
 
     await repository.fetchAnnouncements();
@@ -185,11 +186,14 @@ void main() {
     expect(guestPosts, isEmpty);
     expect(authenticatedPosts, isEmpty);
   });
+
   test('guest metrics are sent through the Worker URL', () async {
     final posts = <Uri>[];
     final repository = AnnouncementRepository(
       get: (_) async => jsonEncode(_payload),
-      post: (uri) async { posts.add(uri); },
+      post: (uri) async {
+        posts.add(uri);
+      },
       baseUrl: 'https://api.example.test',
       guestMetricsBaseUrl: 'https://worker.example.test',
     );
@@ -197,7 +201,10 @@ void main() {
     await repository.recordOpened('f7d0b52a-4a36-4fd9-9ad5-8cbbece8f3d1');
     await Future<void>.delayed(const Duration(milliseconds: 10));
     expect(posts, hasLength(2));
-    expect(posts.every((uri) => uri.origin == 'https://worker.example.test'), isTrue);
+    expect(
+      posts.every((uri) => uri.origin == 'https://worker.example.test'),
+      isTrue,
+    );
   });
 
   test('guest metrics are disabled without Worker URL', () async {
