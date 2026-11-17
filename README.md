@@ -251,24 +251,17 @@ flutter pub get
 flutter run
 ```
 
-### 4. التشغيل على منصات محددة
+### 4. منصة الإصدار
 
-#### Android
+Release 1 مخصص لـ Android فقط:
+
 ```bash
 flutter run -d android
+flutter build apk --debug
+flutter build apk --release
 ```
 
-#### Web
-```bash
-flutter run -d chrome
-```
-
-#### Windows
-```bash
-flutter run -d windows
-```
-
-المنصات المهيأة حالياً داخل المستودع هي Android وWeb وWindows. مجلدات iOS وmacOS وLinux غير موجودة حالياً، فلا تُعد هذه المنصات مدعومة في إعدادات المستودع الحالية.
+نسخة Release الحالية مخصصة لاختبار QA وتستخدم توقيع debug؛ ليست نسخة إنتاجية أو جاهزة لـ Play Store. وجود مجلدات Web أو Windows في المستودع لا يجعلها ضمن نطاق الإصدار الأول. لا تُشغّل Web أو Cloudflare Pages ضمن بوابة Release 1.
 
 ### 5. التحقق من الجودة
 
