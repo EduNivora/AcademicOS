@@ -8,6 +8,7 @@ import { authenticateGoogleIdToken } from './auth.js';
 import type { AuthenticatedUser } from './auth.js';
 import { checkDatabase, closeDatabase, pool } from './db.js';
 import { OpenAIProvider } from './openai-provider.js';
+import { selectRecentContext } from './context.js';
 import type { ChatTurn } from './provider.js';
 
 const app = Fastify({
@@ -123,7 +124,10 @@ async function prepareConversation(user: AuthenticatedUser, message: string, req
      ) recent ORDER BY id ASC`,
     [id, user.id, config.MAX_CONTEXT_MESSAGES],
   );
-  return { id, history: history.rows as ChatTurn[] };
+  return {
+    id,
+    history: selectRecentContext(history.rows as ChatTurn[], config.MAX_CONTEXT_MESSAGES),
+  };
 }
 
 app.post('/v1/chat', {
