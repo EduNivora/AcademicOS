@@ -14,8 +14,12 @@ export type GenerationResult = {
   model: string;
 };
 
+export type ProviderStreamEvent =
+  | { type: 'delta'; text: string }
+  | { type: 'usage'; inputTokens: number; outputTokens: number; model: string };
+
 export interface AIProvider {
   readonly name: string;
   generate(request: GenerationRequest): Promise<GenerationResult>;
-  stream(request: GenerationRequest): AsyncIterable<string>;
+  stream(request: GenerationRequest): AsyncIterable<ProviderStreamEvent>;
 }
