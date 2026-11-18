@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 import '../../domain/ai/ai_chat_event.dart';
 import '../../domain/entities/course_entity.dart';
@@ -255,13 +256,23 @@ class _AcademicAiScreenState extends ConsumerState<AcademicAiScreen> {
                               ),
                             ),
                           )
-                        : SelectableText(
-                            message.text,
-                            style: TextStyle(
-                              color: message.isUser
-                                  ? Colors.white
-                                  : Theme.of(context).textTheme.bodyLarge?.color,
-                              height: 1.55,
+                        : MarkdownBody(
+                            data: message.text,
+                            selectable: true,
+                            styleSheet: MarkdownStyleSheet.fromTheme(
+                              Theme.of(context),
+                            ).copyWith(
+                              p: TextStyle(
+                                color: message.isUser
+                                    ? Colors.white
+                                    : Theme.of(context).textTheme.bodyLarge?.color,
+                                height: 1.55,
+                              ),
+                              code: TextStyle(
+                                color: message.isUser
+                                    ? Colors.white
+                                    : Theme.of(context).colorScheme.primary,
+                              ),
                             ),
                           ),
                   ),
