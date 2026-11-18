@@ -22,7 +22,7 @@ Choose strong passwords when prompted. Keep the keystore file and both passwords
 
 Open: https://github.com/EduNivora/AcademicOS/settings/secrets/actions
 
-Choose New repository secret and add these four secrets:
+Choose New repository secret and add these four secrets, then add the Google OAuth web client ID as a repository variable:
 
 | Secret name | Value |
 |---|---|
@@ -30,6 +30,12 @@ Choose New repository secret and add these four secrets:
 | ANDROID_KEYSTORE_PASSWORD | Keystore password |
 | ANDROID_KEY_ALIAS | edunivora-upload |
 | ANDROID_KEY_PASSWORD | Password for the key alias |
+
+Create this repository variable under Settings → Secrets and variables → Actions → Variables:
+
+| Variable name | Value |
+|---|---|
+| GOOGLE_SERVER_CLIENT_ID | OAuth 2.0 Web application Client ID from the same Google Cloud project configured in Neon Auth |
 
 To copy the Base64 value to the clipboard in PowerShell:
 
@@ -45,7 +51,7 @@ Open: https://github.com/EduNivora/AcademicOS/actions/workflows/android-producti
 
 After this workflow is available on the repository's default branch, choose Run workflow and select the release branch. Alternatively, merge the approved branch and push a version tag such as v1.0.0.
 
-The workflow verifies the keystore and alias, runs Flutter analysis and tests, builds app-release.apk and app-release.aab, verifies both signatures, records SHA-256 checksums, uploads both files as a 30-day Actions artifact, and attaches both files to a GitHub Release when triggered by a v* tag.
+The workflow verifies the keystore, alias and Google OAuth web client ID, runs Flutter analysis and tests, builds app-release.apk and app-release.aab with GOOGLE_SERVER_CLIENT_ID, verifies both signatures, records SHA-256 checksums, uploads both files as a 30-day Actions artifact, and attaches both files to a GitHub Release when triggered by a v* tag.
 
 ## Google Play signing note
 
