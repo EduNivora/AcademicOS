@@ -128,13 +128,25 @@
 ## 18. نتائج البناء التجريبي (Android Debug Build)
 - **الأمر:** `flutter build apk --debug --no-pub`
 - **رمز الخروج:** `0`
-- **مدة البناء:** 88.4 ثانية
 - **الملف الناتج:** `build/app/outputs/flutter-apk/app-debug.apk`
+- **حجم الحزمة:** 212,127,137 بايت (~202.3 ميجابايت متضمنة مكتبات C++ لمعالجات arm, arm64, x64)
+- **بصمة الحزمة (SHA-256):** `427481732D386DFB6231554BF5225373D0294F972452D0154DDFD3AEEA92E5E6`
 - **فحص البيانات عبر AAPT:**
   - `package: name='com.arfatalkamli.academicos'` (مطابق)
   - `application-label:'EduNivora'` (مطابق)
   - `versionCode='2'`, `versionName='1.0.0'` (مطابق)
 - **التقييم:** **PASS**.
+
+### 18.1. نتائج اختبارات الواجهة الخلفية لـ Neon (Backend API Tests)
+- **الأمر:** `npm test` (تشغيل `node --test backend/neon/functions/notices/*.test.mjs`)
+- **رمز الخروج:** `0`
+- **إجمالي الاختبارات:** 20 اختباراً
+- **النتيجة:** **PASS (20/20 بنجاح 100%)**
+- **أبرز ما تم التحقق منه:**
+  - تغذية الإعلانات العامة متاحة للجميع دون مصادقة (`public announcement feed is available without authentication`).
+  - عدم قدرة المستخدمين غير الإداريين على إنشاء أو تعديل الإعلانات (`non-admin accounts cannot create announcements`).
+  - تسجيل المشاهدات بصورة مجمعة مجهولة دون تتبع هوية الزائر (`guest view stores aggregate metric without identity`).
+  - التحقق من توكنات Neon JWTs وعزل الصلاحيات وحماية نقاط النهاية.
 
 ## 19. مصفوفة التحقق والجاهزية (Verification Matrix)
 

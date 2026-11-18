@@ -2132,6 +2132,22 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
           ),
           actions: [
             IconButton(
+              icon: const Icon(Icons.campaign_outlined),
+              tooltip: widget.isArabic
+                  ? 'التعميمات والإعلانات العامة'
+                  : 'Public announcements',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AnnouncementsScreen(
+                      authUseCases: widget.authUseCases,
+                    ),
+                  ),
+                );
+              },
+            ),
+            IconButton(
               icon: const Icon(Icons.search),
               tooltip: widget.isArabic ? 'بحث عام' : 'Global search',
               onPressed: () => _showGlobalSearch(),
