@@ -177,27 +177,40 @@ app.post('/v1/chat/stream', {
   };
 
   let answer = '';
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let responseModel = config.OPENAI_MODEL;
   try {
     send('meta', { conversationId: id, model: config.OPENAI_MODEL });
-    for await (const delta of provider.stream({
+    for await (const event of provider.stream({
       systemPrompt: await loadSystemPrompt(),
       history,
       signal: controller.signal,
     })) {
-      answer += delta;
-      send('delta', { text: delta });
+      if (event.type === 'usage') {
+        inputTokens = event.inputTokens;
+        outputTokens = event.outputTokens;
+        responseModel = event.model;
+      } else {
+        answer += event.text;
+        send('delta', { text: event.text });
+      }
     }
     if (!answer.trim()) throw new Error('The AI provider returned an empty response.');
     await pool.query(
-      `INSERT INTO ai_messages (conversation_id, user_id, role, content, model)
-       VALUES ($1, $2, 'assistant', $3, $4)`,
-      [id, user.id, answer, config.OPENAI_MODEL],
+      `INSERT INTO ai_messages
+        (conversation_id, user_id, role, content, model, input_tokens, output_tokens)
+       VALUES ($1, $2, 'assistant', $3, $4, $5, $6)`,
+      [id, user.id, answer, responseModel, inputTokens, outputTokens],
     );
     await pool.query(
       'UPDATE ai_conversations SET updated_at = NOW() WHERE id = $1 AND user_id = $2',
       [id, user.id],
     );
-    send('done', { conversationId: id });
+    send('done', {
+      conversationId: id,
+      usage: { inputTokens, outputTokens },
+    });
   } catch (error) {
     request.log.error({ errorName: error instanceof Error ? error.name : 'UnknownError' }, 'AI stream failed');
     send('error', { message: 'The AI response could not be completed. Please retry.' });
