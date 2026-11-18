@@ -23,6 +23,7 @@ jobs:
       ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
       ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      GOOGLE_SERVER_CLIENT_ID: ${{ vars.GOOGLE_SERVER_CLIENT_ID }}
 
     steps:
       - name: Checkout source
@@ -46,6 +47,10 @@ jobs:
               exit 1
             fi
           done
+          if [ -z "${GOOGLE_SERVER_CLIENT_ID:-}" ]; then
+            echo "::error::Missing repository variable: GOOGLE_SERVER_CLIENT_ID"
+            exit 1
+          fi
           if [ -z "$KEYSTORE_BASE64" ]; then
             echo "::error::Missing GitHub Actions secret: ANDROID_KEYSTORE_BASE64"
             exit 1
@@ -86,10 +91,10 @@ jobs:
         run: flutter test
 
       - name: Build production APK
-        run: flutter build apk --release
+        run: flutter build apk --release --dart-define=GOOGLE_SERVER_CLIENT_ID="$GOOGLE_SERVER_CLIENT_ID"
 
       - name: Build production Android App Bundle
-        run: flutter build appbundle --release
+        run: flutter build appbundle --release --dart-define=GOOGLE_SERVER_CLIENT_ID="$GOOGLE_SERVER_CLIENT_ID"
 
       - name: Verify package identity and production signatures
         shell: bash
