@@ -29,7 +29,7 @@ class _AcademicAiScreenState extends ConsumerState<AcademicAiScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final List<_ChatMessage> _messages = [
-    const _ChatMessage(
+    _ChatMessage(
       text: 'مرحباً! أنا EduNivora Academic AI. أرسل سؤالك وسأحاول مساعدتك بشرح أكاديمي واضح.',
       isUser: false,
     ),
@@ -132,7 +132,7 @@ class _AcademicAiScreenState extends ConsumerState<AcademicAiScreen> {
       _conversationId = null;
       _messages
         ..clear()
-        ..add(const _ChatMessage(
+        ..add(_ChatMessage(
           text: 'بدأت محادثة جديدة. ما الموضوع الذي تريد دراسته؟',
           isUser: false,
         ));
@@ -327,6 +327,4 @@ class _ChatMessage {
   final bool isUser;
 
   _ChatMessage({required this.text, required this.isUser});
-
-  const _ChatMessage.initial({required this.text, required this.isUser});
 }
