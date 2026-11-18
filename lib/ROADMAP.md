@@ -17,15 +17,15 @@ Product principles:
 The repository is a Flutter application with a local SQLite/sqflite data layer and a broad set of academic screens. Existing code includes tasks, courses, weekly schedules, exams, grades/GPA tools, study planning/focus, reminders, academic reporting/dashboard, local auth/Google auth integration, app lock, settings, and backup UI. Feature presence in source is not proof that every workflow is complete or production-ready.
 
 ### Recently implemented on the unified execution branch
-- Persistent database initialization fails closed; no silent in-memory fallback.
-- Startup failure is visible and retryable.
-- Logout/session recovery retains local credentials while requiring explicit re-authentication.
-- Auth state read failures fail closed.
-- New local password and app-lock PIN verifiers use versioned Argon2id; legacy SHA-256 verifiers upgrade after successful verification.
-- App-lock PIN failed attempts are persisted and exponentially throttled after five failures, capped at 15 minutes.
-- Backup JSON is validated before mutation; academic data replacement is transaction-based.
-- Backup file save/import uses a platform file-picker flow.
-- Regression tests cover initialization, backup validation, KDF migration, auth recovery, PIN throttling, and reports.
+- Brand identity unified as `EduNivora` across UI, app label, launcher icon, and splash screen, while preserving technical namespace `com.arfatalkamli.academicos`.
+- Native SQLite on Android runs via `sqflite` platform channel with fail-closed initialization and no in-memory fallback.
+- Native Google Sign-In and Neon Auth loopback / deep-link session authentication implemented and unit-tested (`test/neon_google_auth_test.dart`).
+- Official EduNivora launcher icons generated for all densities (adaptive, round, monochrome).
+- Kotlin build configuration fixed on Windows (`kotlin.incremental=false`) to ensure reproducible builds across drives.
+- Flutter analyze reports 0 errors and 0 warnings.
+- 134 automated unit and widget tests passing (100% pass rate).
+- Android debug build passes and verified with AAPT (`package: com.arfatalkamli.academicos`, `application-label: 'EduNivora'`).
+- Android production release workflow (`.github/workflows/android-production-release.yml`) established for signed APK and AAB.
 
 ### Explicitly not complete
 - SQLite database-at-rest encryption is not implemented. The secure-storage database key is not connected to an encrypted SQLite engine.

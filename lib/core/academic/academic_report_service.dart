@@ -75,7 +75,7 @@ class AcademicReportService {
         .length;
 
     final lines = <String>[
-      'EduNivora (Academic OS) — Academic Report',
+      'EduNivora — Academic Report',
       'Generated: ${DateTime.now().toLocal()}',
       '',
       'Summary:',

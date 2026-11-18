@@ -56,3 +56,10 @@ The workflow verifies the keystore, alias and Google OAuth web client ID, runs F
 ## Google Play signing note
 
 The generated keystore is the upload key. For Google Play distribution, enroll the app in Play App Signing and register this certificate as the upload certificate. Google Play then signs delivered APKs with the app-signing key managed by Play. Keep the upload keystore unchanged for future updates.
+
+## Local and CI Security Policy
+
+- Keystore files (`*.jks`, `*.keystore`) and `key.properties` are strictly excluded from source control via `.gitignore`.
+- Production signing credentials (`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`) must only be supplied via GitHub Actions Secrets on the remote repository.
+- No dummy, replacement, or self-signed keystore will be committed or used to build a production release.
+- A production release build will only proceed once these secrets are securely configured by the project owner and explicit authorization is given.

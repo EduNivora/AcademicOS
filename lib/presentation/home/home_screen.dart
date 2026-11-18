@@ -815,15 +815,17 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                       children: [
                         Text(
                           isAr
-                              ? 'تأسيس وتطوير: محمد غالب العصيمي وعرفات الكاملي'
-                              : 'Founders & Developers: Mohammed Ghaleb Alaosimi & Arfat Alkamly',
+                              ? 'فريق تطوير EduNivora'
+                              : 'EduNivora Development Team',
                           style: theme.textTheme.bodySmall?.copyWith(
                             fontWeight: FontWeight.w700,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'EduNivora\nFounded & Developed by\nMohammed Ghaleb Alaosimi & Arfat Alkamly',
+                          isAr
+                              ? 'المنظومة الأكاديمية الذكية — صُممت لتمكين الطالب الجامعي وتعزيز إنتاجيته وتنظيم مسيرته الدراسية.'
+                              : 'The Intelligent Academic Ecosystem — Built for student productivity, focus, and academic success.',
                           style: theme.textTheme.bodySmall,
                         ),
                       ],

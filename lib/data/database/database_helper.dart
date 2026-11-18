@@ -73,7 +73,7 @@ class DatabaseHelper {
   Future<Database> _initDatabase() async {
     try {
       if (kIsWeb && !_webFactoryInitialized) {
-        databaseFactory = databaseFactoryFfiWeb;
+        _initializeWebFactory();
         _webFactoryInitialized = true;
         debugPrint('[SQLite] Web database factory initialized.');
       } else if (!kIsWeb &&

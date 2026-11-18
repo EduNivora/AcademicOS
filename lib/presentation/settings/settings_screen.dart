@@ -304,8 +304,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     icon: Icons.people_outline_rounded,
                     title: isAr ? 'الفريق والمؤسسون' : 'Team & Founders',
                     subtitle: isAr
-                        ? 'محمد العصيمي وعرفات الكاملي'
-                        : 'Mohammed Alaosimi & Arfat Alkamly',
+                        ? 'فريق تطوير المنظومة'
+                        : 'EduNivora Development Team',
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => const AboutScreen()),
