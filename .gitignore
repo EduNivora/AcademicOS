@@ -39,7 +39,7 @@ app.*.symbols
 # Obfuscation related
 app.*.map.json
 
-# Built release binaries
+# Android production signing material (never commit these files)\n*.jks\n*.keystore\nkey.properties\n\n# Built release binaries
 /releases/
 *.apk
 *.aab
