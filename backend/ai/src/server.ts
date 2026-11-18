@@ -5,7 +5,6 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { config, loadSystemPrompt } from './config.js';
 import { authenticateGoogleIdToken } from './auth.js';
-import type { AuthenticatedUser } from './auth.js';
 import { checkDatabase, closeDatabase, pool } from './db.js';
 import { OpenAIProvider } from './openai-provider.js';
 import { selectRecentContext } from './context.js';
@@ -28,12 +27,6 @@ const requestSchema = z.object({
   message: z.string().trim().min(1).max(config.MAX_USER_MESSAGE_CHARS),
   conversationId: z.string().uuid().optional(),
 });
-
-declare module 'fastify' {
-  interface FastifyRequest {
-    authenticatedUser: AuthenticatedUser | null;
-  }
-}
 
 app.decorateRequest('authenticatedUser', null);
 
