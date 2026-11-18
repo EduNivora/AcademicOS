@@ -2,17 +2,16 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 class GoogleIdTokenProvider {
   GoogleIdTokenProvider({GoogleSignIn? googleSignIn})
-      : _googleSignIn = googleSignIn ??
-            GoogleSignIn(
-              serverClientId: const String.fromEnvironment(
-                'GOOGLE_SERVER_CLIENT_ID',
-                defaultValue: '',
-              ).isEmpty
-                  ? null
-                  : const String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID'),
-            );
+      : _googleSignIn = googleSignIn ?? _createGoogleSignIn();
 
   final GoogleSignIn _googleSignIn;
+
+  static GoogleSignIn _createGoogleSignIn() {
+    const serverClientId = String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID');
+    return GoogleSignIn(
+      serverClientId: serverClientId.isEmpty ? null : serverClientId,
+    );
+  }
 
   Future<String> requireIdToken() async {
     final account = await _googleSignIn.signInSilently();
