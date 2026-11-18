@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 import { config } from './config.js';
-import type { AIProvider, ChatTurn, GenerationRequest, GenerationResult } from './provider.js';
+import type { AIProvider, ChatTurn, GenerationRequest, GenerationResult, ProviderStreamEvent } from './provider.js';
 
 export class OpenAIProvider implements AIProvider {
   readonly name = 'openai';
@@ -34,17 +34,28 @@ export class OpenAIProvider implements AIProvider {
     };
   }
 
-  async *stream(request: GenerationRequest): AsyncIterable<string> {
+  async *stream(request: GenerationRequest): AsyncIterable<ProviderStreamEvent> {
     const stream = await this.client.chat.completions.create({
       model: config.OPENAI_MODEL,
       messages: this.messages(request.systemPrompt, request.history),
       max_tokens: config.OPENAI_MAX_OUTPUT_TOKENS,
       stream: true,
+      stream_options: { include_usage: true },
     }, { signal: request.signal });
 
     for await (const part of stream) {
+      if (part.usage) {
+        yield {
+          type: 'usage',
+          inputTokens: part.usage.prompt_tokens,
+          outputTokens: part.usage.completion_tokens,
+          model: part.model,
+        };
+      }
       const delta = part.choices[0]?.delta?.content;
-      if (typeof delta === 'string' && delta.length) yield delta;
+      if (typeof delta === 'string' && delta.length) {
+        yield { type: 'delta', text: delta };
+      }
     }
   }
 }
