@@ -40,21 +40,24 @@ await app.register(cors, {
   origin: config.allowedOrigins.length ? config.allowedOrigins : false,
   credentials: false,
 });
-await app.register(rateLimit, {
-  global: false,
-  keyGenerator: request => request.authenticatedUser?.id ?? request.ip,
-});
-
 app.get('/health', async () => ({ status: 'ok' }));
 
-app.addHook('preHandler', async (request, reply) => {
+// Verify identity before the rate-limit hook so limits are keyed by verified user ID.
+app.addHook('onRequest', async (request, reply) => {
   if (request.url === '/health') return;
   try {
     request.authenticatedUser = await authenticateGoogleIdToken(request);
-  } catch (error) {
-    const statusCode = (error as { statusCode?: number }).statusCode ?? 401;
-    return reply.code(statusCode).send({ error: 'unauthorized', message: 'Authentication required.' });
+  } catch {
+    return reply.code(401).send({
+      error: 'unauthorized',
+      message: 'Authentication required.',
+    });
   }
+});
+
+await app.register(rateLimit, {
+  global: false,
+  keyGenerator: request => request.authenticatedUser?.id ?? request.ip,
 });
 
 app.get('/v1/conversations', {
@@ -199,7 +202,7 @@ app.post('/v1/chat/stream', {
     );
     send('done', { conversationId: id });
   } catch (error) {
-    request.log.error({ err: error }, 'AI stream failed');
+    request.log.error({ errorName: error instanceof Error ? error.name : 'UnknownError' }, 'AI stream failed');
     send('error', { message: 'The AI response could not be completed. Please retry.' });
   } finally {
     if (!reply.raw.destroyed) reply.raw.end();
@@ -207,7 +210,7 @@ app.post('/v1/chat/stream', {
 });
 
 app.setErrorHandler((error, request, reply) => {
-  request.log.error({ err: error }, 'Request failed');
+  request.log.error({ errorName: error instanceof Error ? error.name : 'UnknownError' }, 'Request failed');
   const statusCode = (error as { statusCode?: number }).statusCode;
   if (reply.sent) return;
   if (statusCode === 404) return reply.code(404).send({ error: 'not_found' });
