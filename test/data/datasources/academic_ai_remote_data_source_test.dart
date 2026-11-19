@@ -10,7 +10,7 @@ void main() {
       Uri? requestedUri;
       Map<String, String>? requestedHeaders;
       Map<String, dynamic>? requestedBody;
-      bool? withCredentials;
+      bool? sentWithCredentials;
 
       final source = AcademicAiRemoteDataSource(
         baseUrl: 'https://ai.example.test/',
@@ -18,12 +18,12 @@ void main() {
           required method,
           required headers,
           body,
-          required withCredentials: credentials,
+          required withCredentials,
         }) async {
           requestedUri = uri;
           requestedHeaders = headers;
           requestedBody = jsonDecode(body!) as Map<String, dynamic>;
-          withCredentials = credentials;
+          sentWithCredentials = withCredentials;
           expect(method, 'POST');
           return const PlatformHttpResponse(
             statusCode: 200,
@@ -44,7 +44,7 @@ void main() {
       expect(requestedHeaders!['Content-Type'], 'application/json');
       expect(requestedBody!['message'], 'اشرح قواعد البيانات');
       expect(requestedBody!['context'], contains('Database'));
-      expect(withCredentials, isFalse);
+      expect(sentWithCredentials, isFalse);
     });
 
     test('maps server errors to a safe localized exception', () async {
