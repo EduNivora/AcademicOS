@@ -98,5 +98,43 @@ void main() {
       );
       expect(requestCalled, isFalse);
     });
+
+    test('reports Gemini as ready only when the health endpoint is configured', () async {
+      final source = AcademicAiRemoteDataSource(
+        baseUrl: 'https://ai.example.test',
+        request: (uri, {
+          required method,
+          required headers,
+          body,
+          required withCredentials,
+        }) async {
+          expect(uri.path, '/health');
+          expect(method, 'GET');
+          expect(withCredentials, isFalse);
+          return const PlatformHttpResponse(
+            statusCode: 200,
+            body: '{"ok":true,"service":"edunivora-ai","configured":true}',
+          );
+        },
+      );
+
+      expect(await source.isConfigured(), isTrue);
+    });
+
+    test('reports Gemini as not ready when the server key is absent', () async {
+      final source = AcademicAiRemoteDataSource(
+        request: (_, {
+          required method,
+          required headers,
+          body,
+          required withCredentials,
+        }) async => const PlatformHttpResponse(
+          statusCode: 200,
+          body: '{"ok":true,"service":"edunivora-ai","configured":false}',
+        ),
+      );
+
+      expect(await source.isConfigured(), isFalse);
+    });
   });
 }
