@@ -2241,6 +2241,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                           courses: _courses,
                           tasks: widget.taskState.tasks,
                           exams: const [],
+                          authUseCases: widget.authUseCases,
                         ),
                       ),
                     );
@@ -2621,6 +2622,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                           courses: _courses,
                           tasks: widget.taskState.tasks,
                           exams: const [],
+                          authUseCases: widget.authUseCases,
                         ),
                       ),
                     );
