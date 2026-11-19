@@ -58,7 +58,7 @@ test("valid authenticated request returns Gemini answer", async () => {
   assert.equal(response.status, 200);
   const data = await response.json();
   assert.equal(data.answer, "شرح مبسط.");
-  assert.equal(data.model, "gemini-2.5-flash");
+  assert.equal(data.model, "gemini-3.8-flash");
   assert.equal(requestOptions.headers["x-goog-api-key"], "test-api-key-not-a-real-secret");
 });
 
@@ -78,8 +78,10 @@ test("academic context is forwarded as a separate data-only message", async () =
     body: JSON.stringify({ message: "ما أولويتي؟", context: "لدي مهمتان واختبار غدًا." }),
   });
   assert.equal(response.status, 200);
-  assert.match(payload.contents[0].parts[0].text, /بيانات أكاديمية مرجعية/);
-  assert.equal(payload.contents[1].parts[0].text, "ما أولويتي؟");
+  assert.match(payload.input[0].content, /بيانات أكاديمية مرجعية/);
+  assert.equal(payload.input[1].content, "ما أولويتي؟");
+  assert.equal(payload.store, false);
+  assert.equal(payload.model, "gemini-3.8-flash");
 });
 
 test("oversized user messages are rejected before provider invocation", async () => {
