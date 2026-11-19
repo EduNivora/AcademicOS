@@ -29,7 +29,7 @@ export function createAiApp({
   fetchImpl = fetch,
 }) {
   if (typeof verifyIdentity !== "function") throw new TypeError("A token verifier is required");
-  if (typeof apiKey !== "string" || apiKey.length < 10) throw new TypeError("A valid Gemini API key is required");
+  
   if (typeof fetchImpl !== "function") throw new TypeError("A fetch implementation is required");
 
   const app = new Hono();
@@ -48,6 +48,10 @@ export function createAiApp({
   app.get("/health", (c) => c.json({ ok: true, service: "edunivora-ai" }));
 
   app.post("/v1/chat", async (c) => {
+    if (typeof apiKey !== "string" || apiKey.length < 10) {
+      return error(c, 503, "ai_not_configured", "لم يتم إعداد مفتاح خدمة الذكاء الاصطناعي على الخادم بعد.");
+    }
+
     const authorization = c.req.header("Authorization") ?? "";
     const token = authorization.match(/^Bearer\s+(.+)$/i)?.[1];
     if (!token) return error(c, 401, "unauthorized", "تسجيل الدخول مطلوب لاستخدام المساعد.");
