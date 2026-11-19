@@ -8,10 +8,18 @@ export default defineConfig({
       source: "backend/neon/functions/notices/index.mjs",
       externalPackages: ["pg", "@neon/functions"],
     },
+    ai: {
+      name: "EduNivora AI",
+      source: "backend/neon/functions/ai/index.mjs",
+      externalPackages: ["hono", "jose"],
+    },
   },
   branch: () => ({
     functions: {
       notices: {
+        runtime: "nodejs24",
+      },
+      ai: {
         runtime: "nodejs24",
       },
     },
