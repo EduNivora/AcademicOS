@@ -4,7 +4,8 @@ on:
   pull_request:
     branches: [main, chore/edunivora-phase0-execution, feat/durable-attachment-storage, feat/google-neon-auth-native]
   push:
-    branches: [main]
+    branches: [main, feat/google-neon-auth-native]
+  workflow_dispatch:
 
 permissions:
   contents: read
