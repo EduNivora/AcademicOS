@@ -69,7 +69,7 @@ test("provider diagnostics are not exposed", async () => {
   assert.doesNotMatch(await response.text(), /secret detail/);
 });
 test("missing Gemini key fails closed", async () => {
-  const response = await make({ apiKey: undefined })(request("سؤال"));
+  const response = await make({ apiKey: "" })(request("سؤال"));
   assert.equal(response.status, 503);
   assert.equal((await response.json()).error.code, "ai_not_configured");
 });
