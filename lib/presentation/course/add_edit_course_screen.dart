@@ -415,7 +415,7 @@ class _AddEditCourseScreenState extends State<AddEditCourseScreen> {
                       ),
                       const SizedBox(height: 8),
                       DropdownButtonFormField<int>(
-                        value: _lectureReminderOffsetMinutes,
+                        initialValue: _lectureReminderOffsetMinutes,
                         decoration: const InputDecoration(
                           labelText: 'التنبيه قبل (دقيقة)',
                         ),

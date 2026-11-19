@@ -17,6 +17,14 @@ class AppTheme {
   static const Color textMuted = Color(0xFF94A3B8);
   static const Color border = Color(0xFF334155);
 
+  static const double radiusSm = 12.0;
+  static const double radiusMd = 16.0;
+  static const double radiusLg = 22.0;
+
+  static const double spacingSm = 8.0;
+  static const double spacingMd = 16.0;
+  static const double spacingLg = 24.0;
+
   static ThemeData lightTheme() {
     final base = ThemeData(
       useMaterial3: true,
@@ -79,6 +87,30 @@ class AppTheme {
           borderSide: const BorderSide(color: primary, width: 1.6),
         ),
       ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radiusMd),
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radiusMd),
+          ),
+          side: const BorderSide(color: Color(0xFFCBD5E1)),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radiusSm),
+          ),
+        ),
+      ),
       chipTheme: ChipThemeData(
         side: BorderSide.none,
         selectedColor: primarySoft,
@@ -87,7 +119,7 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: Colors.white.withOpacity(0.94),
+        backgroundColor: Colors.white.withValues(alpha: 0.94),
         indicatorColor: primarySoft,
         elevation: 0,
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
@@ -128,7 +160,7 @@ class AppTheme {
         centerTitle: true,
       ),
       cardTheme: CardThemeData(
-        color: const Color(0xFF111827).withOpacity(0.9),
+        color: const Color(0xFF111827).withValues(alpha: 0.9),
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         margin: EdgeInsets.zero,
@@ -150,7 +182,7 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: const Color(0xFF0F172A).withOpacity(0.9),
+        fillColor: const Color(0xFF0F172A).withValues(alpha: 0.9),
         hintStyle: const TextStyle(color: textMuted),
         prefixIconColor: Colors.white70,
         border: OutlineInputBorder(
@@ -166,16 +198,40 @@ class AppTheme {
           borderSide: const BorderSide(color: primary, width: 1.6),
         ),
       ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radiusMd),
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radiusMd),
+          ),
+          side: const BorderSide(color: border),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radiusSm),
+          ),
+        ),
+      ),
       chipTheme: ChipThemeData(
         side: BorderSide.none,
-        selectedColor: const Color(0xFF312E81).withOpacity(0.8),
+        selectedColor: const Color(0xFF312E81).withValues(alpha: 0.8),
         backgroundColor: const Color(0xFF111827),
         labelStyle: const TextStyle(fontWeight: FontWeight.w600),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: const Color(0xFF0B1220).withOpacity(0.94),
-        indicatorColor: const Color(0xFF312E81).withOpacity(0.5),
+        backgroundColor: const Color(0xFF0B1220).withValues(alpha: 0.94),
+        indicatorColor: const Color(0xFF312E81).withValues(alpha: 0.5),
         elevation: 0,
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           return const TextStyle(fontWeight: FontWeight.w600);

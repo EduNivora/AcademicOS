@@ -1,0 +1,53 @@
+name: Build EduNivora AI Neon function
+
+concurrency:
+  group: neon-ai-function-bundle-${{ github.ref }}
+  cancel-in-progress: false
+
+on:
+  push:
+    branches:
+      - feat/edunivora-gemini-ai
+    paths:
+      - "backend/neon/functions/ai/**"
+      - "package.json"
+      - "neon.ts"
+      - ".github/workflows/neon-ai-function-bundle.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install root build dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Check source syntax and tests
+        run: |
+          npm run check
+          npm test
+      - name: Build standalone Node.js 24 AI bundle
+        run: npm run build:ai
+      - name: Package deployable Neon function
+        shell: bash
+        run: |
+          set -euo pipefail
+          package_dir="$RUNNER_TEMP/ai-function"
+          mkdir -p "$package_dir"
+          cp backend/neon/dist/ai.mjs "$package_dir/index.mjs"
+          printf '{"type":"module"}\n' > "$package_dir/package.json"
+          (cd "$package_dir" && zip -9qr "$RUNNER_TEMP/ai-function.zip" .)
+      - name: Upload deployable AI bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: edunivora-ai-function-${{ github.sha }}
+          path: |
+            backend/neon/dist/ai.mjs
+            ${{ runner.temp }}/ai-function.zip
+          if-no-files-found: error
+          retention-days: 14

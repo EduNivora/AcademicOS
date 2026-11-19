@@ -1,0 +1,49 @@
+name: Temporary Android SHA-1 Extraction
+
+on:
+  pull_request:
+    branches:
+      - chore/edunivora-phase0-execution
+    paths:
+      - ".github/workflows/extract-android-sha1.yml"
+  push:
+    branches:
+      - feat/google-neon-auth-native
+    paths:
+      - ".github/workflows/extract-android-sha1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  extract-debug-sha1:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Create the standard Android debug keystore and print fingerprints
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.android"
+          KEYSTORE="$HOME/.android/debug.keystore"
+          if [ ! -f "$KEYSTORE" ]; then
+            keytool -genkeypair -v \
+              -keystore "$KEYSTORE" \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+          keytool -list -v \
+            -keystore "$KEYSTORE" \
+            -storepass android \
+            -alias androiddebugkey | grep -E "SHA1:|SHA256:"

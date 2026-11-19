@@ -31,9 +31,9 @@ class _FocusTimerScreenState extends State<FocusTimerScreen> {
   int? _selectedCourseId;
 
   _TimerPhase _phase = _TimerPhase.focus;
-  int _focusMinutes = 25;
-  int _shortBreakMinutes = 5;
-  int _longBreakMinutes = 15;
+  final int _focusMinutes = 25;
+  final int _shortBreakMinutes = 5;
+  final int _longBreakMinutes = 15;
 
   int _remainingSeconds = 25 * 60;
   bool _isRunning = false;
@@ -53,6 +53,7 @@ class _FocusTimerScreenState extends State<FocusTimerScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _timer = null;
     super.dispose();
   }
 
@@ -126,10 +127,14 @@ class _FocusTimerScreenState extends State<FocusTimerScreen> {
 
   void _startTimer() {
     if (_isRunning) return;
+    _timer?.cancel();
     _setRandomQuote();
     setState(() => _isRunning = true);
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) return;
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
       if (_remainingSeconds <= 0) {
         timer.cancel();
         _handleSessionCompletion();
@@ -167,14 +172,14 @@ class _FocusTimerScreenState extends State<FocusTimerScreen> {
   }
 
   Future<void> _saveFocusLog(int minutes) async {
+    if (_courses.isEmpty) {
+      return;
+    }
+
     final selectedCourse = _courses.firstWhere(
       (course) => course.id == _selectedCourseId,
       orElse: () => _courses.first,
     );
-
-    if (_selectedCourseId == null && _courses.isEmpty) {
-      return;
-    }
 
     final title = 'جلسة تركيز - ${selectedCourse.name}';
     final task = TaskModel(
@@ -195,7 +200,7 @@ class _FocusTimerScreenState extends State<FocusTimerScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('تم تسجيل ${minutes} دقيقة من الدراسة في ${selectedCourse.name}.'),
+          content: Text('تم تسجيل $minutes دقيقة من الدراسة في ${selectedCourse.name}.'),
           behavior: SnackBarBehavior.floating,
           margin: const EdgeInsets.all(16),
         ),
@@ -248,7 +253,8 @@ class _FocusTimerScreenState extends State<FocusTimerScreen> {
                     ),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<int>(
-                      value: _selectedCourseId,
+                      key: ValueKey(_selectedCourseId),
+                      initialValue: _selectedCourseId,
                       dropdownColor: const Color(0xFF111827),
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(

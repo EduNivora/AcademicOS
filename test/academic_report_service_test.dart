@@ -134,7 +134,7 @@ void main() {
         ],
       );
 
-      expect(report, contains('Academic OS'));
+      expect(report, contains('EduNivora'));
       expect(report, contains('GPA Breakdown'));
       expect(report, contains('Math'));
     });

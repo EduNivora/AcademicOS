@@ -44,7 +44,7 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
       semester: _semester,
       notes: _notesController.text.trim(),
       colorHex:
-          '#${_selectedColor.value.toRadixString(16).padLeft(8, '0').substring(2)}',
+          '#${_selectedColor.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}',
       lectureReminderEnabled: _lectureReminderEnabled,
     );
 
@@ -72,8 +72,9 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
         SnackBar(content: Text(errorMessage)),
       );
     } finally {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -162,7 +163,7 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
                     ),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
-                      value: _semester,
+                      initialValue: _semester,
                       items: const [
                         DropdownMenuItem(
                             value: 'الفصل الأول', child: Text('الفصل الأول')),
@@ -298,7 +299,7 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
               child: Wrap(
                 spacing: 8,
                 children: presets.map((c) {
-                  final selected = c.value == _selectedColor.value;
+                  final selected = c.toARGB32() == _selectedColor.toARGB32();
                   return GestureDetector(
                     onTap: () => setState(() => _selectedColor = c),
                     child: CircleAvatar(

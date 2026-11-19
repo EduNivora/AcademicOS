@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/config/edunivora_identity.dart';
+import '../../core/widgets/edunivora_ui.dart';
 import '../../domain/usecases/auth_use_cases.dart';
 import 'register_screen.dart';
 import 'email_verification_screen.dart';
@@ -73,7 +75,8 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       final identity = _usernameController.text.trim();
       final message = error.toString().toLowerCase();
-      final verificationRequired = identity.contains('@') &&
+      final verificationRequired =
+          identity.contains('@') &&
           (message.contains('email_not_verified') ||
               message.contains('email not verified') ||
               message.contains('email verification'));
@@ -91,23 +94,73 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
       setState(() {
-        _errorMessage = 'تعذّر إكمال تسجيل الدخول. تحقق من بياناتك وحاول مرة أخرى.';
-        _isLoading = false;
+        _errorMessage =
+            'تعذّر إكمال تسجيل الدخول. تحقق من بياناتك وحاول مرة أخرى.';
       });
+    } finally {
+      if (mounted && _isLoading) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _loginWithGoogle() async {
+    if (_isLoading) return;
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final success = await widget.authUseCases.loginWithGoogle.call();
+      if (!mounted) return;
+      if (!success) {
+        setState(() {
+          _errorMessage =
+              'تم إلغاء تسجيل الدخول عبر Google. يمكنك المحاولة مرة أخرى.';
+        });
+        return;
+      }
+      await widget.onLoginSuccess();
+    } catch (error) {
+      if (!mounted) return;
+      final message = error.toString();
+      setState(() {
+        if (message.contains('account_unavailable')) {
+          _errorMessage = 'هذا الحساب غير متاح حالياً.';
+        } else if (message.contains('google_email_not_verified')) {
+          _errorMessage = 'بريد Google غير موثّق. يرجى استخدام حساب موثّق.';
+        } else if (message.contains('oauth_timeout')) {
+          _errorMessage = 'انتهت مهلة تسجيل الدخول عبر Google. حاول مرة أخرى.';
+        } else {
+          _errorMessage =
+              'تعذّر إكمال تسجيل الدخول باستخدام Google. حاول مرة أخرى.';
+        }
+      });
+    } finally {
+      if (mounted && _isLoading) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   Future<void> _continueAsGuest() async {
     if (_isLoading || widget.onContinueAsGuest == null) return;
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
     try {
       await widget.onContinueAsGuest!();
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _errorMessage = 'تعذّر المتابعة الآن. حاول مرة أخرى.';
-        _isLoading = false;
       });
+    } finally {
+      if (mounted && _isLoading) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -123,7 +176,9 @@ class _LoginScreenState extends State<LoginScreen> {
       prefixIcon: Icon(icon, size: 21),
       suffixIcon: suffix,
       filled: true,
-      fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.42),
+      fillColor: theme.colorScheme.surfaceContainerHighest.withValues(
+        alpha: 0.42,
+      ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
@@ -131,7 +186,9 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: theme.dividerColor.withOpacity(0.35)),
+        borderSide: BorderSide(
+          color: theme.dividerColor.withValues(alpha: 0.35),
+        ),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
@@ -161,7 +218,7 @@ class _LoginScreenState extends State<LoginScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              colors.primary.withOpacity(isDark ? 0.16 : 0.07),
+              colors.primary.withValues(alpha: isDark ? 0.16 : 0.07),
               theme.scaffoldBackgroundColor,
               theme.scaffoldBackgroundColor,
             ],
@@ -182,36 +239,39 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 8),
                       Center(
                         child: Container(
-                          width: 68,
-                          height: 68,
                           decoration: BoxDecoration(
-                            color: colors.primary,
                             borderRadius: BorderRadius.circular(21),
                             boxShadow: [
                               BoxShadow(
-                                color: colors.primary.withOpacity(0.22),
+                                color: colors.primary.withValues(alpha: 0.22),
                                 blurRadius: 24,
                                 offset: const Offset(0, 10),
                               ),
                             ],
                           ),
-                          child: const Icon(
-                            Icons.school_rounded,
-                            color: Colors.white,
-                            size: 34,
-                          ),
+                          child: const EduBrandMark(size: 72, borderRadius: 21),
                         ),
                       ),
                       const SizedBox(height: 18),
                       Text(
-                        'AcademicOS',
+                        EdunivoraIdentity.appName,
                         textAlign: TextAlign.center,
                         style: theme.textTheme.headlineMedium?.copyWith(
                           fontWeight: FontWeight.w800,
                           letterSpacing: -0.5,
                         ),
                       ),
-                      const SizedBox(height: 7),
+                      const SizedBox(height: 6),
+                      Text(
+                        EdunivoraIdentity.officialTagline,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.primary,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
                       Text(
                         'مساحتك الأكاديمية، منظمة في مكان واحد',
                         textAlign: TextAlign.center,
@@ -227,11 +287,13 @@ class _LoginScreenState extends State<LoginScreen> {
                           color: theme.cardColor,
                           borderRadius: BorderRadius.circular(24),
                           border: Border.all(
-                            color: theme.dividerColor.withOpacity(0.35),
+                            color: theme.dividerColor.withValues(alpha: 0.35),
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(isDark ? 0.12 : 0.045),
+                              color: Colors.black.withValues(
+                                alpha: isDark ? 0.12 : 0.045,
+                              ),
                               blurRadius: 26,
                               offset: const Offset(0, 12),
                             ),
@@ -289,8 +351,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                   onPressed: _isLoading
                                       ? null
                                       : () => setState(
-                                            () => _obscurePassword = !_obscurePassword,
-                                          ),
+                                          () => _obscurePassword =
+                                              !_obscurePassword,
+                                        ),
                                   icon: Icon(
                                     _obscurePassword
                                         ? Icons.visibility_outlined
@@ -310,7 +373,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: colors.errorContainer.withOpacity(0.7),
+                                  color: colors.errorContainer.withValues(
+                                    alpha: 0.7,
+                                  ),
                                   borderRadius: BorderRadius.circular(14),
                                 ),
                                 child: Row(
@@ -339,7 +404,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             SizedBox(
                               height: 54,
                               child: FilledButton(
-                                onPressed: _isLoading ? null : _loginWithUsername,
+                                onPressed: _isLoading
+                                    ? null
+                                    : _loginWithUsername,
                                 style: FilledButton.styleFrom(
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16),
@@ -355,7 +422,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                         ),
                                       )
                                     : const Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
                                         children: [
                                           Icon(Icons.login_rounded, size: 20),
                                           SizedBox(width: 9),
@@ -371,11 +439,23 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                             const SizedBox(height: 14),
-                            Text(
-                              'تسجيل الدخول عبر Google سيُفعّل بعد إعداد OAuth الخاص بالتطبيق.',
-                              textAlign: TextAlign.center,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: colors.onSurfaceVariant,
+                            SizedBox(
+                              height: 52,
+                              child: OutlinedButton.icon(
+                                onPressed: _isLoading ? null : _loginWithGoogle,
+                                icon: const Icon(
+                                  Icons.g_mobiledata_rounded,
+                                  size: 28,
+                                ),
+                                label: const Text(
+                                  'المتابعة باستخدام Google',
+                                  style: TextStyle(fontWeight: FontWeight.w700),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                ),
                               ),
                             ),
                           ],
@@ -424,7 +504,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         'بياناتك المحلية تبقى على هذا الجهاز.',
                         textAlign: TextAlign.center,
                         style: theme.textTheme.labelSmall?.copyWith(
-                          color: colors.onSurfaceVariant.withOpacity(0.8),
+                          color: colors.onSurfaceVariant.withValues(alpha: 0.8),
                         ),
                       ),
                     ],

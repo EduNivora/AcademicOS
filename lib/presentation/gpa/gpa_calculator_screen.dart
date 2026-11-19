@@ -14,6 +14,7 @@ class GpaCalculatorScreen extends StatefulWidget {
 class _GpaCalculatorScreenState extends State<GpaCalculatorScreen> {
   List<CourseEntity> _courses = [];
   bool _loading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -22,6 +23,10 @@ class _GpaCalculatorScreenState extends State<GpaCalculatorScreen> {
   }
 
   Future<void> _loadCourses() async {
+    setState(() {
+      _loading = true;
+      _errorMessage = null;
+    });
     try {
       final db = await DatabaseHelper.instance.database;
       final rows = await db.query('courses', orderBy: 'name ASC');
@@ -33,7 +38,10 @@ class _GpaCalculatorScreenState extends State<GpaCalculatorScreen> {
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _loading = false);
+      setState(() {
+        _errorMessage = 'تعذّر تحميل المقررات. حاول مرة أخرى.';
+        _loading = false;
+      });
     }
   }
 
@@ -88,18 +96,25 @@ class _GpaCalculatorScreenState extends State<GpaCalculatorScreen> {
   }
 
   Future<void> _updateCourseGrade(int courseId, CourseEntity course) async {
-    final db = await DatabaseHelper.instance.database;
-    await db.update(
-      'courses',
-      {
-        'mid_grade': course.midGrade ?? 0,
-        'practical_grade': course.practicalGrade ?? 0,
-        'final_grade': course.finalGrade ?? 0,
-        'credit_hours': course.creditHours ?? 3,
-      },
-      where: 'id = ?',
-      whereArgs: [courseId],
-    );
+    try {
+      final db = await DatabaseHelper.instance.database;
+      await db.update(
+        'courses',
+        {
+          'mid_grade': course.midGrade ?? 0,
+          'practical_grade': course.practicalGrade ?? 0,
+          'final_grade': course.finalGrade ?? 0,
+          'credit_hours': course.creditHours ?? 3,
+        },
+        where: 'id = ?',
+        whereArgs: [courseId],
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذّر حفظ التعديلات. حاول مرة أخرى.')),
+      );
+    }
   }
 
   @override
@@ -126,7 +141,30 @@ class _GpaCalculatorScreenState extends State<GpaCalculatorScreen> {
       appBar: AppBar(title: const Text('حاسبة المعدل والدرجات')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
+          : _errorMessage != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.error_outline_rounded, size: 48),
+                        const SizedBox(height: 12),
+                        Text(
+                          _errorMessage!,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        FilledButton.icon(
+                          onPressed: _loadCourses,
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('إعادة المحاولة'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : ListView(
               padding: const EdgeInsets.all(16),
               children: [
                 Card(
@@ -246,7 +284,9 @@ class _GpaCalculatorScreenState extends State<GpaCalculatorScreen> {
                                       final index = _courses.indexWhere((c) => c.id == course.id);
                                       if (index >= 0) _courses[index] = updated;
                                     });
-                                    await _updateCourseGrade(course.id!, updated);
+                                    if (course.id != null) {
+                                      await _updateCourseGrade(course.id!, updated);
+                                    }
                                   },
                                 ),
                               ),
@@ -261,7 +301,9 @@ class _GpaCalculatorScreenState extends State<GpaCalculatorScreen> {
                                       final index = _courses.indexWhere((c) => c.id == course.id);
                                       if (index >= 0) _courses[index] = updated;
                                     });
-                                    await _updateCourseGrade(course.id!, updated);
+                                    if (course.id != null) {
+                                      await _updateCourseGrade(course.id!, updated);
+                                    }
                                   },
                                 ),
                               ),
@@ -276,7 +318,9 @@ class _GpaCalculatorScreenState extends State<GpaCalculatorScreen> {
                                       final index = _courses.indexWhere((c) => c.id == course.id);
                                       if (index >= 0) _courses[index] = updated;
                                     });
-                                    await _updateCourseGrade(course.id!, updated);
+                                    if (course.id != null) {
+                                      await _updateCourseGrade(course.id!, updated);
+                                    }
                                   },
                                 ),
                               ),
@@ -287,7 +331,7 @@ class _GpaCalculatorScreenState extends State<GpaCalculatorScreen> {
                             children: [
                               Expanded(
                                 child: DropdownButtonFormField<int>(
-                                  value: course.creditHours ?? 3,
+                                  initialValue: course.creditHours ?? 3,
                                   decoration: const InputDecoration(labelText: 'Credits'),
                                   items: const [
                                     DropdownMenuItem(value: 1, child: Text('1')),
@@ -310,7 +354,8 @@ class _GpaCalculatorScreenState extends State<GpaCalculatorScreen> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: DropdownButtonFormField<String>(
-                                  value: letter,
+                                  key: ValueKey('${course.id}_$letter'),
+                                  initialValue: letter,
                                   decoration: const InputDecoration(labelText: 'Letter'),
                                   items: const [
                                     DropdownMenuItem(value: 'A', child: Text('A')),
@@ -360,10 +405,26 @@ class _GpaCalculatorScreenState extends State<GpaCalculatorScreen> {
     return TextFormField(
       initialValue: value.toStringAsFixed(0),
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      autovalidateMode: AutovalidateMode.onUserInteraction,
       decoration: InputDecoration(labelText: label),
+      validator: (text) {
+        final trimmed = text?.trim() ?? '';
+        if (trimmed.isEmpty) return null;
+        final parsed = double.tryParse(trimmed);
+        if (parsed == null || parsed < 0 || parsed > 100) {
+          return '0 - 100';
+        }
+        return null;
+      },
       onChanged: (text) {
-        final parsed = double.tryParse(text) ?? 0;
-        onChanged(parsed);
+        final trimmed = text.trim();
+        if (trimmed.isEmpty) {
+          onChanged(0);
+          return;
+        }
+        final parsed = double.tryParse(trimmed);
+        if (parsed == null) return;
+        onChanged(parsed.clamp(0.0, 100.0));
       },
     );
   }

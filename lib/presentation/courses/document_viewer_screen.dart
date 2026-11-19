@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -98,10 +97,10 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
         ),
-        builder: (context) {
+        builder: (sheetContext) {
           return Padding(
             padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom,
+              bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
             ),
             child: DraggableScrollableSheet(
               expand: false,
@@ -118,12 +117,10 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
                           const Text('ملخص المحاضرة (محلي)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                           TextButton.icon(
                             onPressed: () async {
-                              final textToCopy = 'المفاهيم الأساسية:\n' +
-                                  summary.coreConcepts.join(', ') +
-                                  '\n\nالنقاط الجوهرية:\n' +
-                                  summary.keyPoints.join('\n') +
-                                  '\n\nملخص سريع:\n' +
-                                  summary.quickSummary;
+                              final textToCopy =
+                                  'المفاهيم الأساسية:\n${summary.coreConcepts.join(', ')}'
+                                  '\n\nالنقاط الجوهرية:\n${summary.keyPoints.join('\n')}'
+                                  '\n\nملخص سريع:\n${summary.quickSummary}';
                               await Clipboard.setData(ClipboardData(text: textToCopy));
                               if (!mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نسخ الملخص')));
@@ -154,7 +151,7 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: summary.keyPoints.map((p) => Padding(
                             padding: const EdgeInsets.symmetric(vertical: 6),
-                            child: Text('• ' + p),
+                            child: Text('• $p'),
                           )).toList(),
                         ),
                       const SizedBox(height: 12),
