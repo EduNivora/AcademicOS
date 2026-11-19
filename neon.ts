@@ -11,7 +11,7 @@ export default defineConfig({
     ai: {
       name: "EduNivora AI",
       source: "backend/neon/functions/ai/index.mjs",
-      externalPackages: ["hono", "jose"],
+      externalPackages: [],
     },
   },
   branch: () => ({
