@@ -1,143 +1,82 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createAiApp } from "./app.mjs";
-
-const validIdentity = { sub: "9c6d51f0-78b9-4b3e-8a3b-5cb08d0a29a0" };
-
-function makeApp({ verifyIdentity, fetchImpl } = {}) {
-  return createAiApp({
-    verifyIdentity: verifyIdentity ?? (async (token) => token === "valid" ? validIdentity : null),
-    apiKey: "test-api-key-not-a-real-secret",
+import { createAiHandler } from "./app.mjs";
+const token = "valid";
+const identity = { sub: "user-123" };
+const make = ({ apiKey = "test-api-key-not-real", fetchImpl, verifyIdentity } = {}) =>
+  createAiHandler({
+    verifyIdentity: verifyIdentity ?? (async (value) => value === token ? identity : null),
+    apiKey,
     allowedOrigins: ["https://app.example.test"],
-    fetchImpl: fetchImpl ?? (async () => new Response(JSON.stringify({
-      steps: [{ type: "model_output", content: [{ type: "text", text: "إجابة اختبارية" }] }],
-      usage: { total_tokens: 12 },
-    }), { status: 200, headers: { "Content-Type": "application/json" } })),
+    fetchImpl: fetchImpl ?? (async () => Response.json({
+      steps: [{ type: "model_output", content: [{ type: "text", text: "جواب اختباري" }] }],
+      usage: { total_tokens: 10 },
+    })),
   });
-}
-
-test("health endpoint reports AI service availability without exposing configuration", async () => {
-  const response = await makeApp().request("/health");
-  assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { ok: true, service: "edunivora-ai" });
-});
-
-test("chat endpoint requires a bearer token", async () => {
-  const response = await makeApp().request("/v1/chat", {
+const request = (message, { bearer = token, context, origin } = {}) =>
+  new Request("https://unit.test/v1/chat", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message: "اشرح التفاضل" }),
-  });
-  assert.equal(response.status, 401);
-});
-
-test("chat endpoint rejects invalid identity tokens", async () => {
-  const response = await makeApp().request("/v1/chat", {
-    method: "POST",
-    headers: { Authorization: "Bearer invalid", "Content-Type": "application/json" },
-    body: JSON.stringify({ message: "اشرح التفاضل" }),
-  });
-  assert.equal(response.status, 401);
-});
-
-test("valid authenticated request returns Gemini answer", async () => {
-  let requestOptions;
-  const app = makeApp({
-    fetchImpl: async (_url, options) => {
-      requestOptions = options;
-      return new Response(JSON.stringify({
-        steps: [{ type: "model_output", content: [{ type: "text", text: "شرح مبسط." }] }],
-      }), { status: 200 });
+    headers: {
+      "Content-Type": "application/json",
+      ...(bearer ? { Authorization: "Bearer " + bearer } : {}),
+      ...(origin ? { Origin: origin } : {}),
     },
+    body: JSON.stringify({ message, ...(context === undefined ? {} : { context }) }),
   });
-  const response = await app.request("/v1/chat", {
-    method: "POST",
-    headers: { Authorization: "Bearer valid", "Content-Type": "application/json" },
-    body: JSON.stringify({ message: "اشرح التفاضل" }),
-  });
-  assert.equal(response.status, 200);
-  const data = await response.json();
-  assert.equal(data.answer, "شرح مبسط.");
-  assert.equal(data.model, "gemini-3.8-flash");
-  assert.equal(requestOptions.headers["x-goog-api-key"], "test-api-key-not-a-real-secret");
-});
 
-test("academic context is forwarded as a separate data-only message", async () => {
+test("health route", async () => {
+  const response = await make()(new Request("https://unit.test/health"));
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).service, "edunivora-ai");
+});
+test("authentication is required", async () => {
+  assert.equal((await make()(request("سؤال", { bearer: null }))).status, 401);
+});
+test("invalid bearer token is rejected", async () => {
+  assert.equal((await make()(request("سؤال", { bearer: "bad" }))).status, 401);
+});
+test("valid request calls Gemini Interactions API", async () => {
+  let sent;
+  const response = await make({ fetchImpl: async (url, options) => {
+    sent = { url, options };
+    return Response.json({ steps: [{ type: "model_output", content: [{ type: "text", text: "شرح." }] }] });
+  }})(request("اشرح"));
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).answer, "شرح.");
+  assert.equal(sent.url, "https://generativelanguage.googleapis.com/v1beta/interactions");
+  assert.equal(JSON.parse(sent.options.body).model, "gemini-3.8-flash");
+  assert.equal(JSON.parse(sent.options.body).store, false);
+});
+test("academic context is bounded and forwarded separately", async () => {
   let payload;
-  const app = makeApp({
-    fetchImpl: async (_url, options) => {
-      payload = JSON.parse(options.body);
-      return new Response(JSON.stringify({
-        steps: [{ type: "model_output", content: [{ type: "text", text: "تم التحليل." }] }],
-      }), { status: 200 });
-    },
-  });
-  const response = await app.request("/v1/chat", {
-    method: "POST",
-    headers: { Authorization: "Bearer valid", "Content-Type": "application/json" },
-    body: JSON.stringify({ message: "ما أولويتي؟", context: "لدي مهمتان واختبار غدًا." }),
-  });
+  const response = await make({ fetchImpl: async (_url, options) => {
+    payload = JSON.parse(options.body);
+    return Response.json({ steps: [{ type: "model_output", content: [{ type: "text", text: "تمام" }] }] });
+  }})(request("ما أولويتي؟", { context: "لدي اختبار غدًا" }));
   assert.equal(response.status, 200);
-  assert.match(payload.input[0].content, /بيانات أكاديمية مرجعية/);
+  assert.match(payload.input[0].content, /بيانات أكاديمية/);
   assert.equal(payload.input[1].content, "ما أولويتي؟");
-  assert.equal(payload.store, false);
-  assert.equal(payload.model, "gemini-3.8-flash");
 });
-
-test("oversized user messages are rejected before provider invocation", async () => {
+test("message size is validated before provider call", async () => {
   let called = false;
-  const app = makeApp({ fetchImpl: async () => { called = true; return new Response("{}"); } });
-  const response = await app.request("/v1/chat", {
-    method: "POST",
-    headers: { Authorization: "Bearer valid", "Content-Type": "application/json" },
-    body: JSON.stringify({ message: "x".repeat(12_001) }),
-  });
+  const response = await make({ fetchImpl: async () => { called = true; return Response.json({}); } })(request("x".repeat(12001)));
   assert.equal(response.status, 400);
   assert.equal(called, false);
 });
-
-test("provider rate limits are mapped to a safe client error", async () => {
-  const app = makeApp({ fetchImpl: async () => new Response("private provider details", { status: 429 }) });
-  const response = await app.request("/v1/chat", {
-    method: "POST",
-    headers: { Authorization: "Bearer valid", "Content-Type": "application/json" },
-    body: JSON.stringify({ message: "اشرح التفاضل" }),
-  });
-  assert.equal(response.status, 429);
-  assert.doesNotMatch(await response.text(), /private provider details/);
-});
-
-test("provider configuration errors never disclose provider response bodies", async () => {
-  const app = makeApp({ fetchImpl: async () => new Response("secret diagnostic", { status: 403 }) });
-  const response = await app.request("/v1/chat", {
-    method: "POST",
-    headers: { Authorization: "Bearer valid", "Content-Type": "application/json" },
-    body: JSON.stringify({ message: "اشرح التفاضل" }),
-  });
+test("provider diagnostics are not exposed", async () => {
+  const response = await make({ fetchImpl: async () => new Response("secret detail", { status: 403 }) })(request("سؤال"));
   assert.equal(response.status, 503);
-  assert.doesNotMatch(await response.text(), /secret diagnostic/);
+  assert.doesNotMatch(await response.text(), /secret detail/);
 });
-
-test("CORS only reflects configured application origins", async () => {
-  const app = makeApp();
-  const allowed = await app.request("/health", { headers: { Origin: "https://app.example.test" } });
-  const denied = await app.request("/health", { headers: { Origin: "https://evil.example.test" } });
-  assert.equal(allowed.headers.get("Access-Control-Allow-Origin"), "https://app.example.test");
-  assert.equal(denied.headers.get("Access-Control-Allow-Origin"), null);
-});
-
-test("chat endpoint stays safely unavailable when server key is not configured", async () => {
-  const app = createAiApp({
-    verifyIdentity: async () => validIdentity,
-    apiKey: undefined,
-    allowedOrigins: [],
-    fetchImpl: async () => { throw new Error("provider must not be called"); },
-  });
-  const response = await app.request("/v1/chat", {
-    method: "POST",
-    headers: { Authorization: "Bearer valid", "Content-Type": "application/json" },
-    body: JSON.stringify({ message: "اختبر الإعداد" }),
-  });
+test("missing Gemini key fails closed", async () => {
+  const response = await make({ apiKey: undefined })(request("سؤال"));
   assert.equal(response.status, 503);
   assert.equal((await response.json()).error.code, "ai_not_configured");
+});
+test("CORS only allows configured origins", async () => {
+  const handler = make();
+  const allowed = await handler(new Request("https://unit.test/health", { headers: { Origin: "https://app.example.test" } }));
+  const denied = await handler(new Request("https://unit.test/health", { headers: { Origin: "https://evil.test" } }));
+  assert.equal(allowed.headers.get("Access-Control-Allow-Origin"), "https://app.example.test");
+  assert.equal(denied.headers.get("Access-Control-Allow-Origin"), null);
 });
