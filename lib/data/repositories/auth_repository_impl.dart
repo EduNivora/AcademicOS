@@ -293,9 +293,20 @@ class AuthRepositoryImpl implements AuthRepository {
     }
   }
 
-  UserEntity _mapNeonUser(Map<String, dynamic> user, {String role = 'user'}) {
+  Future<UserEntity> _mapNeonUser(
+    Map<String, dynamic> user, {
+    String role = 'user',
+  }) async {
     final email = user['email'] is String ? user['email'] as String : '';
-    final name = user['name'] is String ? user['name'] as String : email;
+    final neonName = user['name'] is String
+        ? (user['name'] as String).trim()
+        : '';
+    final googleAccount = await _secureStorageService.getGoogleAccountData();
+    final cachedGoogleName = googleAccount['name']?.trim() ?? '';
+    final emailName = email.contains('@') ? email.split('@').first : email;
+    final name = neonName.isNotEmpty
+        ? neonName
+        : (cachedGoogleName.isNotEmpty ? cachedGoogleName : emailName);
     final createdAt = DateTime.tryParse(user['createdAt']?.toString() ?? '') ??
         DateTime.fromMillisecondsSinceEpoch(0);
     return UserEntity(
@@ -303,7 +314,7 @@ class AuthRepositoryImpl implements AuthRepository {
       username: email,
       email: email,
       displayName: name,
-      isGoogleLinked: false,
+      isGoogleLinked: googleAccount['id'] != null,
       isBiometricEnabled: false,
       role: role,
       createdAt: createdAt,
