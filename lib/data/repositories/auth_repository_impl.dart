@@ -157,6 +157,16 @@ class AuthRepositoryImpl implements AuthRepository {
       await _neonAuthDataSource.signOut();
       throw StateError('neon_session_verification_failed');
     }
+
+    // Resolve a real Neon access token immediately after OAuth. The session
+    // cookie remains the refreshable credential; short-lived bearer tokens
+    // are fetched on demand rather than persisted in local storage.
+    final accessToken = await _neonAuthDataSource.getAccessToken();
+    if (accessToken == null || accessToken.isEmpty) {
+      await _neonAuthDataSource.signOut();
+      throw StateError('neon_access_token_missing');
+    }
+
     if (user['banned'] == true) {
       await _neonAuthDataSource.signOut();
       throw StateError('account_unavailable');
@@ -167,17 +177,19 @@ class AuthRepositoryImpl implements AuthRepository {
     }
 
     final email = (user['email']?.toString() ?? '').trim().toLowerCase();
+    if (email.isEmpty) {
+      await _neonAuthDataSource.signOut();
+      throw StateError('google_email_missing');
+    }
     final id = user['id']?.toString() ?? email;
     final name = (user['name']?.toString() ?? '').trim();
 
-    if (email.isNotEmpty) {
-      await _secureStorageService.saveGoogleAccountData(
-        id: id,
-        email: email,
-        name: name.isNotEmpty ? name : email,
-      );
-      await _secureStorageService.saveAuthUsername(email);
-    }
+    await _secureStorageService.saveGoogleAccountData(
+      id: id,
+      email: email,
+      name: name.isNotEmpty ? name : email.split('@').first,
+    );
+    await _secureStorageService.saveAuthUsername(email);
     await _secureStorageService.saveNeonAuthSessionActive(true);
     await _secureStorageService.saveAuthSessionActive(true);
     return true;
