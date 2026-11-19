@@ -39,6 +39,7 @@ import '../study_plan/study_planner_screen.dart';
 import '../task/add_edit_task_screen.dart';
 import '../screens/grade_distribution_screen.dart';
 import '../../data/database/database_helper.dart';
+import '../../data/models/exam_model.dart';
 
 class StudentProfile {
   static const String storageKey = 'academic_os_student_profile';
@@ -252,6 +253,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
   late final AppLockService _appLockService;
   final TextEditingController _searchController = TextEditingController();
   List<CourseEntity> _courses = [];
+  List<ExamModel> _exams = [];
   bool _isAppLocked = false;
   bool _showMotivationCard = true;
   int _selectedBottomNav = 0;
@@ -368,6 +370,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
       final activeTerm = await db.getActiveAcademicTerm();
       final schedules = await db.getSchedules();
       final courses = await db.getCourses();
+      final exams = await db.getExams();
       final courseMap = {for (final c in courses) c.id!: c};
       final todayDay = _getTodayArabicDay();
       final todaySchedules = schedules
@@ -396,6 +399,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
           _activeTermName = activeTerm.name;
         }
         _todayLectures = todaySchedules;
+        _exams = exams;
       });
     } catch (e) {
       debugPrint('HomeScreen._loadScheduleAndTerm error: $e');
@@ -939,7 +943,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     final dashboard = const AcademicDashboardService().analyze(
       courses: _courses,
       tasks: widget.taskState.tasks,
-      exams: const [],
+      exams: _exams,
     );
 
     final healthText = dashboard.studyHealthScore.round();
@@ -2100,23 +2104,29 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  const Icon(
-                    Icons.check_circle_outline_rounded,
-                    color: Color(0xFF2563EB),
-                    size: 22,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    widget.isArabic ? 'مهامي القادمة' : 'Upcoming Tasks',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+              Expanded(
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.check_circle_outline_rounded,
+                      color: Color(0xFF2563EB),
+                      size: 22,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        widget.isArabic ? 'مهامي القادمة' : 'Upcoming Tasks',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               GestureDetector(
                 onTap: () {
@@ -2240,7 +2250,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                         builder: (_) => AcademicAiScreen(
                           courses: _courses,
                           tasks: widget.taskState.tasks,
-                          exams: const [],
+                          exams: _exams,
+                          authUseCases: widget.authUseCases,
                         ),
                       ),
                     );
@@ -2620,7 +2631,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                         builder: (_) => AcademicAiScreen(
                           courses: _courses,
                           tasks: widget.taskState.tasks,
-                          exams: const [],
+                          exams: _exams,
+                          authUseCases: widget.authUseCases,
                         ),
                       ),
                     );
