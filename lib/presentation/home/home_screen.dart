@@ -1599,15 +1599,35 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     );
   }
 
+  String _resolveVisibleUserName(UserEntity? currentUser) {
+    final accountName = currentUser?.displayName?.trim();
+    if (accountName != null &&
+        accountName.isNotEmpty &&
+        !accountName.contains('@')) {
+      return accountName;
+    }
+
+    final profileName = _studentProfile.fullName.trim();
+    if (profileName.isNotEmpty) return profileName;
+
+    final identity = (currentUser?.email ?? currentUser?.username ?? '').trim();
+    if (identity.contains('@')) {
+      final localPart = identity.split('@').first.trim();
+      if (localPart.isNotEmpty) return localPart;
+    } else if (identity.isNotEmpty) {
+      return identity;
+    }
+
+    return widget.isArabic ? 'زائر' : 'Guest';
+  }
+
   Widget _buildReferenceHeader(
     BuildContext context,
     UserEntity? currentUser,
     bool isDark,
   ) {
     final topPadding = MediaQuery.of(context).padding.top;
-    final userName = _studentProfile.fullName.isNotEmpty
-        ? _studentProfile.fullName
-        : (currentUser?.displayName ?? (currentUser?.username ?? 'Mohammed'));
+    final userName = _resolveVisibleUserName(currentUser);
     final termText = _activeTermName.isNotEmpty
         ? 'الفصل الدراسي: $_activeTermName'
         : (_studentProfile.academicLevel.isNotEmpty
@@ -1758,8 +1778,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                   children: [
                     Text(
                       widget.isArabic
-                          ? 'مرحباً بك مجدداً 👋'
-                          : 'Welcome back 👋',
+                          ? 'أهلاً بك 👋'
+                          : 'Welcome 👋',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14,
@@ -2440,9 +2460,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     bool isDark,
     Color primary,
   ) {
-    final userName = _studentProfile.fullName.isNotEmpty
-        ? _studentProfile.fullName
-        : (currentUser?.displayName ?? (currentUser?.username ?? 'Mohammed'));
+    final userName = _resolveVisibleUserName(currentUser);
     final userRole = _studentProfile.major.isNotEmpty
         ? _studentProfile.major
         : (widget.isArabic ? 'طالب جامعي' : 'University Student');
