@@ -205,4 +205,33 @@ void main() {
 
     expect(await auth.getAccessToken(), 'header-jwt');
   });
+
+  test('reuses the JWT from get-session response without a duplicate request',
+      () async {
+    var requestCount = 0;
+    final auth = NeonAuthDataSource(
+      request: (_, {
+        required String method,
+        required Map<String, String> headers,
+        String? body,
+        required bool withCredentials,
+      }) async {
+        requestCount++;
+        return const PlatformHttpResponse(
+          statusCode: 200,
+          body: '{"session":{"id":"session-1"},"user":{"id":"user-1"}}',
+          headers: {'set-auth-jwt': ['header-jwt']},
+        );
+      },
+      sessionStore: _MemorySessionStore(),
+      baseUrl: 'https://auth.example.test/auth',
+      webMode: false,
+    );
+
+    final session = await auth.getSession();
+    expect(session?['session']['token'], 'header-jwt');
+    expect(await auth.getAccessToken(session: session), 'header-jwt');
+    expect(requestCount, 1);
+  });
+
 }
