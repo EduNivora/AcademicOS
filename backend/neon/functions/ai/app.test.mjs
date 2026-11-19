@@ -125,3 +125,19 @@ test("CORS only reflects configured application origins", async () => {
   assert.equal(allowed.headers.get("Access-Control-Allow-Origin"), "https://app.example.test");
   assert.equal(denied.headers.get("Access-Control-Allow-Origin"), null);
 });
+
+test("chat endpoint stays safely unavailable when server key is not configured", async () => {
+  const app = createAiApp({
+    verifyIdentity: async () => validIdentity,
+    apiKey: undefined,
+    allowedOrigins: [],
+    fetchImpl: async () => { throw new Error("provider must not be called"); },
+  });
+  const response = await app.request("/v1/chat", {
+    method: "POST",
+    headers: { Authorization: "Bearer valid", "Content-Type": "application/json" },
+    body: JSON.stringify({ message: "اختبر الإعداد" }),
+  });
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error.code, "ai_not_configured");
+});
