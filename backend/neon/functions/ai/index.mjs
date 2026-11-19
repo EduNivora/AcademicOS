@@ -3,7 +3,7 @@ import { cors } from "hono/cors";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { createAiApp } from "./app.mjs";
 
-const required = ["NEON_AUTH_BASE_URL", "NEON_AUTH_JWKS_URL", "GEMINI_API_KEY"];
+const required = ["NEON_AUTH_BASE_URL", "NEON_AUTH_JWKS_URL"];
 for (const key of required) {
   if (!process.env[key]) throw new Error(`Missing required runtime variable: ${key}`);
 }
