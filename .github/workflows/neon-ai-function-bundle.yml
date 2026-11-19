@@ -31,7 +31,7 @@ jobs:
         run: |
           npm run check
           npm test
-      - name: Build Node.js 24 AI bundle
+      - name: Build standalone Node.js 24 AI bundle
         run: npm run build:ai
       - name: Package deployable Neon function
         shell: bash
@@ -40,16 +40,7 @@ jobs:
           package_dir="$RUNNER_TEMP/ai-function"
           mkdir -p "$package_dir"
           cp backend/neon/dist/ai.mjs "$package_dir/index.mjs"
-          cat > "$package_dir/package.json" <<'JSON'
-          {
-            "type": "module",
-            "dependencies": {
-              "hono": "4.9.0",
-              "jose": "6.1.0"
-            }
-          }
-          JSON
-          npm install --prefix "$package_dir" --omit=dev --ignore-scripts --no-audit --no-fund
+          printf '{"type":"module"}\n' > "$package_dir/package.json"
           (cd "$package_dir" && zip -qr "$RUNNER_TEMP/ai-function.zip" .)
       - name: Upload deployable AI bundle
         uses: actions/upload-artifact@v4
