@@ -9,25 +9,17 @@ class AppInitializer {
   final SecureStorageService _secureStorageService = SecureStorageService();
 
   Future<void> initialize() async {
-    try {
-      if (AppPlatform.shouldUseNativeSecurity()) {
-        await _secureStorageService.getDatabasePassword();
-      } else {
-        debugPrint(
-            'Web mode detected: skipping secure storage initialization.');
-      }
-
-      await Future.microtask(() async {
-        try {
-          await _databaseHelper.database;
-        } catch (error, stackTrace) {
-          debugPrint('Database initialization warning: $error\n$stackTrace');
-        }
-      });
-
-      debugPrint('Application initialized successfully.');
-    } catch (error, stackTrace) {
-      debugPrint('AppInitializer failed: $error\n$stackTrace');
+    if (AppPlatform.shouldUseNativeSecurity()) {
+      await _secureStorageService.getDatabasePassword();
+    } else {
+      debugPrint(
+        'Web mode detected: skipping secure storage initialization.',
+      );
     }
+
+    // Startup must fail if persistent storage cannot be opened. Silently
+    // continuing can make the application appear usable while data is unsafe.
+    await _databaseHelper.database;
+    debugPrint('Application initialized successfully.');
   }
 }
