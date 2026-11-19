@@ -40,7 +40,7 @@ dev_dependencies:
 
 flutter_launcher_icons:
   android: true
-  ios: true
+  ios: false
   image_path: assets/branding/edunivora_app_icon.png
   adaptive_icon_background: "#071B33"
   adaptive_icon_foreground: assets/branding/edunivora_app_icon.png
