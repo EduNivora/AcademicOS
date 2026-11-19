@@ -3,8 +3,6 @@ name: EduNivora Android Production Release
 on:
   workflow_dispatch:
   push:
-    branches:
-      - feat/google-neon-auth-native
     tags:
       - "v*"
 
