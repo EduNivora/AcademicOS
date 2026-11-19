@@ -41,7 +41,7 @@ jobs:
           mkdir -p "$package_dir"
           cp backend/neon/dist/ai.mjs "$package_dir/index.mjs"
           printf '{"type":"module"}\n' > "$package_dir/package.json"
-          (cd "$package_dir" && zip -qr "$RUNNER_TEMP/ai-function.zip" .)
+          (cd "$package_dir" && zip -9qr "$RUNNER_TEMP/ai-function.zip" .)
       - name: Upload deployable AI bundle
         uses: actions/upload-artifact@v4
         with:
