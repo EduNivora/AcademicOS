@@ -67,7 +67,7 @@ export function createAiHandler({ verifyIdentity, apiKey, allowedOrigins = [], f
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
     const url = new URL(request.url);
     if (request.method === "GET" && url.pathname === "/health") {
-      return json(200, { ok: true, service: "edunivora-ai" }, headers);
+      return json(200, { ok: true, service: "edunivora-ai", configured: typeof apiKey === "string" && apiKey.length >= 10 }, headers);
     }
     if (request.method !== "POST" || url.pathname !== "/v1/chat") {
       return fail(404, "not_found", "المسار المطلوب غير موجود.", headers);
