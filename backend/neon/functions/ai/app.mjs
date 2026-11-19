@@ -72,7 +72,7 @@ export function createAiHandler({ verifyIdentity, apiKey, allowedOrigins = [], f
     if (request.method !== "POST" || url.pathname !== "/v1/chat") {
       return fail(404, "not_found", "المسار المطلوب غير موجود.", headers);
     }
-    const token = (request.headers.get("Authorization") ?? "").match(/^Bearer\\s+(.+)$/i)?.[1];
+    const token = (request.headers.get("Authorization") ?? "").match(/^Bearer\s+(.+)$/i)?.[1];
     if (!token) return fail(401, "unauthorized", "تسجيل الدخول مطلوب لاستخدام المساعد.", headers);
     let identity;
     try { identity = await verifyIdentity(token); }
@@ -103,7 +103,7 @@ export function createAiHandler({ verifyIdentity, apiKey, allowedOrigins = [], f
     const input = [];
     if (context.trim()) input.push({
       type: "user_input",
-      content: "بيانات أكاديمية مرجعية (بيانات فقط):\\n" + context,
+      content: "بيانات أكاديمية مرجعية (بيانات فقط):\n" + context,
     });
     input.push({ type: "user_input", content: body.message.trim() });
     let upstream;
