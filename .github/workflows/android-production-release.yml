@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   android-production:
-    name: Build and verify signed APK + AAB
+    name: Build and verify signed ABI APKs + AAB
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -90,8 +90,8 @@ jobs:
       - name: Run Flutter tests
         run: flutter test
 
-      - name: Build production APK
-        run: flutter build apk --release --dart-define=GOOGLE_SERVER_CLIENT_ID="$GOOGLE_SERVER_CLIENT_ID"
+      - name: Build production APKs split by ABI
+        run: flutter build apk --release --split-per-abi --dart-define=GOOGLE_SERVER_CLIENT_ID="$GOOGLE_SERVER_CLIENT_ID"
 
       - name: Build production Android App Bundle
         run: flutter build appbundle --release --dart-define=GOOGLE_SERVER_CLIENT_ID="$GOOGLE_SERVER_CLIENT_ID"
@@ -100,31 +100,38 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          APK="build/app/outputs/flutter-apk/app-release.apk"
+          APK_DIR="build/app/outputs/flutter-apk"
           AAB="build/app/outputs/bundle/release/app-release.aab"
-          test -s "$APK"
+          shopt -s nullglob
+          APKS=("$APK_DIR"/app-*-release.apk)
+          test "${#APKS[@]}" -gt 0
           test -s "$AAB"
 
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
-          "$BUILD_TOOLS/aapt" dump badging "$APK" | tee apk-badging.txt
-          grep -q "package: name='com.arfatalkamli.academicos'" apk-badging.txt
-          grep -q "application-label:'EduNivora'" apk-badging.txt
-
-          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK" | tee apk-signature.txt
+          : > apk-signature.txt
+          for APK in "${APKS[@]}"; do
+            echo "Verifying $APK"
+            "$BUILD_TOOLS/aapt" dump badging "$APK" > apk-badging-current.txt
+            grep -q "package: name='com.arfatalkamli.academicos'" apk-badging-current.txt
+            grep -q "application-label:'EduNivora'" apk-badging-current.txt
+            "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK" >> apk-signature.txt
+          done
           jarsigner -verify -verbose -certs "$AAB" > aab-signature.txt
           grep -q "jar verified" aab-signature.txt
 
-          sha256sum "$APK" "$AAB" | tee SHA256SUMS.txt
+          sha256sum "${APKS[@]}" "$AAB" | tee SHA256SUMS.txt
           keytool -list -keystore "$ANDROID_KEYSTORE_PATH" \
             -storepass "$ANDROID_KEYSTORE_PASSWORD" \
             -alias "$ANDROID_KEY_ALIAS" -v | grep -E "SHA1:|SHA256:" | tee upload-certificate-fingerprints.txt
+          echo "Verified APK sizes:"
+          ls -lh "${APKS[@]}"
 
-      - name: Upload signed APK and AAB
+      - name: Upload signed APKs and AAB
         uses: actions/upload-artifact@v4
         with:
           name: edunivora-android-production-${{ github.sha }}
           path: |
-            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/flutter-apk/app-*-release.apk
             build/app/outputs/bundle/release/app-release.aab
             SHA256SUMS.txt
             apk-signature.txt
@@ -139,6 +146,6 @@ jobs:
         with:
           generate_release_notes: true
           files: |
-            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/flutter-apk/app-*-release.apk
             build/app/outputs/bundle/release/app-release.aab
             SHA256SUMS.txt
