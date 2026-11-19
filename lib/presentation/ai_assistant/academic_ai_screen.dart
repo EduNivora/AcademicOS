@@ -47,6 +47,7 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
   bool _isSending = false;
   bool _isCheckingSession = true;
   bool _hasCloudSession = false;
+  bool _isGeminiReady = false;
 
   @override
   void initState() {
@@ -57,15 +58,19 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
   Future<void> _refreshSessionState() async {
     try {
       final token = await widget.authUseCases?.getCloudAccessToken.call();
+      final hasSession = token != null && token.isNotEmpty;
+      final configured = hasSession && await _remote.isConfigured();
       if (!mounted) return;
       setState(() {
-        _hasCloudSession = token != null && token.isNotEmpty;
+        _hasCloudSession = hasSession;
+        _isGeminiReady = configured;
         _isCheckingSession = false;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _hasCloudSession = false;
+        _isGeminiReady = false;
         _isCheckingSession = false;
       });
     }
@@ -91,20 +96,37 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
     try {
       final token = await widget.authUseCases?.getCloudAccessToken.call();
       if (token == null || token.isEmpty) {
-        if (mounted) setState(() => _hasCloudSession = false);
+        if (mounted) setState(() {
+          _hasCloudSession = false;
+          _isGeminiReady = false;
+        });
         reply = _buildLocalAssistantReply(trimmed);
       } else {
-        if (mounted) setState(() => _hasCloudSession = true);
-        reply = await _remote.sendMessage(
-          accessToken: token,
-          message: trimmed,
-          context: _buildAcademicContext(),
-        );
+        final configured = await _remote.isConfigured();
+        if (mounted) setState(() {
+          _hasCloudSession = true;
+          _isGeminiReady = configured;
+        });
+        if (!configured) {
+          reply = 'حسابك متصل، لكن مفتاح Gemini لم يُضف إلى الخادم بعد. هذه إجابة محلية مؤقتة:\\n\\n${_buildLocalAssistantReply(trimmed)}';
+        } else {
+          reply = await _remote.sendMessage(
+            accessToken: token,
+            message: trimmed,
+            context: _buildAcademicContext(),
+          );
+        }
       }
     } on AcademicAiRemoteException catch (error) {
       reply = error.message;
       if (error.statusCode == 401 && mounted) {
-        setState(() => _hasCloudSession = false);
+        setState(() {
+          _hasCloudSession = false;
+          _isGeminiReady = false;
+        });
+      }
+      if (error.code == 'ai_not_configured' && mounted) {
+        setState(() => _isGeminiReady = false);
       }
     } catch (_) {
       reply = 'تعذر الاتصال بالمساعد السحابي حاليًا. تحقق من اتصال الإنترنت ثم حاول مجددًا.';
@@ -161,12 +183,18 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final statusColor = _hasCloudSession ? Colors.green : Colors.orange;
+    final statusColor = _isGeminiReady
+        ? Colors.green
+        : _hasCloudSession
+            ? Colors.orange
+            : Colors.blueGrey;
     final statusText = _isCheckingSession
         ? 'جارٍ التحقق من الاتصال...'
-        : _hasCloudSession
-            ? 'Gemini 3.8 Flash متصل'
-            : 'المساعد المحلي يعمل';
+        : _isGeminiReady
+            ? 'Gemini 3.8 Flash جاهز'
+            : _hasCloudSession
+                ? 'الحساب متصل — خدمة Gemini بانتظار المفتاح'
+                : 'المساعد المحلي يعمل';
 
     return Scaffold(
       appBar: AppBar(
@@ -206,7 +234,7 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
               ],
             ),
           ),
-          if (_hasCloudSession)
+          if (_isGeminiReady)
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 7, 18, 0),
               child: Text(
