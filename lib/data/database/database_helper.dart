@@ -105,18 +105,11 @@ class DatabaseHelper {
         onUpgrade: _onUpgradeDatabase,
       );
     } catch (error, stackTrace) {
-      if (kIsWeb) {
-        debugPrint(
-          'SQLite web DB init failed; using in-memory fallback. $error\n$stackTrace',
-        );
-        return await openDatabase(
-          inMemoryDatabasePath,
-          version: _databaseVersion,
-          onConfigure: _onConfigure,
-          onCreate: _onCreateDatabase,
-          onUpgrade: _onUpgradeDatabase,
-        );
-      }
+      debugPrint(
+        'Database initialization failed. No temporary in-memory database '
+        'will be substituted because that could hide data-persistence '
+        'failures. $error\n$stackTrace',
+      );
       rethrow;
     }
   }
