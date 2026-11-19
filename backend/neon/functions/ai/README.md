@@ -5,7 +5,7 @@ This function is the server-side Gemini boundary for the Flutter academic assist
 ## Endpoint
 
 - `GET /health` — deployment health only; does not call Gemini.
-- `POST /v1/chat` — authenticated Gemini generation.
+- `POST /v1/chat` — authenticated Gemini Interactions API generation.
 
 Request JSON:
 
@@ -17,7 +17,7 @@ Request JSON:
 ```
 
 The request must include `Authorization: Bearer <Neon Auth JWT>`.
-The response contains `answer`, `model`, and provider usage metadata when available.
+The request uses `store: false` so provider-side interaction history is not persisted. The response contains `answer`, `model`, and provider usage metadata when available.
 
 ## Required runtime environment
 
