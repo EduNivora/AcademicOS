@@ -12,17 +12,25 @@ class AcademicScaffoldBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF020817),
-            Color(0xFF0F172A),
-            Color(0xFF111827),
-          ],
-          stops: [0.0, 0.55, 1.0],
+          colors: isDark
+              ? const [
+                  Color(0xFF020817),
+                  Color(0xFF0F172A),
+                  Color(0xFF111827),
+                ]
+              : const [
+                  Color(0xFFF8FAFD),
+                  Color(0xFFF1F5F9),
+                  Color(0xFFEEF2F6),
+                ],
+          stops: const [0.0, 0.55, 1.0],
         ),
       ),
       child: Stack(
@@ -35,10 +43,14 @@ class AcademicScaffoldBackground extends StatelessWidget {
               height: 260,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFF6366F1).withValues(alpha: 0.22),
+                color: isDark
+                    ? const Color(0xFF6366F1).withValues(alpha: 0.22)
+                    : const Color(0xFF6366F1).withValues(alpha: 0.06),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF6366F1).withValues(alpha: 0.25),
+                    color: isDark
+                        ? const Color(0xFF6366F1).withValues(alpha: 0.25)
+                        : const Color(0xFF6366F1).withValues(alpha: 0.08),
                     blurRadius: 90,
                     spreadRadius: 20,
                   ),
@@ -54,10 +66,14 @@ class AcademicScaffoldBackground extends StatelessWidget {
               height: 260,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFF3B82F6).withValues(alpha: 0.18),
+                color: isDark
+                    ? const Color(0xFF3B82F6).withValues(alpha: 0.18)
+                    : const Color(0xFF3B82F6).withValues(alpha: 0.05),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF3B82F6).withValues(alpha: 0.18),
+                    color: isDark
+                        ? const Color(0xFF3B82F6).withValues(alpha: 0.18)
+                        : const Color(0xFF3B82F6).withValues(alpha: 0.06),
                     blurRadius: 90,
                     spreadRadius: 18,
                   ),
@@ -68,7 +84,7 @@ class AcademicScaffoldBackground extends StatelessWidget {
           Positioned.fill(
             child: IgnorePointer(
               child: CustomPaint(
-                painter: _AmbientGridPainter(),
+                painter: _AmbientGridPainter(isDark: isDark),
               ),
             ),
           ),
@@ -83,10 +99,16 @@ class AcademicScaffoldBackground extends StatelessWidget {
 }
 
 class _AmbientGridPainter extends CustomPainter {
+  final bool isDark;
+
+  const _AmbientGridPainter({this.isDark = true});
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.035)
+      ..color = isDark
+          ? Colors.white.withValues(alpha: 0.035)
+          : const Color(0xFF64748B).withValues(alpha: 0.03)
       ..strokeWidth = 1;
 
     for (double x = 0; x < size.width; x += 40) {
@@ -98,5 +120,6 @@ class _AmbientGridPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _AmbientGridPainter oldDelegate) =>
+      oldDelegate.isDark != isDark;
 }
