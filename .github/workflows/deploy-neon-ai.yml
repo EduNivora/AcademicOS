@@ -42,7 +42,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm install --ignore-scripts --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Verify AI function before deployment
         run: |
@@ -51,14 +51,7 @@ jobs:
           npm run build:ai
 
       - name: Install Neon CLI
-        run: npm install --global neon@latest
-
-      - name: Link the exact Neon project and branch
-        env:
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-        run: |
-          set -euo pipefail
-          neon link --agent --project-id morning-lab-61449214 --branch br-late-bread-bajll3is --no-env-pull
+        run: npm install --global neon@9.7.2
 
       - name: Deploy configured Neon functions
         env:
@@ -66,7 +59,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           set -euo pipefail
-          npm run neon:deploy
+          npm run neon:deploy -- --project-id morning-lab-61449214 --branch br-late-bread-bajll3is --update-existing --no-env-pull
 
       - name: Verify Gemini configuration is active
         shell: bash
