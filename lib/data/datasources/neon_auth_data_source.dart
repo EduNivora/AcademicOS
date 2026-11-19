@@ -204,24 +204,51 @@ class NeonAuthDataSource {
   }
 
   Future<Map<String, dynamic>?> getSession() async {
-    final result = await _sendNullable('/get-session', method: 'GET');
+    String? responseJwt;
+    final result = await _sendNullable(
+      '/get-session',
+      method: 'GET',
+      onResponse: (response) {
+        responseJwt = response.headers['set-auth-jwt']?.first;
+      },
+    );
     if (result == null || result['user'] is! Map) return null;
+
+    // Neon Auth may return its short-lived bearer token in a response header.
+    // Carry it with this in-memory session result so callers do not make a
+    // second identical get-session request immediately after verification.
+    final sessionData = result['session'];
+    if (sessionData is Map && responseJwt?.isNotEmpty == true) {
+      final normalizedSession = Map<String, dynamic>.from(sessionData);
+      normalizedSession.putIfAbsent('token', () => responseJwt);
+      return {...result, 'session': normalizedSession};
+    }
     return result;
   }
 
-  Future<String?> getAccessToken() async {
+  Future<String?> getAccessToken({
+    Map<String, dynamic>? session,
+  }) async {
+    final providedSession = session?['session'];
+    if (providedSession is Map) {
+      final bodyToken = providedSession['token'];
+      if (bodyToken is String && bodyToken.isNotEmpty) return bodyToken;
+    }
+
     String? responseJwt;
     try {
-      final session = await _sendNullable(
+      final fetchedSession = await _sendNullable(
         '/get-session',
         method: 'GET',
         onResponse: (response) {
           responseJwt = response.headers['set-auth-jwt']?.first;
         },
       );
-      if (session == null || session['session'] is! Map) return null;
+      if (fetchedSession == null || fetchedSession['session'] is! Map) {
+        return null;
+      }
 
-      final sessionData = session['session'] as Map;
+      final sessionData = fetchedSession['session'] as Map;
       final bodyToken = sessionData['token'];
       if (bodyToken is String && bodyToken.isNotEmpty) return bodyToken;
       return responseJwt?.isNotEmpty == true ? responseJwt : null;

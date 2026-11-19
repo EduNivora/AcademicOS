@@ -68,6 +68,15 @@ android {
 
     buildTypes {
         release {
+            // R8 and resource shrinking are enabled for the production artifact.
+            // Flutter/plugin consumer rules remain active; runtime acceptance is required.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+
             // Release builds must use the dedicated production keystore.
             signingConfig = if (releaseSigningConfigured) {
                 signingConfigs.getByName("productionRelease")

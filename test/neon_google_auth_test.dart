@@ -303,6 +303,9 @@ void main() {
               statusCode: 200,
               body:
                   '{"session":{"id":"sess-google-1"},"user":{"id":"google-u1","email":"ahmed@edunivora.com","name":"Ahmed","emailVerified":true,"banned":false}}',
+              headers: {
+                'set-auth-jwt': ['neon-access-token-123'],
+              },
             );
           }
 
@@ -433,6 +436,9 @@ void main() {
             statusCode: 200,
             body:
                 '{"session":{"id":"sess-2"},"user":{"id":"u-2","email":"retry@edunivora.com","name":"Retry User","emailVerified":true}}',
+            headers: {
+              'set-auth-jwt': ['neon-access-token-retry'],
+            },
           );
         }
 

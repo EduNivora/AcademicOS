@@ -35,7 +35,7 @@ class AuthRepositoryImpl implements AuthRepository {
         if (user is Map) {
           var role = 'user';
           try {
-            final token = await _neonAuthDataSource.getAccessToken();
+            final token = await _neonAuthDataSource.getAccessToken(session: session);
             if (token != null) {
               final profile = await _neonAccountDataSource.getProfile(token);
               role = profile['role']?.toString() ?? 'user';
@@ -170,7 +170,7 @@ class AuthRepositoryImpl implements AuthRepository {
     // Resolve a real Neon access token immediately after OAuth. The session
     // cookie remains the refreshable credential; short-lived bearer tokens
     // are fetched on demand rather than persisted in local storage.
-    final accessToken = await _neonAuthDataSource.getAccessToken();
+    final accessToken = await _neonAuthDataSource.getAccessToken(session: verifiedSession);
     if (accessToken == null || accessToken.isEmpty) {
       await _neonAuthDataSource.signOut();
       throw StateError('neon_access_token_missing');

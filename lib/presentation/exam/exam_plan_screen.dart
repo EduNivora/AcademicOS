@@ -28,7 +28,7 @@ class _ExamPlanScreenState extends ConsumerState<ExamPlanScreen> {
   @override
   void initState() {
     super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
+    _timer = Timer.periodic(const Duration(minutes: 1), (_) => setState(() {}));
     _loadCourses();
     ref.read(examListProvider.notifier).loadExams();
   }

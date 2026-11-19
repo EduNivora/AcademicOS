@@ -51,4 +51,4 @@ flutter_launcher_icons:
 flutter:
   uses-material-design: true
   assets:
-    - assets/branding/
+    - assets/branding/edunivora_app_icon.png
