@@ -6,7 +6,7 @@ Server-side Gemini boundary used by the Flutter academic assistant.
 
 `https://br-late-bread-bajll3is-ai.compute.c-8.eu-central-1.aws.neon.tech`
 
-- `GET /health` — deployment health; verified HTTP 200.
+- `GET /health` — deployment health; returns a non-secret `configured` boolean and was verified HTTP 200.
 - `POST /v1/chat` — requires a valid Neon Auth JWT and a configured Gemini key.
 
 Request JSON:
