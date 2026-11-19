@@ -342,7 +342,7 @@ class EduBrandMark extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
       child: Image.asset(
-        'assets/branding/edunivora_logo.png',
+        'assets/branding/edunivora_app_icon.png',
         width: size,
         height: size,
         fit: BoxFit.cover,
