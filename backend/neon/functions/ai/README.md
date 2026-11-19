@@ -55,8 +55,8 @@ The secret is deliberately not stored in this repository or in Flutter.
 On the developer machine, from the repository root:
 
 1. Install the CLI once with `npm install -g neon@latest`. Run `neon link` from the repository root if this checkout is not already linked, then select project `edunivora` (`morning-lab-61449214`) and branch `br-late-bread-bajll3is`.
-2. Create a local `.env.local` containing exactly `GEMINI_API_KEY=your-key`. On PowerShell, use `Read-Host -AsSecureString` to enter it without echoing it. The repository ignores `.env.local` and all `.env.*` files.
-3. Run `npm run neon:deploy -- --env .env.local`. The `ai` function declares this value as required, so deployment fails rather than silently publishing an unusable Gemini integration if the key is absent.
-4. Delete `.env.local` after deployment. Neon retains the deployed function environment value; the local copy is no longer needed. Never commit or upload this file.
+2. On Windows PowerShell, run `./scripts/deploy-ai-secret.ps1`. It prompts for the key with hidden input, writes it temporarily to the ignored `.env.local`, and runs `npm run neon:deploy -- --env .env.local`.
+3. The `ai` function declares the key as required, so deployment fails rather than silently publishing an unusable Gemini integration if the key is absent.
+4. The script removes `.env.local` in its `finally` block. Neon retains the deployed function environment value; never commit or upload the local file.
 
 This command applies the repository's Neon configuration and redeploys the functions declared in `neon.ts`; variables not declared there, such as the existing `APP_ORIGINS` on `notices`, are left unchanged by Neon.
