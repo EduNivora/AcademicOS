@@ -27,7 +27,9 @@ const request = (message, { bearer = token, context, origin } = {}) =>
 test("health route", async () => {
   const response = await make()(new Request("https://unit.test/health"));
   assert.equal(response.status, 200);
-  assert.equal((await response.json()).service, "edunivora-ai");
+  const health = await response.json();
+  assert.equal(health.service, "edunivora-ai");
+  assert.equal(health.configured, true);
 });
 test("authentication is required", async () => {
   assert.equal((await make()(request("سؤال", { bearer: null }))).status, 401);
@@ -79,4 +81,12 @@ test("CORS only allows configured origins", async () => {
   const denied = await handler(new Request("https://unit.test/health", { headers: { Origin: "https://evil.test" } }));
   assert.equal(allowed.headers.get("Access-Control-Allow-Origin"), "https://app.example.test");
   assert.equal(denied.headers.get("Access-Control-Allow-Origin"), null);
+});
+
+test("health reports an unset Gemini key without exposing the key", async () => {
+  const response = await make({ apiKey: "" })(new Request("https://unit.test/health"));
+  const health = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(health.configured, false);
+  assert.equal(JSON.stringify(health).includes("test-api-key"), false);
 });
