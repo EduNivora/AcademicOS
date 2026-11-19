@@ -6,11 +6,12 @@
     "node": ">=24"
   },
   "scripts": {
-    "test": "node --test backend/neon/functions/notices/*.test.mjs",
-    "check": "node --check backend/neon/functions/notices/app.mjs && node --check backend/neon/functions/notices/index.mjs && node --check backend/neon/functions/notices/token_verifier.mjs && node --check backend/neon/functions/notices/app.test.mjs && node --check backend/neon/functions/notices/token_verifier.test.mjs",
+    "test": "node --test backend/neon/functions/notices/*.test.mjs backend/neon/functions/ai/*.test.mjs",
+    "check": "node --check backend/neon/functions/notices/app.mjs && node --check backend/neon/functions/notices/index.mjs && node --check backend/neon/functions/notices/token_verifier.mjs && node --check backend/neon/functions/ai/app.mjs && node --check backend/neon/functions/ai/index.mjs && node --check backend/neon/functions/ai/app.test.mjs",
     "neon:dev": "neon dev",
     "neon:deploy": "neon deploy",
-    "build:function": "esbuild backend/neon/functions/notices/index.mjs --bundle --platform=node --format=esm --target=node24 --outfile=backend/neon/dist/notices.mjs --external:node:* --external:pg --external:@neon/functions --external:pg-native"
+    "build:function": "esbuild backend/neon/functions/notices/index.mjs --bundle --platform=node --format=esm --target=node24 --outfile=backend/neon/dist/notices.mjs --external:node:* --external:pg --external:@neon/functions --external:pg-native",
+    "build:ai": "esbuild backend/neon/functions/ai/index.mjs --bundle --platform=node --format=esm --target=node24 --outfile=backend/neon/dist/ai.mjs --external:node:* --external:hono --external:jose"
   },
   "dependencies": {
     "@neon/config": "^1.14.0",
