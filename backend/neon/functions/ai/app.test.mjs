@@ -10,8 +10,8 @@ function makeApp({ verifyIdentity, fetchImpl } = {}) {
     apiKey: "test-api-key-not-a-real-secret",
     allowedOrigins: ["https://app.example.test"],
     fetchImpl: fetchImpl ?? (async () => new Response(JSON.stringify({
-      candidates: [{ content: { parts: [{ text: "إجابة اختبارية" }] } }],
-      usageMetadata: { totalTokenCount: 12 },
+      steps: [{ type: "model_output", content: [{ type: "text", text: "إجابة اختبارية" }] }],
+      usage: { total_tokens: 12 },
     }), { status: 200, headers: { "Content-Type": "application/json" } })),
   });
 }
@@ -46,7 +46,7 @@ test("valid authenticated request returns Gemini answer", async () => {
     fetchImpl: async (_url, options) => {
       requestOptions = options;
       return new Response(JSON.stringify({
-        candidates: [{ content: { parts: [{ text: "شرح مبسط." }] } }],
+        steps: [{ type: "model_output", content: [{ type: "text", text: "شرح مبسط." }] }],
       }), { status: 200 });
     },
   });
@@ -68,7 +68,7 @@ test("academic context is forwarded as a separate data-only message", async () =
     fetchImpl: async (_url, options) => {
       payload = JSON.parse(options.body);
       return new Response(JSON.stringify({
-        candidates: [{ content: { parts: [{ text: "تم التحليل." }] } }],
+        steps: [{ type: "model_output", content: [{ type: "text", text: "تم التحليل." }] }],
       }), { status: 200 });
     },
   });
