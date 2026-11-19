@@ -24,6 +24,25 @@ class AcademicAiRemoteDataSource {
   })  : _request = request ?? platformRequest,
         _baseUrl = baseUrl.replaceFirst(RegExp(r'/+$'), '');
 
+
+  Future<bool> isConfigured() async {
+    try {
+      final response = await _request(
+        Uri.parse('$_baseUrl/health'),
+        method: 'GET',
+        headers: const {'Accept': 'application/json'},
+        withCredentials: false,
+      );
+      if (response.statusCode != 200) return false;
+      final decoded = jsonDecode(response.body);
+      return decoded is Map<String, dynamic> &&
+          decoded['ok'] == true &&
+          decoded['configured'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<String> sendMessage({
     required String accessToken,
     required String message,
