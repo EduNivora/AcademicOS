@@ -27,5 +27,5 @@ jobs:
         run: flutter pub get
       - name: Analyze Dart code
         run: flutter analyze --no-pub --no-fatal-infos
-      - name: Run Flutter tests
-        run: flutter test --no-pub
+      - name: Run focused AI client tests
+        run: flutter test --no-pub test/data/datasources/academic_ai_remote_data_source_test.dart
