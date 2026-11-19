@@ -1599,35 +1599,15 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     );
   }
 
-  String _resolveVisibleUserName(UserEntity? currentUser) {
-    final accountName = currentUser?.displayName?.trim();
-    if (accountName != null &&
-        accountName.isNotEmpty &&
-        !accountName.contains('@')) {
-      return accountName;
-    }
-
-    final profileName = _studentProfile.fullName.trim();
-    if (profileName.isNotEmpty) return profileName;
-
-    final identity = (currentUser?.email ?? currentUser?.username ?? '').trim();
-    if (identity.contains('@')) {
-      final localPart = identity.split('@').first.trim();
-      if (localPart.isNotEmpty) return localPart;
-    } else if (identity.isNotEmpty) {
-      return identity;
-    }
-
-    return widget.isArabic ? 'زائر' : 'Guest';
-  }
-
   Widget _buildReferenceHeader(
     BuildContext context,
     UserEntity? currentUser,
     bool isDark,
   ) {
     final topPadding = MediaQuery.of(context).padding.top;
-    final userName = _resolveVisibleUserName(currentUser);
+    final userName = _studentProfile.fullName.isNotEmpty
+        ? _studentProfile.fullName
+        : (currentUser?.displayName ?? (currentUser?.username ?? 'Mohammed'));
     final termText = _activeTermName.isNotEmpty
         ? 'الفصل الدراسي: $_activeTermName'
         : (_studentProfile.academicLevel.isNotEmpty
@@ -1660,6 +1640,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
         children: [
           // Top status/brand row
           Row(
+            textDirection: TextDirection.ltr,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -1771,6 +1752,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
           const SizedBox(height: 20),
           // Greeting & Profile Row
           Row(
+            textDirection: TextDirection.ltr,
             children: [
               Expanded(
                 child: Column(
@@ -1778,8 +1760,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                   children: [
                     Text(
                       widget.isArabic
-                          ? 'أهلاً بك 👋'
-                          : 'Welcome 👋',
+                          ? 'مرحباً بك مجدداً 👋'
+                          : 'Welcome back 👋',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14,
@@ -1871,36 +1853,24 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     final gpaDisplay = targetGpa > 0
         ? '${(_estimatedGpa * 25).clamp(0, 100).round()}%'
         : (_courses.isEmpty
-              ? '92%'
-              : '${(_estimatedGpa * 25).clamp(0, 100).round()}%');
+            ? '92%'
+            : '${(_estimatedGpa * 25).clamp(0, 100).round()}%');
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
+        textDirection: TextDirection.ltr,
         children: [
-          // Card 1: إنجازك
           Expanded(
             child: _buildStatRefCard(
-              icon: Icons.trending_up_rounded,
-              iconColor: const Color(0xFF6366F1),
-              value: '$completionRate%',
-              label: widget.isArabic ? 'إنجازك' : 'Progress',
+              icon: Icons.emoji_events_rounded,
+              iconColor: const Color(0xFFF59E0B),
+              value: gpaDisplay,
+              label: widget.isArabic ? 'معدلك' : 'GPA',
               isDark: isDark,
             ),
           ),
           const SizedBox(width: 10),
-          // Card 2: مهام متبقية
-          Expanded(
-            child: _buildStatRefCard(
-              icon: Icons.check_circle_rounded,
-              iconColor: const Color(0xFF10B981),
-              value: '$_pendingTasksCount',
-              label: widget.isArabic ? 'مهام متبقية' : 'Pending',
-              isDark: isDark,
-            ),
-          ),
-          const SizedBox(width: 10),
-          // Card 3: مقرراتك
           Expanded(
             child: _buildStatRefCard(
               icon: Icons.menu_book_rounded,
@@ -1911,13 +1881,22 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
             ),
           ),
           const SizedBox(width: 10),
-          // Card 4: معدلك
           Expanded(
             child: _buildStatRefCard(
-              icon: Icons.emoji_events_rounded,
-              iconColor: const Color(0xFFF59E0B),
-              value: gpaDisplay,
-              label: widget.isArabic ? 'معدلك' : 'GPA',
+              icon: Icons.check_circle_rounded,
+              iconColor: const Color(0xFF10B981),
+              value: '$_pendingTasksCount',
+              label: widget.isArabic ? 'مهام متبقية' : 'Pending',
+              isDark: isDark,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _buildStatRefCard(
+              icon: Icons.trending_up_rounded,
+              iconColor: const Color(0xFF6366F1),
+              value: '$completionRate%',
+              label: widget.isArabic ? 'إنجازك' : 'Progress',
               isDark: isDark,
             ),
           ),
@@ -2460,7 +2439,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     bool isDark,
     Color primary,
   ) {
-    final userName = _resolveVisibleUserName(currentUser);
+    final userName = _studentProfile.fullName.isNotEmpty
+        ? _studentProfile.fullName
+        : (currentUser?.displayName ?? (currentUser?.username ?? 'Mohammed'));
     final userRole = _studentProfile.major.isNotEmpty
         ? _studentProfile.major
         : (widget.isArabic ? 'طالب جامعي' : 'University Student');
@@ -2490,6 +2471,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
               children: [
                 // Mascot + Logo + Tagline
                 Row(
+                  textDirection: TextDirection.ltr,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
@@ -2544,6 +2526,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                 const SizedBox(height: 18),
                 // User avatar + info row
                 Row(
+                  textDirection: TextDirection.ltr,
                   children: [
                     Stack(
                       clipBehavior: Clip.none,
@@ -3093,6 +3076,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
         child: SizedBox(
           height: 64,
           child: Row(
+            textDirection: TextDirection.ltr,
             children: [
               // 0: الرئيسية (Home)
               Expanded(
@@ -3254,17 +3238,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
               : const Color(0xFFF6F8FD),
           drawer: _buildReferenceDrawer(context, currentUser, isDark, primary),
           bottomNavigationBar: _buildReferenceBottomNav(context, isDark),
-          floatingActionButton: Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: FloatingActionButton.extended(
-              onPressed: () => _navigateToAddEdit(null),
-              backgroundColor: const Color(0xFF2563EB),
-              foregroundColor: Colors.white,
-              elevation: 4,
-              icon: const Icon(Icons.add_task_outlined),
-              label: Text(widget.isArabic ? 'مهمة جديدة' : 'New task'),
-            ),
-          ),
           body: widget.taskState.errorMessage != null
               ? Center(
                   child: Padding(
