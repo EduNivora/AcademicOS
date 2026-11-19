@@ -1,0 +1,90 @@
+name: Deploy EduNivora AI to Neon
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_deploy:
+        description: Type deploy to publish the AI function to the configured Neon branch
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: edunivora-neon-ai-production
+  cancel-in-progress: false
+
+jobs:
+  deploy-ai:
+    if: ${{ inputs.confirm_deploy == 'deploy' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Validate required secrets
+        shell: bash
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$NEON_API_KEY" || { echo "::error::Missing GitHub Actions secret NEON_API_KEY"; exit 1; }
+          test -n "$GEMINI_API_KEY" || { echo "::error::Missing GitHub Actions secret GEMINI_API_KEY"; exit 1; }
+
+      - name: Checkout AI implementation branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/edunivora-gemini-ai
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Verify AI function before deployment
+        run: |
+          npm run check
+          npm test
+          npm run build:ai
+
+      - name: Install Neon CLI
+        run: npm install --global neon@latest
+
+      - name: Link the exact Neon project and branch
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        run: |
+          set -euo pipefail
+          neon link --agent --project-id morning-lab-61449214 --branch br-late-bread-bajll3is --no-env-pull
+
+      - name: Deploy configured Neon functions
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          set -euo pipefail
+          npm run neon:deploy
+
+      - name: Verify Gemini configuration is active
+        shell: bash
+        run: |
+          set -euo pipefail
+          response=""
+          for attempt in $(seq 1 12); do
+            response="$(curl --silent --show-error --fail https://br-late-bread-bajll3is-ai.compute.c-8.eu-central-1.aws.neon.tech/health)" && break
+            sleep 5
+          done
+          test -n "$response" || { echo "::error::AI health endpoint did not respond"; exit 1; }
+          printf '%s' "$response" | node --input-type=module -e '
+            let body = "";
+            for await (const chunk of process.stdin) body += chunk;
+            const health = JSON.parse(body);
+            if (health.configured !== true) {
+              console.error("AI function is deployed but Gemini is not configured.");
+              process.exit(1);
+            }
+            console.log("AI health check passed: Gemini configuration is active.");
+          '
