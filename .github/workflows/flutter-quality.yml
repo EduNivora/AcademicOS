@@ -197,6 +197,83 @@ jobs:
             adb logcat -d -t 2000 || true
             exit 1
 
+      - name: Prepare optional production signing
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          GOOGLE_SERVER_CLIENT_ID: ${{ vars.GOOGLE_SERVER_CLIENT_ID }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD GOOGLE_SERVER_CLIENT_ID; do
+            if [ -z "${!name:-}" ]; then missing+=("$name"); fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::notice::Skipping signed ARM64 APK: production signing configuration is incomplete (${missing[*]})."
+            echo "PRODUCTION_SIGNING_READY=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          keystore="$RUNNER_TEMP/edunivora-production-upload.jks"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          chmod 600 "$keystore"
+          test -s "$keystore"
+          keytool -list -keystore "$keystore" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null
+          echo "PRODUCTION_SIGNING_READY=true" >> "$GITHUB_ENV"
+          echo "Production signing configuration verified."
+
+      - name: Build optimized signed ARM64 APK
+        if: env.PRODUCTION_SIGNING_READY == 'true'
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/edunivora-production-upload.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          GOOGLE_SERVER_CLIENT_ID: ${{ vars.GOOGLE_SERVER_CLIENT_ID }}
+        run: >-
+          flutter build apk --release --split-per-abi
+          --target-platform android-arm64
+          --obfuscate
+          --split-debug-info=build/symbols/apk
+          --dart-define=GOOGLE_SERVER_CLIENT_ID="$GOOGLE_SERVER_CLIENT_ID"
+
+      - name: Verify signed ARM64 APK and size
+        if: env.PRODUCTION_SIGNING_READY == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="build/app/outputs/flutter-apk/app-arm64-v8a-release.apk"
+          test -s "$apk"
+          build_tools="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          "$build_tools/aapt" dump badging "$apk" > apk-badging-release.txt
+          grep -q "package: name='com.arfatalkamli.academicos'" apk-badging-release.txt
+          grep -q "application-label:'EduNivora'" apk-badging-release.txt
+          "$build_tools/apksigner" verify --verbose --print-certs "$apk" > apk-signature-release.txt
+          apk_bytes="$(stat -c%s "$apk")"
+          apk_mib="$(awk -v bytes="$apk_bytes" 'BEGIN { printf "%.1f", bytes / 1048576 }')"
+          echo "Verified signed ARM64 APK size: ${apk_mib} MiB"
+          if [ "$apk_bytes" -gt $((60 * 1024 * 1024)) ]; then
+            echo "::error::Signed ARM64 APK exceeds the 60 MiB size target."
+            exit 1
+          fi
+          sha256sum "$apk" | tee SHA256SUMS-release.txt
+
+      - name: Upload signed ARM64 release APK
+        if: env.PRODUCTION_SIGNING_READY == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: edunivora-android-arm64-release-${{ github.sha }}
+          path: |
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            build/symbols/**
+            apk-badging-release.txt
+            apk-signature-release.txt
+            SHA256SUMS-release.txt
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Free unused runner disk space
         run: |
           echo "Disk space before cleanup:"
