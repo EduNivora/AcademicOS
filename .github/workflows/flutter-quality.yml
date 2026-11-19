@@ -163,7 +163,38 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disable-animations: true
-          script: flutter test integration_test/database_android_integration_test.dart --no-pub
+          script: |
+            set -uo pipefail
+            test_file="integration_test/database_android_integration_test.dart"
+
+            # The emulator can report boot-complete before Android's package manager
+            # is ready to accept an APK install. Probe it, then retry one transient
+            # ADB/package-service failure without hiding real test failures.
+            for attempt in 1 2; do
+              adb wait-for-device
+              package_ready=0
+              for _ in $(seq 1 30); do
+                if adb shell cmd package list packages >/dev/null 2>&1; then
+                  package_ready=1
+                  break
+                fi
+                sleep 5
+              done
+
+              if [ "$package_ready" -eq 1 ] && flutter test "$test_file" --no-pub; then
+                exit 0
+              fi
+
+              echo "::warning::Android SQLite integration attempt $attempt failed."
+              if [ "$attempt" -lt 2 ]; then
+                adb reconnect || true
+                sleep 15
+              fi
+            done
+
+            echo "::error::Android SQLite integration test failed after retry."
+            adb logcat -d -t 2000 || true
+            exit 1
 
       - name: Free unused runner disk space
         run: |
