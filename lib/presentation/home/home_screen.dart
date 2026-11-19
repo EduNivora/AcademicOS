@@ -39,6 +39,7 @@ import '../study_plan/study_planner_screen.dart';
 import '../task/add_edit_task_screen.dart';
 import '../screens/grade_distribution_screen.dart';
 import '../../data/database/database_helper.dart';
+import '../../data/models/exam_model.dart';
 
 class StudentProfile {
   static const String storageKey = 'academic_os_student_profile';
@@ -60,31 +61,31 @@ class StudentProfile {
   });
 
   factory StudentProfile.empty() => const StudentProfile(
-        fullName: '',
-        university: '',
-        major: '',
-        academicLevel: '',
-        targetGpa: '',
-        avatar: 'student',
-      );
+    fullName: '',
+    university: '',
+    major: '',
+    academicLevel: '',
+    targetGpa: '',
+    avatar: 'student',
+  );
 
   Map<String, dynamic> toJson() => {
-        'fullName': fullName,
-        'university': university,
-        'major': major,
-        'academicLevel': academicLevel,
-        'targetGpa': targetGpa,
-        'avatar': avatar,
-      };
+    'fullName': fullName,
+    'university': university,
+    'major': major,
+    'academicLevel': academicLevel,
+    'targetGpa': targetGpa,
+    'avatar': avatar,
+  };
 
   factory StudentProfile.fromJson(Map<String, dynamic> json) => StudentProfile(
-        fullName: json['fullName']?.toString() ?? '',
-        university: json['university']?.toString() ?? '',
-        major: json['major']?.toString() ?? '',
-        academicLevel: json['academicLevel']?.toString() ?? '',
-        targetGpa: json['targetGpa']?.toString() ?? '',
-        avatar: json['avatar']?.toString() ?? 'student',
-      );
+    fullName: json['fullName']?.toString() ?? '',
+    university: json['university']?.toString() ?? '',
+    major: json['major']?.toString() ?? '',
+    academicLevel: json['academicLevel']?.toString() ?? '',
+    targetGpa: json['targetGpa']?.toString() ?? '',
+    avatar: json['avatar']?.toString() ?? 'student',
+  );
 
   static Future<StudentProfile> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -252,6 +253,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
   late final AppLockService _appLockService;
   final TextEditingController _searchController = TextEditingController();
   List<CourseEntity> _courses = [];
+  List<ExamModel> _exams = [];
   bool _isAppLocked = false;
   bool _showMotivationCard = true;
   int _selectedBottomNav = 0;
@@ -271,7 +273,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
       widget.taskState.tasks.where((task) => task.isCompleted).length;
   int get _pendingTasksCount =>
       widget.taskState.tasks.length - _completedTasksCount;
-
 
   double _percentageToGpa(double percent) {
     if (percent >= 95) return 4.0;
@@ -308,13 +309,14 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     return (totalWeighted / totalCredits).clamp(0, 4.0);
   }
 
-
   Future<void> _showGlobalSearch() async {
     if (!mounted) return;
     final allTasks = widget.taskState.tasks;
     final matchCount = allTasks
-        .where((task) =>
-            task.title.toLowerCase().contains(_searchQuery.toLowerCase()))
+        .where(
+          (task) =>
+              task.title.toLowerCase().contains(_searchQuery.toLowerCase()),
+        )
         .length;
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -368,27 +370,36 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
       final activeTerm = await db.getActiveAcademicTerm();
       final schedules = await db.getSchedules();
       final courses = await db.getCourses();
+      final exams = await db.getExams();
       final courseMap = {for (final c in courses) c.id!: c};
       final todayDay = _getTodayArabicDay();
-      final todaySchedules = schedules
-          .where((row) => (row['day_of_week']?.toString() ?? '') == todayDay)
-          .map((row) {
-            final courseId = row['course_id'] is int
-                ? row['course_id'] as int
-                : int.tryParse(row['course_id']?.toString() ?? '');
-            final course = courseId != null ? courseMap[courseId] : null;
-            return {
-              'id': row['id'],
-              'day': row['day_of_week']?.toString() ?? todayDay,
-              'courseTitle': course?.name ?? (widget.isArabic ? 'محاضرة' : 'Lecture'),
-              'instructor': course?.instructor ?? '',
-              'start': row['start_time']?.toString() ?? '08:00',
-              'end': row['end_time']?.toString() ?? '09:00',
-              'location': row['location']?.toString() ?? (widget.isArabic ? 'غير محدد' : 'TBD'),
-            };
-          })
-          .toList()
-        ..sort((a, b) => (a['start'] as String).compareTo(b['start'] as String));
+      final todaySchedules =
+          schedules
+              .where(
+                (row) => (row['day_of_week']?.toString() ?? '') == todayDay,
+              )
+              .map((row) {
+                final courseId = row['course_id'] is int
+                    ? row['course_id'] as int
+                    : int.tryParse(row['course_id']?.toString() ?? '');
+                final course = courseId != null ? courseMap[courseId] : null;
+                return {
+                  'id': row['id'],
+                  'day': row['day_of_week']?.toString() ?? todayDay,
+                  'courseTitle':
+                      course?.name ?? (widget.isArabic ? 'محاضرة' : 'Lecture'),
+                  'instructor': course?.instructor ?? '',
+                  'start': row['start_time']?.toString() ?? '08:00',
+                  'end': row['end_time']?.toString() ?? '09:00',
+                  'location':
+                      row['location']?.toString() ??
+                      (widget.isArabic ? 'غير محدد' : 'TBD'),
+                };
+              })
+              .toList()
+            ..sort(
+              (a, b) => (a['start'] as String).compareTo(b['start'] as String),
+            );
 
       if (!mounted) return;
       setState(() {
@@ -396,6 +407,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
           _activeTermName = activeTerm.name;
         }
         _todayLectures = todaySchedules;
+        _exams = exams;
       });
     } catch (e) {
       debugPrint('HomeScreen._loadScheduleAndTerm error: $e');
@@ -409,7 +421,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     final target = DateTime(date.year, date.month, date.day);
     final diff = target.difference(today).inDays;
 
-    final hour = date.hour > 12 ? date.hour - 12 : (date.hour == 0 ? 12 : date.hour);
+    final hour = date.hour > 12
+        ? date.hour - 12
+        : (date.hour == 0 ? 12 : date.hour);
     final minute = date.minute.toString().padLeft(2, '0');
     final amPm = widget.isArabic
         ? (date.hour >= 12 ? 'م' : 'ص')
@@ -511,12 +525,13 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
   }
 
   List<String> get _courseFilterOptions {
-    final options = _courses
-        .map((course) => course.name.trim())
-        .where((name) => name.isNotEmpty)
-        .toSet()
-        .toList()
-      ..sort();
+    final options =
+        _courses
+            .map((course) => course.name.trim())
+            .where((name) => name.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
     return ['الكل', ...options, 'بدون كورس'];
   }
 
@@ -680,8 +695,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
       builder: (dialogContext) {
         return AlertDialog(
           backgroundColor: theme.cardColor,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           content: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520),
             child: SingleChildScrollView(
@@ -741,60 +757,70 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(children: [
-                        const Text('📚  ', style: TextStyle(fontSize: 18)),
-                        Expanded(
-                          child: Text(
-                            isAr
-                                ? 'إدارة المقررات: متابعة تفاصيل المواد، المحاضرين، والساعات المعتمدة.'
-                                : 'Courses: track subjects, instructors, materials, and credits.',
+                      Row(
+                        children: [
+                          const Text('📚  ', style: TextStyle(fontSize: 18)),
+                          Expanded(
+                            child: Text(
+                              isAr
+                                  ? 'إدارة المقررات: متابعة تفاصيل المواد، المحاضرين، والساعات المعتمدة.'
+                                  : 'Courses: track subjects, instructors, materials, and credits.',
+                            ),
                           ),
-                        ),
-                      ]),
+                        ],
+                      ),
                       const SizedBox(height: 8),
-                      Row(children: [
-                        const Text('📝  ', style: TextStyle(fontSize: 18)),
-                        Expanded(
-                          child: Text(
-                            isAr
-                                ? 'إدارة المهام: تنظيم الواجبات والتكاليف ومواعيد التسليم حسب الأولوية.'
-                                : 'Tasks: organize assignments and deadlines by priority.',
+                      Row(
+                        children: [
+                          const Text('📝  ', style: TextStyle(fontSize: 18)),
+                          Expanded(
+                            child: Text(
+                              isAr
+                                  ? 'إدارة المهام: تنظيم الواجبات والتكاليف ومواعيد التسليم حسب الأولوية.'
+                                  : 'Tasks: organize assignments and deadlines by priority.',
+                            ),
                           ),
-                        ),
-                      ]),
+                        ],
+                      ),
                       const SizedBox(height: 8),
-                      Row(children: [
-                        const Text('📅  ', style: TextStyle(fontSize: 18)),
-                        Expanded(
-                          child: Text(
-                            isAr
-                                ? 'الجدول الدراسي: تتبع أوقات المحاضرات، القاعات والمعامل، والمحاضرات النشطة.'
-                                : 'Weekly Schedule: track lecture times, rooms, and active sessions.',
+                      Row(
+                        children: [
+                          const Text('📅  ', style: TextStyle(fontSize: 18)),
+                          Expanded(
+                            child: Text(
+                              isAr
+                                  ? 'الجدول الدراسي: تتبع أوقات المحاضرات، القاعات والمعامل، والمحاضرات النشطة.'
+                                  : 'Weekly Schedule: track lecture times, rooms, and active sessions.',
+                            ),
                           ),
-                        ),
-                      ]),
+                        ],
+                      ),
                       const SizedBox(height: 8),
-                      Row(children: [
-                        const Text('📊  ', style: TextStyle(fontSize: 18)),
-                        Expanded(
-                          child: Text(
-                            isAr
-                                ? 'توزيع الدرجات والمعدل: رصد درجات النظري والعملي واحتساب المعدل الفعلي ومؤشرات التقدم.'
-                                : 'Grades & GPA: track scores and calculate your GPA progress.',
+                      Row(
+                        children: [
+                          const Text('📊  ', style: TextStyle(fontSize: 18)),
+                          Expanded(
+                            child: Text(
+                              isAr
+                                  ? 'توزيع الدرجات والمعدل: رصد درجات النظري والعملي واحتساب المعدل الفعلي ومؤشرات التقدم.'
+                                  : 'Grades & GPA: track scores and calculate your GPA progress.',
+                            ),
                           ),
-                        ),
-                      ]),
+                        ],
+                      ),
                       const SizedBox(height: 8),
-                      Row(children: [
-                        const Text('⏱️  ', style: TextStyle(fontSize: 18)),
-                        Expanded(
-                          child: Text(
-                            isAr
-                                ? 'أدوات الإنتاجية: جلسات التركيز والتقارير الأكاديمية المحلية.'
-                                : 'Productivity: focus sessions and local academic reports.',
+                      Row(
+                        children: [
+                          const Text('⏱️  ', style: TextStyle(fontSize: 18)),
+                          Expanded(
+                            child: Text(
+                              isAr
+                                  ? 'أدوات الإنتاجية: جلسات التركيز والتقارير الأكاديمية المحلية.'
+                                  : 'Productivity: focus sessions and local academic reports.',
+                            ),
                           ),
-                        ),
-                      ]),
+                        ],
+                      ),
                     ],
                   ),
                   const SizedBox(height: 14),
@@ -859,8 +885,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                           );
                         },
                         icon: const Icon(Icons.groups_rounded, size: 18),
-                        label:
-                            Text(isAr ? 'الفريق والمؤسسون' : 'Team & Founders'),
+                        label: Text(
+                          isAr ? 'الفريق والمؤسسون' : 'Team & Founders',
+                        ),
                       ),
                       OutlinedButton(
                         onPressed: () => Navigator.pop(dialogContext),
@@ -939,15 +966,17 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     final dashboard = const AcademicDashboardService().analyze(
       courses: _courses,
       tasks: widget.taskState.tasks,
-      exams: const [],
+      exams: _exams,
     );
 
     final healthText = dashboard.studyHealthScore.round();
     final riskText = dashboard.atRiskCourses.isEmpty
-        ? (widget.isArabic ? 'لا توجد مواد في خطر حاليًا.' : 'No courses currently at risk.')
+        ? (widget.isArabic
+              ? 'لا توجد مواد في خطر حاليًا.'
+              : 'No courses currently at risk.')
         : (widget.isArabic
-            ? 'مواد تحتاج عناية إضافية: ${dashboard.atRiskCourses.join(" • ")}'
-            : 'Needs attention: ${dashboard.atRiskCourses.join(" • ")}');
+              ? 'مواد تحتاج عناية إضافية: ${dashboard.atRiskCourses.join(" • ")}'
+              : 'Needs attention: ${dashboard.atRiskCourses.join(" • ")}');
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -995,7 +1024,10 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(999),
@@ -1150,13 +1182,13 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.inbox_outlined,
-                size: 70,
-                color: Theme.of(context)
-                    .textTheme
-                    .bodyMedium
-                    ?.color
-                    ?.withValues(alpha: 0.4)),
+            Icon(
+              Icons.inbox_outlined,
+              size: 70,
+              color: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.color?.withValues(alpha: 0.4),
+            ),
             const SizedBox(height: 12),
             Text(
               'لا يوجد شيء هنا بعد',
@@ -1171,7 +1203,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
               'أضف أول مادة أو أول مهمة لبدء تنظيم دراستك',
               textAlign: TextAlign.center,
               style: TextStyle(
-                  color: Theme.of(context).textTheme.bodyMedium?.color),
+                color: Theme.of(context).textTheme.bodyMedium?.color,
+              ),
             ),
             const SizedBox(height: 12),
             Wrap(
@@ -1245,8 +1278,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     for (final task in _filteredTasks()) {
       final groupName =
           (task.courseName != null && task.courseName!.trim().isNotEmpty)
-              ? task.courseName!
-              : 'بدون كورس';
+          ? task.courseName!
+          : 'بدون كورس';
       groups.putIfAbsent(groupName, () => []).add(task);
     }
     final sortedKeys = groups.keys.toList()
@@ -1278,15 +1311,19 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
   }
 
   Future<void> _showProfileEditor() async {
-    final controllerName =
-        TextEditingController(text: _studentProfile.fullName);
-    final controllerUniversity =
-        TextEditingController(text: _studentProfile.university);
+    final controllerName = TextEditingController(
+      text: _studentProfile.fullName,
+    );
+    final controllerUniversity = TextEditingController(
+      text: _studentProfile.university,
+    );
     final controllerMajor = TextEditingController(text: _studentProfile.major);
-    final controllerLevel =
-        TextEditingController(text: _studentProfile.academicLevel);
-    final controllerTarget =
-        TextEditingController(text: _studentProfile.targetGpa);
+    final controllerLevel = TextEditingController(
+      text: _studentProfile.academicLevel,
+    );
+    final controllerTarget = TextEditingController(
+      text: _studentProfile.targetGpa,
+    );
     String selectedAvatar = _studentProfile.avatar;
 
     final result = await showDialog<bool>(
@@ -1311,32 +1348,37 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                   children: [
                     TextField(
                       controller: controllerName,
-                      decoration:
-                          const InputDecoration(labelText: 'اسم الطالب'),
+                      decoration: const InputDecoration(
+                        labelText: 'اسم الطالب',
+                      ),
                     ),
                     const SizedBox(height: 10),
                     TextField(
                       controller: controllerUniversity,
-                      decoration:
-                          const InputDecoration(labelText: 'الجامعة / الكلية'),
+                      decoration: const InputDecoration(
+                        labelText: 'الجامعة / الكلية',
+                      ),
                     ),
                     const SizedBox(height: 10),
                     TextField(
                       controller: controllerMajor,
-                      decoration:
-                          const InputDecoration(labelText: 'التخصص الدراسي'),
+                      decoration: const InputDecoration(
+                        labelText: 'التخصص الدراسي',
+                      ),
                     ),
                     const SizedBox(height: 10),
                     TextField(
                       controller: controllerLevel,
-                      decoration:
-                          const InputDecoration(labelText: 'المستوى الدراسي'),
+                      decoration: const InputDecoration(
+                        labelText: 'المستوى الدراسي',
+                      ),
                     ),
                     const SizedBox(height: 10),
                     TextField(
                       controller: controllerTarget,
-                      decoration:
-                          const InputDecoration(labelText: 'المعدل المستهدف'),
+                      decoration: const InputDecoration(
+                        labelText: 'المعدل المستهدف',
+                      ),
                     ),
                     const SizedBox(height: 14),
                     const Align(
@@ -1369,8 +1411,10 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                               ),
                             ),
                             child: Center(
-                              child: Text(emoji,
-                                  style: const TextStyle(fontSize: 26)),
+                              child: Text(
+                                emoji,
+                                style: const TextStyle(fontSize: 26),
+                              ),
                             ),
                           ),
                         );
@@ -1495,7 +1539,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
-                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          color: isDark
+                              ? Colors.white
+                              : const Color(0xFF0F172A),
                           decoration: task.isCompleted
                               ? TextDecoration.lineThrough
                               : null,
@@ -1528,8 +1574,10 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                 const SizedBox(width: 8),
                 // Priority Badge
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: priorityBg,
                     borderRadius: BorderRadius.circular(12),
@@ -1563,10 +1611,10 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     final termText = _activeTermName.isNotEmpty
         ? 'الفصل الدراسي: $_activeTermName'
         : (_studentProfile.academicLevel.isNotEmpty
-            ? 'الفصل الدراسي: ${_studentProfile.academicLevel}'
-            : (widget.isArabic
-                ? 'الفصل الدراسي: الثاني 1447 هـ'
-                : 'Term: Second 1447 AH'));
+              ? 'الفصل الدراسي: ${_studentProfile.academicLevel}'
+              : (widget.isArabic
+                    ? 'الفصل الدراسي: الثاني 1447 هـ'
+                    : 'Term: Second 1447 AH'));
 
     return Container(
       padding: EdgeInsets.fromLTRB(16, topPadding + 8, 16, 26),
@@ -1709,7 +1757,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      widget.isArabic ? 'مرحباً بك مجدداً 👋' : 'Welcome back 👋',
+                      widget.isArabic
+                          ? 'مرحباً بك مجدداً 👋'
+                          : 'Welcome back 👋',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14,
@@ -1800,7 +1850,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     final targetGpa = double.tryParse(_studentProfile.targetGpa) ?? 0;
     final gpaDisplay = targetGpa > 0
         ? '${(_estimatedGpa * 25).clamp(0, 100).round()}%'
-        : (_courses.isEmpty ? '92%' : '${(_estimatedGpa * 25).clamp(0, 100).round()}%');
+        : (_courses.isEmpty
+              ? '92%'
+              : '${(_estimatedGpa * 25).clamp(0, 100).round()}%');
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -2033,15 +2085,16 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                         hasLecture
                             ? '${lecture!['courseTitle']}'
                             : (widget.isArabic
-                                ? 'محاضرة الذكاء الاصطناعي'
-                                : 'Artificial Intelligence Lecture'),
+                                  ? 'محاضرة الذكاء الاصطناعي'
+                                  : 'Artificial Intelligence Lecture'),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w800,
-                          color:
-                              isDark ? Colors.white : const Color(0xFF0F172A),
+                          color: isDark
+                              ? Colors.white
+                              : const Color(0xFF0F172A),
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -2086,8 +2139,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     BuildContext context,
     bool isDark,
   ) {
-    final pending =
-        widget.taskState.tasks.where((t) => !t.isCompleted).toList();
+    final pending = widget.taskState.tasks
+        .where((t) => !t.isCompleted)
+        .toList();
     final displayTasks = pending.isNotEmpty
         ? pending.take(3).toList()
         : widget.taskState.tasks.take(3).toList();
@@ -2100,23 +2154,31 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  const Icon(
-                    Icons.check_circle_outline_rounded,
-                    color: Color(0xFF2563EB),
-                    size: 22,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    widget.isArabic ? 'مهامي القادمة' : 'Upcoming Tasks',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+              Expanded(
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.check_circle_outline_rounded,
+                      color: Color(0xFF2563EB),
+                      size: 22,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        widget.isArabic ? 'مهامي القادمة' : 'Upcoming Tasks',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: isDark
+                              ? Colors.white
+                              : const Color(0xFF0F172A),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               GestureDetector(
                 onTap: () {
@@ -2173,33 +2235,27 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                           : 'Great! No pending tasks right now',
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
-                        color:
-                            isDark ? Colors.white : const Color(0xFF0F172A),
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
                       ),
                     ),
                     const SizedBox(height: 8),
                     OutlinedButton.icon(
                       onPressed: () => _navigateToAddEdit(null),
                       icon: const Icon(Icons.add, size: 16),
-                      label:
-                          Text(widget.isArabic ? 'إضافة مهمة' : 'Add task'),
+                      label: Text(widget.isArabic ? 'إضافة مهمة' : 'Add task'),
                     ),
                   ],
                 ),
               ),
             )
           else
-            ...displayTasks
-                .map((task) => _buildTaskItemRefCard(task, isDark)),
+            ...displayTasks.map((task) => _buildTaskItemRefCard(task, isDark)),
         ],
       ),
     );
   }
 
-  Widget _buildReferenceQuickAccessSection(
-    BuildContext context,
-    bool isDark,
-  ) {
+  Widget _buildReferenceQuickAccessSection(BuildContext context, bool isDark) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -2240,7 +2296,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                         builder: (_) => AcademicAiScreen(
                           courses: _courses,
                           tasks: widget.taskState.tasks,
-                          exams: const [],
+                          exams: _exams,
                           authUseCases: widget.authUseCases,
                         ),
                       ),
@@ -2483,8 +2539,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                           ),
                           child: CircleAvatar(
                             radius: 24,
-                            backgroundColor:
-                                Colors.white.withValues(alpha: 0.2),
+                            backgroundColor: Colors.white.withValues(
+                              alpha: 0.2,
+                            ),
                             child: Text(
                               _avatarText(_studentProfile.avatar),
                               style: const TextStyle(fontSize: 24),
@@ -2621,7 +2678,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                         builder: (_) => AcademicAiScreen(
                           courses: _courses,
                           tasks: widget.taskState.tasks,
-                          exams: const [],
+                          exams: _exams,
                           authUseCases: widget.authUseCases,
                         ),
                       ),
@@ -2655,8 +2712,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                 ),
                 _buildRefDrawerTile(
                   icon: Icons.calendar_month_outlined,
-                  title:
-                      widget.isArabic ? 'الفصول الدراسية' : 'Academic Terms',
+                  title: widget.isArabic ? 'الفصول الدراسية' : 'Academic Terms',
                   isDark: isDark,
                   onTap: () {
                     Navigator.pop(context);
@@ -2670,8 +2726,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                 ),
                 _buildRefDrawerTile(
                   icon: Icons.psychology_outlined,
-                  title:
-                      widget.isArabic ? 'مخطط المذاكرة الذكي' : 'Study Planner',
+                  title: widget.isArabic
+                      ? 'مخطط المذاكرة الذكي'
+                      : 'Study Planner',
                   isDark: isDark,
                   onTap: () {
                     Navigator.pop(context);
@@ -2701,8 +2758,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                 ),
                 _buildRefDrawerTile(
                   icon: Icons.analytics_outlined,
-                  title:
-                      widget.isArabic ? 'التقارير الأكاديمية' : 'Academic Reports',
+                  title: widget.isArabic
+                      ? 'التقارير الأكاديمية'
+                      : 'Academic Reports',
                   isDark: isDark,
                   onTap: () {
                     Navigator.pop(context);
@@ -2723,8 +2781,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                 ),
                 _buildRefDrawerTile(
                   icon: Icons.person_outline_rounded,
-                  title:
-                      widget.isArabic ? 'الملف الأكاديمي' : 'Academic Profile',
+                  title: widget.isArabic
+                      ? 'الملف الأكاديمي'
+                      : 'Academic Profile',
                   isDark: isDark,
                   onTap: () {
                     Navigator.pop(context);
@@ -2749,7 +2808,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                     try {
                       await widget.authUseCases.logout.call();
                     } catch (error, stackTrace) {
-                      debugPrint('HomeScreen.logout error: $error\n$stackTrace');
+                      debugPrint(
+                        'HomeScreen.logout error: $error\n$stackTrace',
+                      );
                       if (!mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
@@ -2789,8 +2850,10 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                 // Dark mode toggle tile with Switch matching reference
                 Container(
                   margin: const EdgeInsets.symmetric(vertical: 2),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -2876,8 +2939,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                 // Support & About App
                 _buildRefDrawerTile(
                   icon: Icons.info_outline_rounded,
-                  title:
-                      widget.isArabic ? 'عن تطبيق EduNivora' : 'About EduNivora',
+                  title: widget.isArabic
+                      ? 'عن تطبيق EduNivora'
+                      : 'About EduNivora',
                   isDark: isDark,
                   onTap: () {
                     Navigator.pop(context);
@@ -2935,11 +2999,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
       ),
       child: Row(
         children: [
-          Icon(
-            icon,
-            size: 18,
-            color: const Color(0xFF2563EB),
-          ),
+          Icon(icon, size: 18, color: const Color(0xFF2563EB)),
           const SizedBox(width: 8),
           Text(
             title,
@@ -2967,11 +3027,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         child: Row(
           children: [
-            Icon(
-              icon,
-              size: 20,
-              color: const Color(0xFF2563EB),
-            ),
+            Icon(icon, size: 20, color: const Color(0xFF2563EB)),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -3117,8 +3173,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     required VoidCallback onTap,
   }) {
     const activeColor = Color(0xFF2563EB);
-    final inactiveColor =
-        isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final inactiveColor = isDark
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
 
     return InkWell(
       onTap: onTap,
@@ -3165,7 +3222,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     final completionRate = widget.taskState.tasks.isEmpty
         ? 0
         : ((_completedTasksCount / widget.taskState.tasks.length) * 100)
-            .round();
+              .round();
 
     return FutureBuilder<UserEntity?>(
       future: _currentUserFuture,
@@ -3174,10 +3231,10 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
 
         return Scaffold(
           key: _scaffoldKey,
-          backgroundColor:
-              isDark ? const Color(0xFF0F172A) : const Color(0xFFF6F8FD),
-          drawer:
-              _buildReferenceDrawer(context, currentUser, isDark, primary),
+          backgroundColor: isDark
+              ? const Color(0xFF0F172A)
+              : const Color(0xFFF6F8FD),
+          drawer: _buildReferenceDrawer(context, currentUser, isDark, primary),
           bottomNavigationBar: _buildReferenceBottomNav(context, isDark),
           floatingActionButton: Padding(
             padding: const EdgeInsets.only(bottom: 6),
@@ -3278,8 +3335,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                             child: SingleChildScrollView(
                               scrollDirection: Axis.horizontal,
                               child: Row(
-                                children:
-                                    TaskSearchStatus.values.map((status) {
+                                children: TaskSearchStatus.values.map((status) {
                                   final isSelected = _statusFilter == status;
                                   return Padding(
                                     padding: const EdgeInsets.only(left: 8),
@@ -3288,8 +3344,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                                       selected: isSelected,
                                       onSelected: (_) async =>
                                           _saveStatusFilter(status),
-                                      selectedColor: const Color(0xFF2563EB)
-                                          .withValues(alpha: 0.18),
+                                      selectedColor: const Color(
+                                        0xFF2563EB,
+                                      ).withValues(alpha: 0.18),
                                       backgroundColor: isDark
                                           ? const Color(0xFF1E293B)
                                           : Colors.white,
@@ -3297,8 +3354,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                                         color: isSelected
                                             ? const Color(0xFF2563EB)
                                             : (isDark
-                                                ? Colors.white70
-                                                : Colors.black87),
+                                                  ? Colors.white70
+                                                  : Colors.black87),
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -3323,21 +3380,22 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                                           ? const Color(0xFF1E293B)
                                           : Colors.white,
                                       border: OutlineInputBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(14),
+                                        borderRadius: BorderRadius.circular(14),
                                         borderSide: BorderSide.none,
                                       ),
                                       contentPadding:
                                           const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 10,
-                                      ),
+                                            horizontal: 12,
+                                            vertical: 10,
+                                          ),
                                     ),
                                     items: _courseFilterOptions
-                                        .map((option) => DropdownMenuItem(
-                                              value: option,
-                                              child: Text(option),
-                                            ))
+                                        .map(
+                                          (option) => DropdownMenuItem(
+                                            value: option,
+                                            child: Text(option),
+                                          ),
+                                        )
                                         .toList(),
                                     onChanged: (value) async {
                                       if (value == null) return;
@@ -3352,13 +3410,14 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                                   icon: const Icon(Icons.sort_rounded),
                                   onSelected: (mode) async =>
                                       _saveSortMode(mode),
-                                  itemBuilder: (context) =>
-                                      TaskSortMode.values
-                                          .map((mode) => PopupMenuItem(
-                                                value: mode,
-                                                child: Text(mode.label),
-                                              ))
-                                          .toList(),
+                                  itemBuilder: (context) => TaskSortMode.values
+                                      .map(
+                                        (mode) => PopupMenuItem(
+                                          value: mode,
+                                          child: Text(mode.label),
+                                        ),
+                                      )
+                                      .toList(),
                                 ),
                               ],
                             ),
@@ -3370,15 +3429,14 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                             child: widget.taskState.tasks.isEmpty
                                 ? _buildEmptyState(context)
                                 : Column(
-                                    children: _groupTasksByCourse()
-                                        .entries
-                                        .expand((entry) {
+                                    children: _groupTasksByCourse().entries.expand((
+                                      entry,
+                                    ) {
                                       final groupTitle = entry.key;
                                       final tasks = entry.value;
                                       return [
                                         Padding(
-                                          padding:
-                                              const EdgeInsets.fromLTRB(
+                                          padding: const EdgeInsets.fromLTRB(
                                             16,
                                             16,
                                             16,
@@ -3386,8 +3444,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                                           ),
                                           child: Row(
                                             mainAxisAlignment:
-                                                MainAxisAlignment
-                                                    .spaceBetween,
+                                                MainAxisAlignment.spaceBetween,
                                             children: [
                                               Text(
                                                 groupTitle,
@@ -3396,22 +3453,20 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                                                   fontWeight: FontWeight.bold,
                                                   color: isDark
                                                       ? Colors.white
-                                                      : const Color(
-                                                          0xFF0F172A),
+                                                      : const Color(0xFF0F172A),
                                                 ),
                                               ),
                                               Text(
                                                 widget.isArabic
                                                     ? (tasks.length == 1
-                                                        ? 'مهمة واحدة'
-                                                        : '${tasks.length} مهام')
+                                                          ? 'مهمة واحدة'
+                                                          : '${tasks.length} مهام')
                                                     : '${tasks.length} tasks',
                                                 style: TextStyle(
                                                   fontSize: 12,
                                                   color: isDark
                                                       ? Colors.white60
-                                                      : const Color(
-                                                          0xFF64748B),
+                                                      : const Color(0xFF64748B),
                                                 ),
                                               ),
                                             ],
