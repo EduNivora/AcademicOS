@@ -63,11 +63,23 @@ class DatabaseHelper {
   static const String scheduleTable = 'schedule';
 
   Database? _database;
+  Future<Database>? _databaseOpening;
 
   Future<Database> get database async {
-    if (_database != null && _database!.isOpen) return _database!;
-    _database = await _initDatabase();
-    return _database!;
+    final current = _database;
+    if (current != null && current.isOpen) return current;
+
+    // Share one in-flight open operation across concurrent callers.
+    final opening = _databaseOpening ??= _initDatabase();
+    try {
+      final openedDatabase = await opening;
+      _database = openedDatabase;
+      return openedDatabase;
+    } finally {
+      if (identical(_databaseOpening, opening)) {
+        _databaseOpening = null;
+      }
+    }
   }
 
   Future<Database> _initDatabase() async {
