@@ -2362,6 +2362,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                       MaterialPageRoute(
                         builder: (_) => StudyPlannerScreen(
                           courseUseCases: widget.courseUseCases,
+                          taskUseCases: widget.taskUseCases,
+                          onTasksChanged: widget.onRefresh,
                         ),
                       ),
                     );
