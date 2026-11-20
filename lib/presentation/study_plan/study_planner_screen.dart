@@ -3,14 +3,20 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../domain/entities/course_entity.dart';
+import '../../domain/entities/task_entity.dart';
 import '../../domain/usecases/course_use_cases.dart';
+import '../../domain/usecases/task_use_cases.dart';
 
 class StudyPlannerScreen extends StatefulWidget {
   final CourseUseCases courseUseCases;
+  final TaskUseCases taskUseCases;
+  final Future<void> Function()? onTasksChanged;
 
   const StudyPlannerScreen({
     super.key,
     required this.courseUseCases,
+    required this.taskUseCases,
+    this.onTasksChanged,
   });
 
   @override
@@ -31,6 +37,8 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
 
   final List<_StudyDay> _studyDays = [];
   bool _planGenerated = false;
+  bool _isSavingPlan = false;
+  int _savedDayCount = 0;
 
   @override
   void initState() {
@@ -114,6 +122,7 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
               ? 'مراجعة شاملة، أسئلة سريعة، وتلخيص أهم النقاط.'
               : 'دراسة الوحدات ${start.toString()}-${end.toString()} مع تمارين قصيرة.',
           isCompleted: false,
+          dueDate: DateTime.now().add(Duration(days: dayIndex - 1)),
         ),
       );
     }
@@ -123,21 +132,50 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
         ..clear()
         ..addAll(items);
       _planGenerated = true;
+      _savedDayCount = 0;
     });
   }
 
   Future<void> _savePlan() async {
-    if (_studyDays.isEmpty) return;
-    final courseName = _selectedCourseName ?? 'المادة';
-    final message = 'تم حفظ خطة المذاكرة لـ $courseName بنجاح.. الله يوفقك!';
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+    if (_studyDays.isEmpty || _isSavingPlan || _savedDayCount >= _studyDays.length) return;
+    final selected = _courses.where((course) => course.name == _selectedCourseName);
+    if (selected.isEmpty) return;
+    final course = selected.first;
+    setState(() => _isSavingPlan = true);
+    var savedNow = 0;
+    try {
+      for (var index = _savedDayCount; index < _studyDays.length; index++) {
+        final day = _studyDays[index];
+        final task = TaskEntity(
+          title: course.name + ': ' + day.title,
+          description: day.details + ' (' + day.hours.toString() + ' ساعات مذاكرة)',
+          type: TaskType.review,
+          priority: TaskPriority.medium,
+          dueDate: DateTime(day.dueDate.year, day.dueDate.month, day.dueDate.day, 20),
+          courseId: course.id,
+          courseName: course.name,
+        );
+        final id = await widget.taskUseCases.addTask(task);
+        _studyDays[index] = day.copyWith(taskId: id);
+        _savedDayCount = index + 1;
+        savedNow++;
+      }
+      await widget.onTasksChanged?.call();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('تم حفظ ' + savedNow.toString() + ' جلسة مذاكرة كمهام فعلية لمادة ' + course.name + '.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تم حفظ ' + savedNow.toString() + ' من ' + _studyDays.length.toString() + ' جلسة قبل حدوث خطأ: ' + error.toString())),
+      );
+    } finally {
+      if (mounted) setState(() => _isSavingPlan = false);
+    }
   }
 
   @override
@@ -295,12 +333,26 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                                 children: [
                                   Checkbox(
                                     value: day.isCompleted,
-                                    onChanged: (value) {
+                                    onChanged: (value) async {
+                                      final completed = value ?? false;
                                       setState(() {
-                                        _studyDays[index] = day.copyWith(
-                                          isCompleted: value ?? false,
-                                        );
+                                        _studyDays[index] = day.copyWith(isCompleted: completed);
                                       });
+                                      if (day.taskId != null) {
+                                        try {
+                                          final savedTask = await widget.taskUseCases.getTaskById(day.taskId!);
+                                          if (savedTask != null) {
+                                            await widget.taskUseCases.updateTask(savedTask.copyWith(isCompleted: completed));
+                                            await widget.onTasksChanged?.call();
+                                          }
+                                        } catch (error) {
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(content: Text('تعذر تحديث حالة جلسة المذاكرة: ' + error.toString())),
+                                            );
+                                          }
+                                        }
+                                      }
                                     },
                                   ),
                                   const SizedBox(width: 8),
@@ -345,9 +397,15 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton.icon(
-                            onPressed: _savePlan,
-                            icon: const Icon(Icons.save_alt_rounded),
-                            label: const Text('حفظ الخطة'),
+                            onPressed: _isSavingPlan || _savedDayCount >= _studyDays.length ? null : _savePlan,
+                            icon: _isSavingPlan
+                                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                                : const Icon(Icons.save_alt_rounded),
+                            label: Text(_isSavingPlan
+                                ? 'جارٍ حفظ الجلسات...'
+                                : _savedDayCount >= _studyDays.length
+                                    ? 'تم حفظ الخطة كمهام'
+                                    : 'حفظ الخطة كمهام'),
                           ),
                         ),
                       ],
@@ -364,6 +422,8 @@ class _StudyDay {
   final int hours;
   final String details;
   final bool isCompleted;
+  final DateTime dueDate;
+  final int? taskId;
 
   const _StudyDay({
     required this.dayLabel,
@@ -371,15 +431,19 @@ class _StudyDay {
     required this.hours,
     required this.details,
     required this.isCompleted,
+    required this.dueDate,
+    this.taskId,
   });
 
-  _StudyDay copyWith({bool? isCompleted}) {
+  _StudyDay copyWith({bool? isCompleted, int? taskId}) {
     return _StudyDay(
       dayLabel: dayLabel,
       title: title,
       hours: hours,
       details: details,
       isCompleted: isCompleted ?? this.isCompleted,
+      dueDate: dueDate,
+      taskId: taskId ?? this.taskId,
     );
   }
 }
