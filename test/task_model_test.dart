@@ -16,6 +16,7 @@ void main() {
         startDateTime: DateTime(2026, 12, 30, 18),
         endDateTime: DateTime(2026, 12, 30, 20),
         isCompleted: true,
+        completedAt: DateTime(2026, 12, 30, 21),
         courseId: 3,
         courseName: 'Math 101',
         notes: 'Review chapters 1-3',
@@ -34,6 +35,7 @@ void main() {
       expect(map['start_date_time'], '2026-12-30T18:00:00.000');
       expect(map['end_date_time'], '2026-12-30T20:00:00.000');
       expect(map['is_completed'], 1);
+      expect(map['completed_at'], '2026-12-30T21:00:00.000');
       expect(map['course_id'], 3);
       expect(map['course_name'], 'Math 101');
       expect(map['notes'], 'Review chapters 1-3');
@@ -51,6 +53,7 @@ void main() {
       expect(parsed.startDateTime, DateTime(2026, 12, 30, 18));
       expect(parsed.endDateTime, DateTime(2026, 12, 30, 20));
       expect(parsed.isCompleted, isTrue);
+      expect(parsed.completedAt, DateTime(2026, 12, 30, 21));
       expect(parsed.courseId, 3);
       expect(parsed.courseName, 'Math 101');
       expect(parsed.notes, 'Review chapters 1-3');
@@ -73,6 +76,7 @@ void main() {
       expect(parsed.priority, TaskPriority.medium);
       expect(parsed.recurrence, TaskRecurrence.once);
       expect(parsed.isCompleted, isFalse);
+      expect(parsed.completedAt, isNull);
       expect(parsed.reminderEnabled, isFalse);
       expect(parsed.reminderOffsetMinutes, 30);
     });
@@ -104,6 +108,38 @@ void main() {
         }),
         throwsFormatException,
       );
+    });
+
+    test('copyWith can clear a previously configured reminder', () {
+      final task = TaskModel(
+        title: 'Reminder task',
+        description: '',
+        reminderEnabled: true,
+        reminderDate: DateTime(2026, 12, 30, 20),
+      );
+
+      final updated = task.copyWith(
+        reminderEnabled: false,
+        clearReminderDate: true,
+      );
+      expect(updated.reminderEnabled, isFalse);
+      expect(updated.reminderDate, isNull);
+    });
+
+    test('copyWith can clear a previously saved completion timestamp', () {
+      final task = TaskModel(
+        title: 'Completed',
+        description: '',
+        isCompleted: true,
+        completedAt: DateTime(2026, 11, 20, 10),
+      );
+
+      final reopened = task.copyWith(
+        isCompleted: false,
+        clearCompletedAt: true,
+      );
+      expect(reopened.isCompleted, isFalse);
+      expect(reopened.completedAt, isNull);
     });
   });
 }

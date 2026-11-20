@@ -136,5 +136,75 @@ void main() {
 
       expect(await source.isConfigured(), isFalse);
     });
+
+    test('uploads an authenticated image and returns parsed schedule rows', () async {
+      Uri? requestedUri;
+      Map<String, String>? requestedHeaders;
+      Map<String, dynamic>? requestedBody;
+      final source = AcademicAiRemoteDataSource(
+        baseUrl: 'https://ai.example.test',
+        request: (uri, {
+          required method,
+          required headers,
+          body,
+          required withCredentials,
+        }) async {
+          requestedUri = uri;
+          requestedHeaders = headers;
+          requestedBody = jsonDecode(body!) as Map<String, dynamic>;
+          expect(method, 'POST');
+          expect(withCredentials, isFalse);
+          return const PlatformHttpResponse(
+            statusCode: 200,
+            body: '{"entries":[{"day":"الأحد","course_name":"أمن الشبكات","start_time":"08:00","end_time":"09:30","location":"قاعة 2"}]}',
+          );
+        },
+      );
+
+      final entries = await source.parseScheduleImage(
+        accessToken: 'neon-session-jwt',
+        imageBytes: [1, 2, 3],
+        mimeType: 'image/png',
+      );
+
+      expect(requestedUri.toString(), 'https://ai.example.test/v1/schedule/parse');
+      expect(requestedHeaders!['Authorization'], 'Bearer neon-session-jwt');
+      expect(requestedBody!['mimeType'], 'image/png');
+      expect(requestedBody!['image'], base64Encode([1, 2, 3]));
+      expect(entries.single['course_name'], 'أمن الشبكات');
+    });
+
+    test('rejects image parsing without authentication or a valid image', () async {
+      var requestCalled = false;
+      final source = AcademicAiRemoteDataSource(
+        request: (_, {
+          required method,
+          required headers,
+          body,
+          required withCredentials,
+        }) async {
+          requestCalled = true;
+          return const PlatformHttpResponse(statusCode: 200, body: '{"entries":[]}');
+        },
+      );
+
+      await expectLater(
+        source.parseScheduleImage(
+          accessToken: '',
+          imageBytes: [1],
+          mimeType: 'image/png',
+        ),
+        throwsA(isA<AcademicAiRemoteException>()),
+      );
+      await expectLater(
+        source.parseScheduleImage(
+          accessToken: 'neon-session-jwt',
+          imageBytes: [1],
+          mimeType: 'application/pdf',
+        ),
+        throwsA(isA<AcademicAiRemoteException>()),
+      );
+      expect(requestCalled, isFalse);
+    });
   });
 }

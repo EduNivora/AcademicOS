@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
@@ -37,7 +39,7 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
   Future<void> _pickAndSave() async {
     final FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['pdf', 'doc', 'docx', 'txt'],
+      allowedExtensions: ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'txt'],
       withData: true,
     );
     if (result == null || !mounted) return;
@@ -59,7 +61,7 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
 
     final fileName = p.basename(file.name);
     final ext = p.extension(fileName).replaceFirst('.', '').toLowerCase();
-    if (!{'pdf', 'doc', 'docx', 'txt'}.contains(ext)) {
+    if (!{'pdf', 'doc', 'docx', 'ppt', 'pptx', 'txt'}.contains(ext)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('نوع الملف غير مدعوم.')),
       );
@@ -96,28 +98,38 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
       );
       return;
     }
-    if (material.fileType == 'pdf') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-            builder: (_) => DocumentViewerScreen(
-                filePath: material.filePath, title: material.title, fileBytes: material.fileBytes)),
-      );
-    } else {
-      showDialog(
+    if (material.fileType == 'txt') {
+      final text = utf8.decode(material.fileBytes!, allowMalformed: true);
+      await showDialog<void>(
         context: context,
-        builder: (context) => AlertDialog(
+        builder: (dialogContext) => AlertDialog(
           title: Text(material.title),
-          content: const Text(
-              'معاينة هذا النوع من الملفات غير مدعومة داخل التطبيق حالياً.'),
+          content: SizedBox(
+            width: 520,
+            height: 420,
+            child: SingleChildScrollView(child: SelectableText(text)),
+          ),
           actions: [
             TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('إغلاق')),
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('إغلاق'),
+            ),
           ],
         ),
       );
+      return;
     }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DocumentViewerScreen(
+          filePath: material.filePath,
+          title: material.title,
+          fileBytes: material.fileBytes,
+        ),
+      ),
+    );
   }
 
   Future<void> _deleteMaterial(int id) async {

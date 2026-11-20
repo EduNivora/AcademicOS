@@ -67,8 +67,8 @@ class _PrivacyTab extends StatelessWidget {
               ? '1. التخزين المحلي للبيانات (SQLite)'
               : '1. Local Data Storage (SQLite)',
           body: isArabic
-              ? 'يحفظ EduNivora بياناتك الدراسية الأساسية (المهام، المقررات، الجدول الأسبوعي، خطط الاختبارات، وحسابات المعدل) محلياً على جهازك باستخدام قاعدة بيانات SQLite لتعمل دون اتصال بالإنترنت. ملاحظة شفافة: قاعدة بيانات SQLite المحلية غير مشفرة حالياً في وضع السكون، بينما تُحفظ بيانات الجلسة والإعدادات الحساسة عبر التخزين الآمن في النظام (Secure Storage).'
-              : 'EduNivora stores your core study data (tasks, courses, weekly schedule, exam plans, and GPA records) locally on your device in SQLite for offline-first access. Transparency note: the local SQLite database file is not currently encrypted at rest, while sensitive auth tokens and security preferences use platform Secure Storage.',
+              ? 'يحفظ EduNivora بياناتك الدراسية الأساسية (المهام، المواد، الجدول الأسبوعي، خطط الاختبارات) محلياً على جهازك باستخدام قاعدة بيانات SQLite لتعمل دون اتصال بالإنترنت. ملاحظة شفافة: قاعدة بيانات SQLite المحلية غير مشفرة حالياً في وضع السكون، بينما تُحفظ بيانات الجلسة والإعدادات الحساسة عبر التخزين الآمن في النظام (Secure Storage).'
+              : 'EduNivora stores your core study data (tasks, courses, weekly schedule, exam plans) locally on your device in SQLite for offline-first access. Transparency note: the local SQLite database file is not currently encrypted at rest, while sensitive auth tokens and security preferences use platform Secure Storage.',
         ),
         const SizedBox(height: 12),
         _LegalSectionCard(

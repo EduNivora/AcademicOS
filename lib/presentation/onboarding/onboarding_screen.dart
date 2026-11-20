@@ -7,6 +7,7 @@ import '../../core/widgets/academic_scaffold_background.dart';
 import '../../domain/usecases/auth_use_cases.dart';
 import '../../domain/usecases/course_use_cases.dart';
 import '../../domain/usecases/task_use_cases.dart';
+import '../../data/models/student_profile_model.dart';
 import '../home/home_screen.dart';
 
 class StudentProfileSetupScreen extends StatefulWidget {
@@ -39,8 +40,9 @@ class _StudentProfileSetupScreenState extends State<StudentProfileSetupScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _universityController = TextEditingController();
   final TextEditingController _majorController = TextEditingController();
+  final TextEditingController _departmentController = TextEditingController();
+  final TextEditingController _semesterController = TextEditingController();
   final TextEditingController _levelController = TextEditingController();
-  final TextEditingController _targetGpaController = TextEditingController();
 
   String _selectedAvatar = 'student';
   bool _isLoading = false;
@@ -90,8 +92,10 @@ class _StudentProfileSetupScreenState extends State<StudentProfileSetupScreen> {
       fullName: _nameController.text.trim(),
       university: _universityController.text.trim(),
       major: _majorController.text.trim(),
+      department: _departmentController.text.trim(),
+      semester: _semesterController.text.trim(),
       academicLevel: _levelController.text.trim(),
-      targetGpa: _targetGpaController.text.trim(),
+      targetGpa: '',
       avatar: _selectedAvatar,
     );
 
@@ -120,8 +124,9 @@ class _StudentProfileSetupScreenState extends State<StudentProfileSetupScreen> {
     _nameController.dispose();
     _universityController.dispose();
     _majorController.dispose();
+    _departmentController.dispose();
+    _semesterController.dispose();
     _levelController.dispose();
-    _targetGpaController.dispose();
     super.dispose();
   }
 
@@ -315,27 +320,32 @@ class _StudentProfileSetupScreenState extends State<StudentProfileSetupScreen> {
                                     ? (constraints.maxWidth - 56) / 2
                                     : double.infinity,
                                 child: _buildTextField(
+                                  label: 'القسم',
+                                  controller: _departmentController,
+                                  prefix: Icons.account_tree_outlined,
+                                ),
+                              ),
+                              SizedBox(
+                                width: isWide
+                                    ? (constraints.maxWidth - 56) / 2
+                                    : double.infinity,
+                                child: _buildTextField(
+                                  label: 'الفصل الدراسي',
+                                  controller: _semesterController,
+                                  prefix: Icons.calendar_month_outlined,
+                                ),
+                              ),
+                              SizedBox(
+                                width: isWide
+                                    ? (constraints.maxWidth - 56) / 2
+                                    : double.infinity,
+                                child: _buildTextField(
                                   label: 'المستوى الدراسي',
                                   controller: _levelController,
                                   prefix: Icons.analytics_outlined,
                                   validator: (value) =>
                                       value == null || value.trim().isEmpty
                                           ? 'يرجى إدخال المستوى'
-                                          : null,
-                                ),
-                              ),
-                              SizedBox(
-                                width: double.infinity,
-                                child: _buildTextField(
-                                  label: 'المعدل المستهدف',
-                                  controller: _targetGpaController,
-                                  prefix: Icons.flag_outlined,
-                                  keyboardType:
-                                      const TextInputType.numberWithOptions(
-                                          decimal: true),
-                                  validator: (value) =>
-                                      value == null || value.trim().isEmpty
-                                          ? 'يرجى إدخال المعدل المستهدف'
                                           : null,
                                 ),
                               ),

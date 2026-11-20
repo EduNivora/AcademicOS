@@ -5,12 +5,104 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:academic_os/data/database/database_helper.dart';
 import 'package:academic_os/data/models/course_material_model.dart';
 import 'package:academic_os/data/models/course_model.dart';
+import 'package:academic_os/data/models/task_model.dart';
+import 'package:academic_os/data/models/exam_model.dart';
 import 'package:academic_os/data/models/academic_term_model.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Database schema', () {
+    test('course cascade deletion removes related tasks, exams, schedules and files atomically', () async {
+      final helper = DatabaseHelper.instance;
+      await helper.close();
+      final courseId = await helper.insertCourse(CourseModel(
+        name: 'Cascade test material',
+        instructor: 'Test',
+        code: 'CASCADE-${DateTime.now().microsecondsSinceEpoch}',
+      ));
+      final taskId = await helper.insertTask(TaskModel(
+        title: 'Cascade task',
+        description: '',
+        courseId: courseId,
+        courseName: 'Cascade test material',
+      ));
+      final examId = await helper.insertExam(ExamModel(
+        title: 'Cascade exam',
+        examDate: DateTime(2027, 1, 1),
+        courseId: courseId,
+        courseName: 'Cascade test material',
+      ));
+      final scheduleId = await helper.insertSchedule({
+        'course_id': courseId,
+        'day_of_week': 'الأحد',
+        'start_time': '08:00',
+        'end_time': '09:00',
+        'location': 'Cascade room',
+        'reminder_enabled': 1,
+      });
+      final materialId = await helper.insertMaterial({
+        'course_id': courseId,
+        'title': 'Cascade file',
+        'file_path': 'memory://cascade',
+        'file_type': 'pdf',
+        'file_bytes': Uint8List.fromList([1, 2, 3]),
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      final result = await helper.deleteCourseCascade(courseId);
+      expect(result.deletedCourses, 1);
+      expect(result.taskIds, contains(taskId));
+      expect(result.scheduleIds, contains(scheduleId));
+      expect(await helper.getCourseById(courseId), isNull);
+      expect((await helper.getTasks()).where((task) => task.id == taskId), isEmpty);
+      expect((await helper.getExams()).where((exam) => exam.id == examId), isEmpty);
+      expect(await helper.getSchedules().then((rows) => rows.where((row) => row['id'] == scheduleId)), isEmpty);
+      expect(await helper.getMaterialsByCourseId(courseId), isEmpty);
+      expect(materialId, greaterThan(0));
+      await helper.close();
+    });
+
+    test('bulk schedule insertion is atomic', () async {
+      final helper = DatabaseHelper.instance;
+      await helper.close();
+      final before = await helper.getSchedules();
+      final initialIds = before.map((row) => row['id']).toSet();
+
+      try {
+        final ids = await helper.insertSchedules([
+          {
+            'course_id': null,
+            'day_of_week': 'الأحد',
+            'start_time': '23:51',
+            'end_time': '23:52',
+            'location': 'Atomic test A',
+            'reminder_enabled': 0,
+          },
+          {
+            'course_id': null,
+            'day_of_week': 'الأحد',
+            'start_time': '23:53',
+            'end_time': '23:54',
+            'location': 'Atomic test B',
+            'reminder_enabled': 0,
+          },
+        ]);
+        expect(ids, hasLength(2));
+        final after = await helper.getSchedules();
+        expect(after.where((row) => ids.contains(row['id'])), hasLength(2));
+      } finally {
+        final after = await helper.getSchedules();
+        for (final row in after) {
+          final id = row['id'];
+          if (id is int && !initialIds.contains(id) &&
+              (row['location'] == 'Atomic test A' || row['location'] == 'Atomic test B')) {
+            await helper.deleteSchedule(id);
+          }
+        }
+        await helper.close();
+      }
+    });
     test('failed backup restore rolls back and preserves existing data',
         () async {
       final helper = DatabaseHelper.instance;
@@ -457,7 +549,7 @@ void main() {
   );
 
   test(
-    'schema v11 upgrades to v12 without losing existing course data',
+    'schema v11 upgrades to v13 and adds completion timestamps without losing course data',
     () async {
       final helper = DatabaseHelper.instance;
       await helper.close();
@@ -481,7 +573,7 @@ void main() {
 
         final upgradedDb = await helper.database;
         final version = await upgradedDb.rawQuery('PRAGMA user_version');
-        expect(version.single['user_version'], 12);
+        expect(version.single['user_version'], 13);
 
         final termColumns =
             await upgradedDb.rawQuery('PRAGMA table_info(academic_terms)');
@@ -489,6 +581,9 @@ void main() {
           termColumns.map((row) => row['name']),
           containsAll(['name', 'start_date', 'end_date', 'is_active']),
         );
+        final taskColumns =
+            await upgradedDb.rawQuery('PRAGMA table_info(tasks)');
+        expect(taskColumns.map((row) => row['name']), contains('completed_at'));
         final indexes =
             await upgradedDb.rawQuery('PRAGMA index_list(academic_terms)');
         expect(

@@ -31,8 +31,8 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
             en: 'What is EduNivora?',
           ),
           answer: LocalizedCopy(
-            ar: 'EduNivora هو تطبيق أكاديمي يعمل بنهج الأولوية للعمل دون اتصال (Offline-First) لإدارة المهام الدراسية، المقررات، ملفات PDF، الجدول الأسبوعي، خطط الاختبارات، المعدل التراكمي، مؤقت التركيز، والتقارير الأكاديمية.',
-            en: 'EduNivora is an offline-first academic app for managing study tasks, courses and PDFs, weekly schedules, exam plans, GPA simulation, focus timers, and academic reports.',
+            ar: 'EduNivora هو تطبيق أكاديمي يعمل بنهج الأولوية للعمل دون اتصال (Offline-First) لإدارة المهام الدراسية، المواد، ملفات PDF، الجدول الأسبوعي، خطط الدراسة، مؤقت التركيز، والتقارير الأكاديمية.',
+            en: 'EduNivora is an offline-first academic app for managing study tasks, courses and PDFs, weekly schedules, study planning, focus timers, and academic reports.',
           ),
         ),
         _HelpFaqItem(
@@ -41,7 +41,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
             en: 'How do I get started?',
           ),
           answer: LocalizedCopy(
-            ar: 'من بوابة الدخول يمكنك إنشاء حساب سحابي أو محلي، أو تسجيل الدخول عبر Google، أو اختيار الدخول كضيف للاستخدام المحلي الفوري وإضافة مقرراتك ومهامك مباشرةً.',
+            ar: 'من بوابة الدخول يمكنك إنشاء حساب سحابي أو محلي، أو تسجيل الدخول عبر Google، أو اختيار الدخول كضيف للاستخدام المحلي الفوري وإضافة موادك ومهامك مباشرةً.',
             en: 'From the sign-in screen you can create an account, sign in with Google, or continue as a guest to immediately use local features and add your courses and tasks.',
           ),
         ),
@@ -111,8 +111,8 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
         en: 'Profile & Preferences',
       ),
       subtitle: LocalizedCopy(
-        ar: 'بيانات الطالب، اللغة، والوضع الفاتح والداكن',
-        en: 'Student info, Arabic/English language, and Light/Dark themes',
+        ar: 'الملف الأكاديمي، اللغة، والوضع الفاتح والداكن',
+        en: 'Academic profile, Arabic/English language, and Light/Dark themes',
       ),
       items: <_HelpFaqItem>[
         _HelpFaqItem(
@@ -143,8 +143,8 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
       color: AppTheme.success,
       title: LocalizedCopy(ar: 'وحدات التطبيق', en: 'App Modules'),
       subtitle: LocalizedCopy(
-        ar: 'المهام، المقررات، الجدول، الاختبارات، المعدل، التركيز، المساعد، التقارير، والإعلانات',
-        en: 'Tasks, Courses, Schedule, Exams, GPA, Focus, Local AI, Reports & Notices',
+        ar: 'المهام، المواد، الجدول، الاختبارات، التركيز، المساعد، التقارير، والإعلانات',
+        en: 'Tasks, Courses, Schedule, Exams, Focus, Local AI, Reports & Notices',
       ),
       items: <_HelpFaqItem>[
         _HelpFaqItem(
@@ -159,12 +159,12 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
         ),
         _HelpFaqItem(
           question: LocalizedCopy(
-            ar: 'المقررات والملفات وعارض PDF (Courses)',
+            ar: 'المواد والملفات ومعاينة PDF وWord وPowerPoint',
             en: 'Courses, Materials & PDF Viewer',
           ),
           answer: LocalizedCopy(
-            ar: 'أنشئ مقرراتك الدراسية واربط بها الفصول الأكاديمية والمهام وملفات المذاكرة مع إمكانية فتح ملفات PDF داخل التطبيق.',
-            en: 'Organize courses by academic term, link tasks and study attachments, and open lecture PDFs with the built-in viewer.',
+            ar: 'أنشئ موادك الدراسية واربط بها المهام وملفات المذاكرة مع معاينة ملفات PDF وWord وPowerPoint داخل التطبيق دون الحاجة للإنترنت.',
+            en: 'Organize courses by academic term, link tasks and study attachments, and preview PDF, Word, and PowerPoint files inside the app.',
           ),
         ),
         _HelpFaqItem(
@@ -185,16 +185,6 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
           answer: LocalizedCopy(
             ar: 'أنشئ خطط مراجعة لاختباراتك القادمة ووزّع مهام المذاكرة قبل موعد كل امتحان.',
             en: 'Build revision plans for upcoming exams and break study goals into actionable sessions.',
-          ),
-        ),
-        _HelpFaqItem(
-          question: LocalizedCopy(
-            ar: 'حاسبة المعدل ومحاكاة توزيع الدرجات (GPA & Grade Simulator)',
-            en: 'GPA Calculator & Grade Simulator',
-          ),
-          answer: LocalizedCopy(
-            ar: 'احسب معدلك الفصلي والتراكمي وجرّب توزيع درجات أعمال السنة والاختبار النهائي لكل مقرر.',
-            en: 'Calculate semester and cumulative GPA and simulate course grade distributions.',
           ),
         ),
         _HelpFaqItem(
@@ -248,7 +238,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
             en: 'Where do I find modules and settings?',
           ),
           answer: LocalizedCopy(
-            ar: 'استخدم القائمة الجانبية (Drawer) في الشاشة الرئيسية للوصول إلى المقررات، الجدول، مؤقت التركيز، التقارير، المساعد المحلي، والإعدادات. ومن شاشة الإعدادات يمكنك الوصول إلى قفل التطبيق، عن التطبيق، الفريق والمؤسسين، مركز المساعدة، تواصل معنا، والخصوصية والشروط.',
+            ar: 'استخدم القائمة الجانبية (Drawer) في الشاشة الرئيسية للوصول إلى المواد، الجدول، مؤقت التركيز، التقارير، المساعد المحلي، والإعدادات. ومن شاشة الإعدادات يمكنك الوصول إلى قفل التطبيق، عن التطبيق، الفريق والمؤسسين، مركز المساعدة، تواصل معنا، والخصوصية والشروط.',
             en: 'Use the Home screen navigation drawer to open Courses, Schedule, Focus Timer, Reports, Local AI, and Settings. Inside Settings you can access App Lock, About App, Team & Founders, Help Center, Contact Us, and Privacy & Terms.',
           ),
         ),
@@ -283,8 +273,8 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
             en: 'Is data stored locally and does the app work offline?',
           ),
           answer: LocalizedCopy(
-            ar: 'نعم، تُحفظ المهام والمقررات والجدول وحسابات المعدل محلياً في SQLite وتعمل الوظائف الأساسية بالكامل دون إنترنت. يلزم الإنترنت فقط للمصادقة السحابية (Neon Auth / Google) وتحميل الإعلانات السحابية.',
-            en: 'Yes. Tasks, courses, schedules, and GPA data are stored locally in SQLite and core features work offline. Internet is only needed for optional cloud auth (Neon Auth / Google) and cloud announcements.',
+            ar: 'نعم، تُحفظ المهام والمواد والجدول محلياً في SQLite وتعمل الوظائف الأساسية بالكامل دون إنترنت. يلزم الإنترنت فقط للمصادقة السحابية (Neon Auth / Google) وتحميل الإعلانات السحابية.',
+            en: 'Yes. Tasks, courses, schedules are stored locally in SQLite and core features work offline. Internet is only needed for optional cloud auth (Neon Auth / Google) and cloud announcements.',
           ),
         ),
         _HelpFaqItem(
@@ -485,7 +475,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                   ? 'لا توجد نتائج مطابقة'
                   : 'No matching help topics',
               description: isArabic
-                  ? 'جرّب كلمات مفتاحية أخرى مثل: المهام، المقررات، PIN، أو Google.'
+                  ? 'جرّب كلمات مفتاحية أخرى مثل: المهام، المواد، PIN، أو Google.'
                   : 'Try another keyword such as tasks, courses, PIN, or Google.',
               actionLabel: isArabic ? 'إظهار جميع المواضيع' : 'Show all topics',
               onAction: () {

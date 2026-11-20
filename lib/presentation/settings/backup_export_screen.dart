@@ -407,7 +407,7 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
         children: [
           _buildActionCard(
             'نسخ احتياطي فوري',
-            'تصدير المقررات والمهام والاختبارات والجدول وبيانات المرفقات ومحتوى الملفات الفعلي ضمن النسخة.',
+            'تصدير المواد والمهام والاختبارات والجدول وبيانات المرفقات ومحتوى الملفات الفعلي ضمن النسخة.',
             Icons.backup_rounded,
             _exportBackup,
           ),

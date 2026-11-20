@@ -43,6 +43,80 @@ class AcademicAiRemoteDataSource {
     }
   }
 
+  Future<List<Map<String, dynamic>>> parseScheduleImage({
+    required String accessToken,
+    required List<int> imageBytes,
+    required String mimeType,
+  }) async {
+    if (accessToken.trim().isEmpty) {
+      throw const AcademicAiRemoteException(
+        401,
+        'unauthorized',
+        'سجّل الدخول لاستخراج الجدول من الصورة.',
+      );
+    }
+    if (imageBytes.isEmpty || imageBytes.length > 8 * 1024 * 1024 ||
+        !const {'image/jpeg', 'image/png', 'image/webp'}.contains(mimeType)) {
+      throw const AcademicAiRemoteException(
+        400,
+        'invalid_image',
+        'اختر صورة JPG أو PNG أو WebP لا يتجاوز حجمها 8 ميجابايت.',
+      );
+    }
+
+    final response = await _request(
+      Uri.parse('$_baseUrl/v1/schedule/parse'),
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+      body: jsonEncode({
+        'image': base64Encode(imageBytes),
+        'mimeType': mimeType,
+      }),
+      withCredentials: false,
+    );
+
+    Map<String, dynamic> decoded;
+    try {
+      final value = jsonDecode(response.body);
+      if (value is! Map<String, dynamic>) {
+        throw const FormatException('Invalid schedule response shape.');
+      }
+      decoded = value;
+    } catch (_) {
+      throw const AcademicAiRemoteException(
+        502,
+        'invalid_response',
+        'وصل رد غير مفهوم عند قراءة صورة الجدول.',
+      );
+    }
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final error = decoded['error'];
+      final code = error is Map ? error['code']?.toString() ?? 'ai_error' : 'ai_error';
+      final message = error is Map
+          ? error['message']?.toString() ?? 'تعذر استخراج الجدول.'
+          : 'تعذر استخراج الجدول.';
+      throw AcademicAiRemoteException(response.statusCode, code, message);
+    }
+
+    final rawEntries = decoded['entries'];
+    if (rawEntries is! List) {
+      throw const AcademicAiRemoteException(
+        502,
+        'invalid_schedule_result',
+        'تنسيق الجدول المستخرج غير صالح.',
+      );
+    }
+    return rawEntries
+        .whereType<Map>()
+        .map((entry) => Map<String, dynamic>.from(entry))
+        .toList(growable: false);
+  }
+
   Future<String> sendMessage({
     required String accessToken,
     required String message,

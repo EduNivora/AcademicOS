@@ -17,6 +17,18 @@ import '../models/task_model.dart';
 
 /// مساعد قاعدة البيانات المسؤول عن إنشاء قاعدة البيانات والتعامل
 /// مع عمليات CRUD الخاصة بالمهام والمواد.
+class CourseDeletionResult {
+  final int deletedCourses;
+  final List<int> taskIds;
+  final List<int> scheduleIds;
+
+  const CourseDeletionResult({
+    required this.deletedCourses,
+    required this.taskIds,
+    required this.scheduleIds,
+  });
+}
+
 class DatabaseHelper {
   DatabaseHelper._();
 
@@ -42,7 +54,7 @@ class DatabaseHelper {
   static bool _nativeFactoryInitialized = false;
 
   static const String _databaseName = 'academic_os.db';
-  static const int _databaseVersion = 12;
+  static const int _databaseVersion = 13;
   static const String _materialsTable = 'course_materials';
   static const String _taskTable = 'tasks';
   static const String _courseTable = 'courses';
@@ -237,6 +249,7 @@ class DatabaseHelper {
         type TEXT NOT NULL DEFAULT 'other',
         due_date TEXT,
         is_completed INTEGER NOT NULL DEFAULT 0,
+        completed_at TEXT,
         course_id INTEGER,
         course_name TEXT,
         priority TEXT NOT NULL DEFAULT 'medium',
@@ -342,6 +355,9 @@ class DatabaseHelper {
     int oldVersion,
     int newVersion,
   ) async {
+    if (oldVersion < 13) {
+      await _ensureColumn(db, _taskTable, 'completed_at', 'TEXT');
+    }
     if (oldVersion < 2) {
       await _ensureColumn(
         db,
@@ -731,7 +747,7 @@ class DatabaseHelper {
       );
       if (linkedCourses.isNotEmpty) {
         throw StateError(
-          'لا يمكن حذف هذا الفصل لأنه مرتبط بمقررات. انقل المقررات إلى فصل آخر أولاً.',
+          'لا يمكن حذف هذا الفصل لأنه مرتبط بمادةات. انقل المواد إلى فصل آخر أولاً.',
         );
       }
       return txn.delete('academic_terms', where: 'id = ?', whereArgs: [id]);
@@ -826,6 +842,47 @@ class DatabaseHelper {
     return await db.delete(_courseTable, where: 'id = ?', whereArgs: [id]);
   }
 
+  Future<CourseDeletionResult> deleteCourseCascade(int id) async {
+    final db = await database;
+    return db.transaction((txn) async {
+      final taskRows = await txn.query(
+        _taskTable,
+        columns: ['id'],
+        where: 'course_id = ?',
+        whereArgs: [id],
+      );
+      final scheduleRows = await txn.query(
+        scheduleTable,
+        columns: ['id'],
+        where: 'course_id = ?',
+        whereArgs: [id],
+      );
+      final taskIds = taskRows
+          .map((row) => row['id'])
+          .whereType<int>()
+          .toList(growable: false);
+      final scheduleIds = scheduleRows
+          .map((row) => row['id'])
+          .whereType<int>()
+          .toList(growable: false);
+
+      await txn.delete(_taskTable, where: 'course_id = ?', whereArgs: [id]);
+      await txn.delete(scheduleTable, where: 'course_id = ?', whereArgs: [id]);
+      await txn.delete(_examTable, where: 'course_id = ?', whereArgs: [id]);
+      await txn.delete(_materialsTable, where: 'course_id = ?', whereArgs: [id]);
+      final deletedCourses = await txn.delete(
+        _courseTable,
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      return CourseDeletionResult(
+        deletedCourses: deletedCourses,
+        taskIds: taskIds,
+        scheduleIds: scheduleIds,
+      );
+    });
+  }
+
   Future<int> updateCourseGrades(
     int courseId, {
     double midGrade = 0,
@@ -894,6 +951,24 @@ class DatabaseHelper {
       schedule,
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+  }
+
+  Future<List<int>> insertSchedules(
+    List<Map<String, dynamic>> schedules,
+  ) async {
+    if (schedules.isEmpty) return const [];
+    final db = await database;
+    return db.transaction((txn) async {
+      final insertedIds = <int>[];
+      for (final schedule in schedules) {
+        insertedIds.add(await txn.insert(
+          scheduleTable,
+          schedule,
+          conflictAlgorithm: ConflictAlgorithm.abort,
+        ));
+      }
+      return insertedIds;
+    });
   }
 
   Future<List<Map<String, dynamic>>> getSchedules() async {

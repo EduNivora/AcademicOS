@@ -95,6 +95,7 @@ class TaskEntity {
   final DateTime? startDateTime;
   final DateTime? endDateTime;
   final bool isCompleted;
+  final DateTime? completedAt;
   final int? courseId;
   final String? courseName;
   final String notes;
@@ -113,6 +114,7 @@ class TaskEntity {
     this.startDateTime,
     this.endDateTime,
     this.isCompleted = false,
+    this.completedAt,
     this.courseId,
     this.courseName,
     this.notes = '',
@@ -132,11 +134,14 @@ class TaskEntity {
     DateTime? startDateTime,
     DateTime? endDateTime,
     bool? isCompleted,
+    DateTime? completedAt,
+    bool clearCompletedAt = false,
     int? courseId,
     String? courseName,
     String? notes,
     bool? reminderEnabled,
     DateTime? reminderDate,
+    bool clearReminderDate = false,
     int? reminderOffsetMinutes,
   }) {
     return TaskEntity(
@@ -150,11 +155,12 @@ class TaskEntity {
       startDateTime: startDateTime ?? this.startDateTime,
       endDateTime: endDateTime ?? this.endDateTime,
       isCompleted: isCompleted ?? this.isCompleted,
+      completedAt: clearCompletedAt ? null : completedAt ?? this.completedAt,
       courseId: courseId ?? this.courseId,
       courseName: courseName ?? this.courseName,
       notes: notes ?? this.notes,
       reminderEnabled: reminderEnabled ?? this.reminderEnabled,
-      reminderDate: reminderDate ?? this.reminderDate,
+      reminderDate: clearReminderDate ? null : reminderDate ?? this.reminderDate,
       reminderOffsetMinutes:
           reminderOffsetMinutes ?? this.reminderOffsetMinutes,
     );

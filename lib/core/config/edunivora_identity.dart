@@ -265,11 +265,11 @@ class EdunivoraIdentity {
   static const LocalizedCopy overview = LocalizedCopy(
     ar:
         'EduNivora هو تطبيق أكاديمي يعمل بنهج الأولوية للعمل دون اتصال (Offline-First)، '
-        'صُمّم لجمع مهام الطالب الجامعي ومقرراته الدراسية وجدوله الأسبوعي وخطط اختباراته '
-        'وحساب المعدل ومؤقت التركيز والتقارير الأكاديمية في بيئة موحدة سريعة وواضحة.',
+        'صُمّم لجمع مهام الطالب الجامعي ومواده الدراسية وجدوله الأسبوعي وخطط اختباراته '
+        'ومؤقت التركيز والتقارير الأكاديمية في بيئة موحدة سريعة وواضحة.',
     en:
         'EduNivora is an offline-first academic companion that unifies student tasks, '
-        'courses and study materials, weekly schedules, exam study planning, GPA simulation, '
+        'courses and study materials, weekly schedules, exam study planning, '
         'focus sessions, and academic reports in one fast, structured experience.',
   );
 
@@ -279,12 +279,8 @@ class EdunivoraIdentity {
       en: 'Fragmented assignments, deadlines, and notes spread across disconnected apps.',
     ),
     LocalizedCopy(
-      ar: 'صعوبة متابعة تقدم المقررات والملفات الدراسية وربطها بخطة الاختبارات.',
+      ar: 'صعوبة متابعة تقدم المواد والملفات الدراسية وربطها بخطة الاختبارات.',
       en: 'Difficulty tracking courses, lecture PDFs, and exam preparation in one place.',
-    ),
-    LocalizedCopy(
-      ar: 'غياب رؤية واضحة لتأثير الدرجات المتوقعة على المعدل الفصلي والتراكمي.',
-      en: 'Lack of clear visibility into how individual grades impact semester and cumulative GPA.',
     ),
     LocalizedCopy(
       ar: 'الاعتماد الكامل على الإنترنت في أدوات التنظيم اليومية أثناء التواجد في القاعات.',
@@ -357,8 +353,8 @@ class EdunivoraIdentity {
       en: 'Task & assignment management with priorities, due dates, and local notifications.',
     ),
     LocalizedCopy(
-      ar: 'إدارة المقررات الدراسية، الفصول الأكاديمية، والمواد والملفات مع عارض PDF مدمج.',
-      en: 'Courses, academic terms, and course materials with a built-in PDF viewer.',
+      ar: 'إدارة المواد الدراسية ومعاينة ملفات PDF وWord وPowerPoint داخل التطبيق.',
+      en: 'Academic subjects and PDF, Word, and PowerPoint materials with offline preview.',
     ),
     LocalizedCopy(
       ar: 'الجدول الأسبوعي للمحاضرات والمعامل بتنظيم واضح لأيام الأسبوع.',
@@ -367,10 +363,6 @@ class EdunivoraIdentity {
     LocalizedCopy(
       ar: 'خطط الاختبارات ومخطط الدراسة لمتابعة الاستعداد قبل مواعيد الامتحانات.',
       en: 'Exam plans and study planner to structure preparation ahead of exams.',
-    ),
-    LocalizedCopy(
-      ar: 'حاسبة المعدل التراكمي ومحاكاة توزيع الدرجات لكل مقرر.',
-      en: 'GPA calculator and per-course grade distribution simulator.',
     ),
     LocalizedCopy(
       ar: 'مؤقت التركيز (Focus Timer) لدعم جلسات المذاكرة المنتظمة.',

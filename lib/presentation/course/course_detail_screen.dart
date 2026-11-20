@@ -65,7 +65,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
       await _loadData();
     } catch (error) {
       if (!mounted) return;
-      setState(() => _errorMessage = 'تعذر تحميل بيانات المقرر.');
+      setState(() => _errorMessage = 'تعذر تحميل بيانات المادة.');
     }
   }
 
@@ -73,7 +73,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
     if (_course == null) {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'المقرر غير موجود.';
+        _errorMessage = 'المادة غير موجودة.';
       });
       return;
     }
@@ -100,7 +100,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _errorMessage = 'فشل تحميل بيانات المقرر.');
+      setState(() => _errorMessage = 'فشل تحميل بيانات المادة.');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -116,20 +116,16 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
     return '${_formatDate(date)} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 
-  double get _coursePerformancePercent {
-    if (_course == null) return 0;
-    final mid = _course!.midGrade ?? 0;
-    final practical = _course!.practicalGrade ?? 0;
-    final finalValue = _course!.finalGrade ?? 0;
-    return ((mid * 0.3) + (practical * 0.3) + (finalValue * 0.4))
-        .clamp(0, 100)
-        .toDouble();
-  }
-
   Future<void> _toggleTask(TaskEntity task) async {
     try {
-      await widget.taskUseCases
-          .updateTask(task.copyWith(isCompleted: !task.isCompleted));
+      final willComplete = !task.isCompleted;
+      await widget.taskUseCases.updateTask(
+        task.copyWith(
+          isCompleted: willComplete,
+          completedAt: willComplete ? DateTime.now() : null,
+          clearCompletedAt: !willComplete,
+        ),
+      );
       await _loadData();
     } catch (_) {
       if (!mounted) return;
@@ -322,7 +318,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_course?.name ?? 'المقرر'),
+        title: Text(_course?.name ?? 'المادة'),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -405,48 +401,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                         ),
                       ),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'ملخص الأداء الأكاديمي',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _buildMetricCard(
-                                      label: 'المتوسط المتوقع',
-                                      value:
-                                          '${_coursePerformancePercent.toStringAsFixed(1)}%',
-                                      color: Colors.indigo,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: _buildMetricCard(
-                                      label: 'النهائي',
-                                      value: (_course?.finalGrade ?? 0)
-                                          .toStringAsFixed(1),
-                                      color: Colors.green,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
                     TabBar(
                       controller: _tabController,
                       tabs: const [
@@ -478,40 +432,9 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
     );
   }
 
-  Widget _buildMetricCard({
-    required String label,
-    required String value,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(fontSize: 12),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildTasksTab() {
     if (_tasks.isEmpty) {
-      return const Center(child: Text('لا توجد مهام مرتبطة بهذا المقرر.'));
+      return const Center(child: Text('لا توجد مهام مرتبطة بهذه المادة.'));
     }
 
     return ListView.builder(

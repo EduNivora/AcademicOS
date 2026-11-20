@@ -21,13 +21,9 @@ class _AddEditCourseScreenState extends State<AddEditCourseScreen> {
   late final TextEditingController _nameController;
   late final TextEditingController _instructorController;
   late final TextEditingController _codeController;
-  late final TextEditingController _semesterController;
   late final TextEditingController _notesController;
   late final TextEditingController _creditsController;
   late final TextEditingController _creditHoursController;
-  late final TextEditingController _midGradeController;
-  late final TextEditingController _practicalGradeController;
-  late final TextEditingController _finalGradeController;
   late int _credits;
   late int _creditHours;
   late String _selectedColorHex;
@@ -64,9 +60,6 @@ class _AddEditCourseScreenState extends State<AddEditCourseScreen> {
     _codeController = TextEditingController(
       text: widget.existingCourse?.code ?? '',
     );
-    _semesterController = TextEditingController(
-      text: widget.existingCourse?.semester ?? '',
-    );
     _notesController = TextEditingController(
       text: widget.existingCourse?.notes ?? '',
     );
@@ -78,15 +71,6 @@ class _AddEditCourseScreenState extends State<AddEditCourseScreen> {
               widget.existingCourse?.credits ??
               0)
           .toString(),
-    );
-    _midGradeController = TextEditingController(
-      text: (widget.existingCourse?.midGrade ?? 0).toString(),
-    );
-    _practicalGradeController = TextEditingController(
-      text: (widget.existingCourse?.practicalGrade ?? 0).toString(),
-    );
-    _finalGradeController = TextEditingController(
-      text: (widget.existingCourse?.finalGrade ?? 0).toString(),
     );
     _credits = widget.existingCourse?.credits ?? 0;
     _creditHours = widget.existingCourse?.creditHours ??
@@ -105,13 +89,9 @@ class _AddEditCourseScreenState extends State<AddEditCourseScreen> {
     _nameController.dispose();
     _instructorController.dispose();
     _codeController.dispose();
-    _semesterController.dispose();
     _notesController.dispose();
     _creditsController.dispose();
     _creditHoursController.dispose();
-    _midGradeController.dispose();
-    _practicalGradeController.dispose();
-    _finalGradeController.dispose();
     super.dispose();
   }
 
@@ -147,17 +127,13 @@ class _AddEditCourseScreenState extends State<AddEditCourseScreen> {
   Future<void> _saveCourse() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final mid = double.tryParse(_midGradeController.text.trim()) ?? 0;
-    final practical =
-        double.tryParse(_practicalGradeController.text.trim()) ?? 0;
-    final finalValue = double.tryParse(_finalGradeController.text.trim()) ?? 0;
     final course = CourseEntity(
       id: widget.existingCourse?.id,
       name: _nameController.text.trim(),
       instructor: _instructorController.text.trim(),
       code: _codeController.text.trim(),
       credits: _credits,
-      semester: _semesterController.text.trim(),
+      semester: widget.existingCourse?.semester ?? '',
       notes: _notesController.text.trim().isEmpty
           ? null
           : _notesController.text.trim(),
@@ -165,9 +141,9 @@ class _AddEditCourseScreenState extends State<AddEditCourseScreen> {
       lectureReminderEnabled: _lectureReminderEnabled,
       lectureDate: _lectureReminderEnabled ? _lectureDate : null,
       lectureReminderOffsetMinutes: _lectureReminderOffsetMinutes,
-      midGrade: mid,
-      practicalGrade: practical,
-      finalGrade: finalValue,
+      midGrade: widget.existingCourse?.midGrade ?? 0,
+      practicalGrade: widget.existingCourse?.practicalGrade ?? 0,
+      finalGrade: widget.existingCourse?.finalGrade ?? 0,
       creditHours: _creditHours == 0 ? _credits : _creditHours,
     );
 
@@ -259,15 +235,6 @@ class _AddEditCourseScreenState extends State<AddEditCourseScreen> {
                             },
                           ),
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: TextFormField(
-                            controller: _semesterController,
-                            decoration: const InputDecoration(
-                              labelText: 'الفصل الدراسي',
-                            ),
-                          ),
-                        ),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -284,46 +251,6 @@ class _AddEditCourseScreenState extends State<AddEditCourseScreen> {
                               final parsed = int.tryParse(value) ?? _credits;
                               setState(() => _creditHours = parsed);
                             },
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: _midGradeController,
-                            decoration: const InputDecoration(
-                              labelText: 'درجة المتوسط',
-                            ),
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextFormField(
-                            controller: _practicalGradeController,
-                            decoration: const InputDecoration(
-                              labelText: 'العملي',
-                            ),
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextFormField(
-                            controller: _finalGradeController,
-                            decoration: const InputDecoration(
-                              labelText: 'النهائي',
-                            ),
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
                           ),
                         ),
                       ],

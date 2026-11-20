@@ -8,6 +8,7 @@ Server-side Gemini boundary used by the Flutter academic assistant.
 
 - `GET /health` — deployment health; returns a non-secret `configured` boolean and was verified HTTP 200.
 - `POST /v1/chat` — requires a valid Neon Auth JWT and a configured Gemini key.
+- `POST /v1/schedule/parse` — accepts an authenticated base64 JPG/PNG/WebP timetable image (maximum 8 MiB) and returns validated weekly lecture rows.
 
 Request JSON:
 
@@ -21,6 +22,8 @@ Request JSON:
 Send `Authorization: Bearer <Neon Auth JWT>`.
 The provider request uses `store: false`; conversation history is not persisted by the provider.
 The response contains `answer`, `model`, and usage metadata when available.
+
+The schedule parser accepts `{ "image": "<base64>", "mimeType": "image/jpeg" }`. It sends the image and an extraction instruction to Gemini with `store: false`, validates the returned day names and 24-hour time ranges, and returns an `entries` array. The client must match every extracted subject name to an existing material ID and let the student review the proposed rows before saving.
 
 ## Runtime environment
 

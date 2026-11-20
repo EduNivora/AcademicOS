@@ -32,7 +32,6 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
   late TaskPriority _selectedPriority;
   late TaskRecurrence _selectedRecurrence;
   DateTime? _dueDate;
-  DateTime? _startDateTime;
   DateTime? _endDateTime;
   bool _isSaving = false;
   bool _isCompleted = false;
@@ -61,7 +60,6 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
     _selectedRecurrence =
         widget.existingTask?.recurrence ?? TaskRecurrence.once;
     _dueDate = widget.existingTask?.dueDate;
-    _startDateTime = widget.existingTask?.startDateTime;
     _endDateTime = widget.existingTask?.endDateTime;
     _isCompleted = widget.existingTask?.isCompleted ?? false;
     _reminderEnabled = widget.existingTask?.reminderEnabled ?? false;
@@ -71,7 +69,7 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
       _selectedCourse = widget.existingTask!.courseId != null
           ? CourseEntity(
               id: widget.existingTask!.courseId,
-              name: widget.existingTask!.courseName ?? 'المقرر المرتبط',
+              name: widget.existingTask!.courseName ?? 'المادة المرتبطة',
               instructor: '',
               code: '',
             )
@@ -103,66 +101,35 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
     }
   }
 
-  Future<void> _pickReminderDate() async {
+  Future<void> _pickEndDateTime() async {
     final now = DateTime.now();
-    final selectedDate = await showDatePicker(
-      context: context,
-      initialDate: _reminderDate ?? _dueDate ?? now,
-      firstDate: now.subtract(const Duration(days: 365)),
-      lastDate: now.add(const Duration(days: 365 * 5)),
-    );
-    if (selectedDate == null) return;
-
-    final selectedTime = await showTimePicker(
-      // ignore: use_build_context_synchronously
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(_reminderDate ?? selectedDate),
-    );
-    if (selectedTime == null) return;
-
-    setState(() {
-      _reminderDate = DateTime(
-        selectedDate.year,
-        selectedDate.month,
-        selectedDate.day,
-        selectedTime.hour,
-        selectedTime.minute,
-      );
-    });
-  }
-
-  Future<void> _pickDateTime({required bool isStart}) async {
-    final now = DateTime.now();
-    final initialDate =
-        (isStart ? _startDateTime : _endDateTime) ?? _dueDate ?? now;
+    final initialDate = _endDateTime ?? _dueDate ?? now;
     final selectedDate = await showDatePicker(
       context: context,
       initialDate: initialDate,
       firstDate: now.subtract(const Duration(days: 365)),
       lastDate: now.add(const Duration(days: 365 * 5)),
     );
-    if (selectedDate == null) return;
+    if (selectedDate == null || !mounted) return;
 
     final selectedTime = await showTimePicker(
-      // ignore: use_build_context_synchronously
       context: context,
       initialTime: TimeOfDay.fromDateTime(initialDate),
     );
-    if (selectedTime == null) return;
-
-    final picked = DateTime(
-      selectedDate.year,
-      selectedDate.month,
-      selectedDate.day,
-      selectedTime.hour,
-      selectedTime.minute,
-    );
+    if (selectedTime == null || !mounted) return;
 
     setState(() {
-      if (isStart) {
-        _startDateTime = picked;
-      } else {
-        _endDateTime = picked;
+      _endDateTime = DateTime(
+        selectedDate.year,
+        selectedDate.month,
+        selectedDate.day,
+        selectedTime.hour,
+        selectedTime.minute,
+      );
+      if (_reminderEnabled) {
+        _reminderDate = _endDateTime!.subtract(
+          Duration(minutes: _reminderOffsetMinutes),
+        );
       }
     });
   }
@@ -178,30 +145,33 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
   Future<void> _saveTask() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final startDateTime =
+        widget.existingTask?.startDateTime ?? DateTime.now();
+    if (_endDateTime != null && !_endDateTime!.isAfter(startDateTime)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('يجب أن يكون وقت الانتهاء بعد وقت البدء التلقائي.')),
+      );
+      return;
+    }
+
     if (_reminderEnabled) {
-      if (_reminderDate == null && _dueDate != null) {
-        _reminderDate = _dueDate!.subtract(
-          Duration(minutes: _reminderOffsetMinutes),
-        );
-      }
-
-      if (_reminderDate == null) {
-        if (!mounted) return;
+      if (_endDateTime == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('اختر وقت التنبيه أو حدد تاريخ الاستحقاق.')),
+          const SnackBar(content: Text('حدد وقت الانتهاء أولاً لتفعيل التنبيه.')),
         );
         return;
       }
-
+      _reminderDate = _endDateTime!.subtract(
+        Duration(minutes: _reminderOffsetMinutes),
+      );
       if (_reminderDate!.isBefore(DateTime.now())) {
-        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('لا يمكن تعيين تنبيه في وقت سابق من الآن.')),
+          const SnackBar(content: Text('وقت التنبيه المحسوب أصبح في الماضي. اختر وقت انتهاء لاحقاً.')),
         );
         return;
       }
+    } else {
+      _reminderDate = null;
     }
 
     final task = TaskEntity(
@@ -212,9 +182,12 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
       priority: _selectedPriority,
       recurrence: _selectedRecurrence,
       dueDate: _dueDate,
-      startDateTime: _startDateTime,
+      startDateTime: startDateTime,
       endDateTime: _endDateTime,
       isCompleted: _isCompleted,
+      completedAt: _isCompleted
+          ? widget.existingTask?.completedAt ?? DateTime.now()
+          : null,
       courseId: _selectedCourse?.id,
       courseName: _selectedCourse?.name,
       notes: _notesController.text.trim(),
@@ -273,7 +246,7 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
     } catch (error, stackTrace) {
       debugPrint('AddEditTaskScreen._loadCourses error: $error\n$stackTrace');
       if (!mounted) return;
-      setState(() => _courseError = 'فشل تحميل الكورسات');
+      setState(() => _courseError = 'فشل تحميل المواد');
     } finally {
       // ignore: control_flow_in_finally
       if (!mounted) return;
@@ -484,7 +457,7 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
                               });
                             },
                             decoration: const InputDecoration(
-                              labelText: 'المقرر المرتبط',
+                              labelText: 'المادة المرتبطة',
                             ),
                           ),
                     if (_courseError != null)
@@ -513,35 +486,44 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildPickerTile(
-                            icon: Icons.schedule_outlined,
-                            title: 'وقت البدء',
-                            value: _startDateTime == null
-                                ? 'اختر وقت البدء'
-                                : _formatDateTime(_startDateTime!),
-                            onTap: () => _pickDateTime(isStart: true),
-                            isSet: _startDateTime != null,
-                            onClear: () =>
-                                setState(() => _startDateTime = null),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.play_circle_outline),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('وقت البدء'),
+                                Text(
+                                  widget.existingTask?.startDateTime == null
+                                      ? 'يُسجل تلقائياً عند حفظ المهمة'
+                                      : _formatDateTime(widget.existingTask!.startDateTime!),
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildPickerTile(
-                            icon: Icons.flag_outlined,
-                            title: 'وقت الانتهاء',
-                            value: _endDateTime == null
-                                ? 'اختر وقت الانتهاء'
-                                : _formatDateTime(_endDateTime!),
-                            onTap: () => _pickDateTime(isStart: false),
-                            isSet: _endDateTime != null,
-                            onClear: () => setState(() => _endDateTime = null),
-                          ),
-                        ),
-                      ],
+                          const Icon(Icons.lock_clock_outlined),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildPickerTile(
+                      icon: Icons.flag_outlined,
+                      title: 'وقت الانتهاء',
+                      value: _endDateTime == null
+                          ? 'اختر وقت الانتهاء'
+                          : _formatDateTime(_endDateTime!),
+                      onTap: _pickEndDateTime,
+                      isSet: _endDateTime != null,
+                      onClear: () => setState(() => _endDateTime = null),
                     ),
                     const SizedBox(height: 8),
                     TextFormField(
@@ -563,43 +545,19 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
                       onChanged: (value) {
                         setState(() {
                           _reminderEnabled = value;
-                          if (value &&
-                              _reminderDate == null &&
-                              _dueDate != null) {
-                            _reminderDate = _dueDate!.subtract(
-                              Duration(minutes: _reminderOffsetMinutes),
-                            );
-                          }
+                          _reminderDate = value && _endDateTime != null
+                              ? _endDateTime!.subtract(
+                                  Duration(minutes: _reminderOffsetMinutes),
+                                )
+                              : null;
                         });
                       },
                       title: const Text('تفعيل تذكير المهمة'),
                       subtitle: const Text(
-                        'سيظهر تنبيه قبل الموعد المحدد أو قبل الاستحقاق.',
+                        'سيُحسب وقت التنبيه تلقائياً من وقت الانتهاء.',
                       ),
                     ),
                     if (_reminderEnabled) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextButton.icon(
-                              icon: const Icon(Icons.notifications_active),
-                              label: Text(
-                                _reminderDate == null
-                                    ? 'اختر وقت التنبيه'
-                                    : 'تنبيه: ${_formatDate(_reminderDate!)} ${_reminderDate!.hour.toString().padLeft(2, '0')}:${_reminderDate!.minute.toString().padLeft(2, '0')}',
-                              ),
-                              onPressed: _pickReminderDate,
-                            ),
-                          ),
-                          if (_reminderDate != null)
-                            IconButton(
-                              onPressed: () =>
-                                  setState(() => _reminderDate = null),
-                              icon: const Icon(Icons.clear),
-                            ),
-                        ],
-                      ),
                       const SizedBox(height: 8),
                       DropdownButtonFormField<int>(
                         value: _reminderOffsetMinutes,
