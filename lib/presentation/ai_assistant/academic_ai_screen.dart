@@ -212,6 +212,7 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
                 TextField(
                   controller: titleController,
                   autofocus: true,
+                  onChanged: (_) => setDialogState(() {}),
                   decoration: const InputDecoration(labelText: 'عنوان المهمة', hintText: 'مثال: حل واجب الخوارزميات'),
                 ),
                 const SizedBox(height: 12),
@@ -307,7 +308,7 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
       'الاثنين': 'الاثنين', 'الإثنين': 'الاثنين', 'الثلاثاء': 'الثلاثاء',
       'الأربعاء': 'الأربعاء', 'الخميس': 'الخميس', 'الجمعة': 'الجمعة',
     };
-    var selectedDay = days[DateTime.now().weekday % 7];
+    var selectedDay = days[(DateTime.now().weekday + 1) % 7];
     for (final entry in aliases.entries) {
       if (input.contains(entry.key)) { selectedDay = entry.value; break; }
     }
