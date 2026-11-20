@@ -5,6 +5,7 @@ class UserEntity {
   final String? displayName;
   final bool isGoogleLinked;
   final bool isBiometricEnabled;
+  final String role;
   final DateTime createdAt;
 
   const UserEntity({
@@ -14,8 +15,11 @@ class UserEntity {
     this.displayName,
     this.isGoogleLinked = false,
     this.isBiometricEnabled = false,
+    this.role = 'user',
     required this.createdAt,
   });
+
+  bool get isAdmin => role == 'admin';
 
   UserEntity copyWith({
     String? id,
@@ -24,6 +28,7 @@ class UserEntity {
     String? displayName,
     bool? isGoogleLinked,
     bool? isBiometricEnabled,
+    String? role,
     DateTime? createdAt,
   }) {
     return UserEntity(
@@ -33,6 +38,7 @@ class UserEntity {
       displayName: displayName ?? this.displayName,
       isGoogleLinked: isGoogleLinked ?? this.isGoogleLinked,
       isBiometricEnabled: isBiometricEnabled ?? this.isBiometricEnabled,
+      role: role ?? this.role,
       createdAt: createdAt ?? this.createdAt,
     );
   }

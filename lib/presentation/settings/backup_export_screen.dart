@@ -1,14 +1,14 @@
 import 'dart:convert';
-import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/academic/academic_report_service.dart';
 import '../../data/database/database_helper.dart';
-import '../../data/models/course_model.dart';
-import '../../data/models/exam_model.dart';
-import '../../data/models/task_model.dart';
+import '../../data/services/backup_payload_validator.dart';
 
 class BackupExportScreen extends StatefulWidget {
   const BackupExportScreen({super.key});
@@ -42,36 +42,79 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
       final tasks = await _databaseHelper.getTasks();
       final exams = await _databaseHelper.getExams();
       final schedule = await _databaseHelper.getSchedules();
+      final materials = await _databaseHelper.getAllMaterials();
+
+      final missingAttachments = materials.where((row) {
+        final bytes = row['file_bytes'];
+        return bytes is! List<int> || bytes.isEmpty;
+      }).length;
+      if (missingAttachments > 0) {
+        throw StateError(
+          'تعذر إنشاء نسخة كاملة: يوجد $missingAttachments مرفق قديم بلا محتوى محفوظ. أعد إرفاق الملفات المفقودة أولاً.',
+        );
+      }
+
+      final backupMaterials = materials.map((row) {
+        final copy = Map<String, dynamic>.from(row);
+        final bytes = copy.remove('file_bytes');
+        if (bytes is List<int>) {
+          copy['file_bytes_base64'] = base64.encode(bytes);
+        }
+        return copy;
+      }).toList(growable: false);
 
       final payload = _academicReportService.buildBackupPayload(
         courses: courses,
         tasks: tasks,
         exams: exams,
         schedule: List<Map<String, dynamic>>.from(schedule),
+        materials: backupMaterials,
       );
 
-      final compactJson = const JsonEncoder.withIndent('  ').convert(payload);
       final encodedBackup = _academicReportService.encodeBackupJson(payload);
       final boxed = <String, dynamic>{
         'format': 'academic_os_backup',
         'payload': encodedBackup,
       };
       final jsonBackupText = const JsonEncoder.withIndent('  ').convert(boxed);
+      final backupBytes = Uint8List.fromList(utf8.encode(jsonBackupText));
+      if (backupBytes.length > 50 * 1024 * 1024) {
+        throw const FormatException(
+          'حجم النسخة يتجاوز حد الاستيراد الحالي (50 MB). قلّل عدد/حجم المرفقات ثم أعد المحاولة.',
+        );
+      }
 
-      final tempDir = Directory.systemTemp;
-      final backupFile = File(
-        '${tempDir.path}/academic_os_backup_${DateTime.now().millisecondsSinceEpoch}.json',
+      final fileName =
+          'academic_os_backup_${DateTime.now().millisecondsSinceEpoch}.json';
+      final savedPath = await FilePicker.platform.saveFile(
+        fileName: fileName,
+        bytes: backupBytes,
+        type: FileType.custom,
+        allowedExtensions: const ['json'],
+        dialogTitle: 'حفظ النسخة الاحتياطية',
       );
-      await backupFile.writeAsString(jsonBackupText, flush: true);
+      if (savedPath == null && !kIsWeb) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم إلغاء حفظ النسخة الاحتياطية.')),
+        );
+        return;
+      }
 
-      _lastBackupPath = backupFile.path;
+      _lastBackupPath = savedPath ?? fileName;
       _restoreController.text = jsonBackupText;
 
       if (!mounted) return;
-      await _showShareOptions(jsonBackupText, backupFile.path);
+      await _showShareOptions(jsonBackupText, _lastBackupPath!);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text('تم حفظ النسخة الاحتياطية في ${backupFile.path}')),
+          content: Text(
+            kIsWeb
+                ? 'تم إرسال النسخة الاحتياطية إلى تنزيلات المتصفح.'
+                : 'تم حفظ النسخة الاحتياطية في $savedPath',
+          ),
+        ),
       );
     } catch (error) {
       if (!mounted) return;
@@ -85,7 +128,47 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
     }
   }
 
+  Future<void> _pickBackupFile() async {
+    if (_isBusy) return;
+    setState(() => _isBusy = true);
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['json'],
+        allowMultiple: false,
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+
+      final bytes = result.files.single.bytes;
+      if (bytes == null) {
+        throw const FormatException(
+          'تعذر قراءة محتوى الملف. اختر ملف JSON صالحاً.',
+        );
+      }
+      if (bytes.length > 50 * 1024 * 1024) {
+        throw const FormatException(
+          'حجم النسخة الاحتياطية يتجاوز الحد المسموح (50 MB).',
+        );
+      }
+
+      _restoreController.text = utf8.decode(bytes, allowMalformed: false);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم تحميل ملف النسخة. راجعه ثم اضغط استرجاع البيانات.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر فتح ملف النسخة: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _isBusy = false);
+    }
+  }
+
   Future<void> _restoreBackup() async {
+    if (_isBusy) return;
     setState(() => _isBusy = true);
     try {
       final rawText = _restoreController.text.trim();
@@ -98,39 +181,27 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
         throw const FormatException('صيغة النسخة الاحتياطية غير صالحة.');
       }
 
-      final db = await _databaseHelper.database;
-      await db.delete('courses');
-      await db.delete('tasks');
-      await db.delete('exams');
-      await db.delete('schedule');
+      // Validate and deserialize every section before touching live storage.
+      final validated = const BackupPayloadValidator().validate(decoded);
 
-      final courses = (decoded['courses'] as List?) ?? const [];
-      final tasks = (decoded['tasks'] as List?) ?? const [];
-      final exams = (decoded['exams'] as List?) ?? const [];
-      final schedule = (decoded['schedule'] as List?) ?? const [];
-
-      for (final item in courses) {
-        final map = Map<String, dynamic>.from(item as Map);
-        await _databaseHelper.insertCourse(CourseModel.fromMap(map));
-      }
-      for (final item in tasks) {
-        final map = Map<String, dynamic>.from(item as Map);
-        await _databaseHelper.insertTask(TaskModel.fromMap(map));
-      }
-      for (final item in exams) {
-        final map = Map<String, dynamic>.from(item as Map);
-        await _databaseHelper.insertExam(ExamModel.fromMap(map));
-      }
-      for (final item in schedule) {
-        final map = Map<String, dynamic>.from(item as Map);
-        await _databaseHelper.insertSchedule(map);
-      }
+      await _databaseHelper.replaceAcademicData(
+        courses: validated.courses,
+        tasks: validated.tasks,
+        exams: validated.exams,
+        schedules: validated.schedule,
+        materials: validated.materials,
+      );
 
       if (!mounted) return;
+      final materialsSummary = validated.materials == null
+          ? 'لم تتغير بيانات المرفقات'
+          : '${validated.materials!.length} مرفقاً';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'تمت استعادة البيانات بنجاح: ${courses.length} مادة، ${tasks.length} مهمة، ${exams.length} اختبار، ${schedule.length} حصة.',
+            'تمت استعادة البيانات بنجاح: ${validated.courses.length} مادة، '
+            '${validated.tasks.length} مهمة، ${validated.exams.length} اختبار، '
+            '${validated.schedule.length} حصة، $materialsSummary.',
           ),
         ),
       );
@@ -138,7 +209,12 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('فشل الاستعادة: $error')),
+        SnackBar(
+          content: Text(
+            'فشل الاستعادة. لم تُعتمد أي تغييرات جزئية، '
+            'وتم الاحتفاظ بالبيانات السابقة إن فشلت المعاملة: $error',
+          ),
+        ),
       );
     } finally {
       if (mounted) {
@@ -152,9 +228,11 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
       final decoded = jsonDecode(rawText);
       if (decoded is Map<String, dynamic>) {
         if (decoded.containsKey('payload') && decoded['payload'] is String) {
+          if (decoded['format'] != 'academic_os_backup') return null;
           final payloadText =
               utf8.decode(base64.decode(decoded['payload'] as String));
-          return jsonDecode(payloadText) as Map<String, dynamic>;
+          final payload = jsonDecode(payloadText);
+          return payload is Map<String, dynamic> ? payload : null;
         }
         if (decoded.containsKey('courses') ||
             decoded.containsKey('tasks') ||
@@ -176,33 +254,6 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
       final tasks = await _databaseHelper.getTasks();
       final exams = await _databaseHelper.getExams();
       final schedule = await _databaseHelper.getSchedules();
-
-      final sortedSchedule = List<Map<String, dynamic>>.from(schedule)
-        ..sort((a, b) {
-          final aTime = a['start_time']?.toString() ?? '00:00';
-          final bTime = b['start_time']?.toString() ?? '00:00';
-          return aTime.compareTo(bTime);
-        });
-
-      final upcomingExams = exams
-          .where((exam) => exam.examDate.isAfter(DateTime.now()))
-          .toList()
-        ..sort((a, b) => a.examDate.compareTo(b.examDate));
-
-      double totalWeighted = 0;
-      int totalCredits = 0;
-
-      for (final course in courses) {
-        final credit = course.creditHours ?? 3;
-        final average = ((course.midGrade ?? 0) +
-                (course.practicalGrade ?? 0) +
-                (course.finalGrade ?? 0)) /
-            3;
-        totalWeighted += average * credit;
-        totalCredits += credit;
-      }
-
-      final gpa = totalCredits == 0 ? 0.0 : totalWeighted / totalCredits;
 
       _reportText = _academicReportService.generateAcademicReport(
         courses: courses,
@@ -233,23 +284,33 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
       await _generateAcademicReport();
     }
 
-    final reportFile = File(
-      '${Directory.systemTemp.path}/academic_os_report_${DateTime.now().millisecondsSinceEpoch}.txt',
+    if (_reportText.trim().isEmpty) return;
+    final fileName =
+        'academic_os_report_${DateTime.now().millisecondsSinceEpoch}.txt';
+    final savedPath = await FilePicker.platform.saveFile(
+      fileName: fileName,
+      bytes: Uint8List.fromList(utf8.encode(_reportText)),
+      type: FileType.custom,
+      allowedExtensions: const ['txt'],
+      dialogTitle: 'حفظ التقرير الأكاديمي',
     );
-    await reportFile.writeAsString(_reportText, flush: true);
     await Clipboard.setData(ClipboardData(text: _reportText));
 
     if (!mounted) return;
+    final saveMessage = savedPath == null
+        ? (kIsWeb
+            ? 'تم إرسال التقرير إلى تنزيلات المتصفح ونسخه إلى الحافظة.'
+            : 'تم إلغاء حفظ الملف؛ نُسخ التقرير إلى الحافظة.')
+        : 'تم حفظ التقرير في $savedPath ونسخه إلى الحافظة.';
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-          content:
-              Text('تم حفظ تقريرك في ${reportFile.path} ونسخه إلى الحافظة.')),
+      SnackBar(content: Text(saveMessage)),
     );
   }
 
-  Future<void> _showShareOptions(String backupJson, String backupPath) async {
-    final hasText = backupJson.trim().isNotEmpty;
-
+  Future<void> _showShareOptions(
+    String backupJson,
+    String backupPath,
+  ) async {
     await showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -260,37 +321,20 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
           child: Wrap(
             children: [
               ListTile(
-                leading: const Icon(Icons.save_alt_rounded),
-                title: const Text('حفظ ملف النسخة الاحتياطية'),
-                subtitle: Text(backupPath),
-                onTap: () async {
-                  Navigator.pop(context);
-                  final file = File(backupPath);
-                  if (await file.exists()) {
-                    await Clipboard.setData(ClipboardData(text: backupJson));
-                  }
-                },
-              ),
-              ListTile(
                 leading: const Icon(Icons.copy_rounded),
                 title: const Text('نسخ نص JSON إلى الحافظة'),
                 onTap: () async {
                   Navigator.pop(context);
-                  if (hasText) {
-                    await Clipboard.setData(ClipboardData(text: backupJson));
-                  }
+                  await Clipboard.setData(ClipboardData(text: backupJson));
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.share_rounded),
-                title: const Text('مشاركة عبر تطبيقات التواصل'),
-                subtitle: const Text(
-                    'اختر WhatsApp أو Telegram أو أي تطبيق بعد النسخ.'),
+                leading: const Icon(Icons.copy_all_rounded),
+                title: const Text('نسخ مسار ملف النسخة'),
+                subtitle: Text(backupPath),
                 onTap: () async {
                   Navigator.pop(context);
-                  if (hasText) {
-                    await Clipboard.setData(ClipboardData(text: backupJson));
-                  }
+                  await Clipboard.setData(ClipboardData(text: backupPath));
                 },
               ),
             ],
@@ -299,6 +343,7 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
       },
     );
   }
+
 
   Widget _buildActionCard(
     String title,
@@ -362,7 +407,7 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
         children: [
           _buildActionCard(
             'نسخ احتياطي فوري',
-            'تصدير جميع المواد والمهام والاختبارات والجدول في ملف JSON واحد.',
+            'تصدير المقررات والمهام والاختبارات والجدول وبيانات المرفقات ومحتوى الملفات الفعلي ضمن النسخة.',
             Icons.backup_rounded,
             _exportBackup,
           ),
@@ -398,6 +443,11 @@ class _BackupExportScreenState extends State<BackupExportScreen> {
                 ),
               ),
               const SizedBox(width: 8),
+              IconButton(
+                onPressed: _isBusy ? null : _pickBackupFile,
+                icon: const Icon(Icons.folder_open_rounded),
+                tooltip: 'اختيار ملف نسخة احتياطية',
+              ),
               IconButton(
                 onPressed: () async {
                   final result = await Clipboard.getData('text/plain');

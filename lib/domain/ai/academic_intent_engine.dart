@@ -46,7 +46,6 @@ class ParsedAcademicIntent {
 class AcademicIntentEngine {
   final Queue<String> _conversationHistory = Queue<String>();
   String? _lastCourseName;
-  AcademicIntent? _lastIntent;
 
   ParsedAcademicIntent parse(String input) {
     final message = input.trim();
@@ -68,7 +67,6 @@ class AcademicIntentEngine {
 
     if (_containsAny(
         lower, ['مذاكرة', 'خطة مذاكرة', 'توزيع', 'دراسة', 'study plan'])) {
-      _lastIntent = AcademicIntent.studyPlanRequest;
       return ParsedAcademicIntent(
         intent: AcademicIntent.studyPlanRequest,
         context: AcademicIntentContext(
@@ -86,7 +84,6 @@ class AcademicIntentEngine {
 
     if (_containsAny(
         lower, ['محاضرة', 'جدول', 'schedule', 'الساعة', 'حصة', 'lecture'])) {
-      _lastIntent = AcademicIntent.addSchedule;
       return ParsedAcademicIntent(
         intent: AcademicIntent.addSchedule,
         context: AcademicIntentContext(
@@ -105,7 +102,6 @@ class AcademicIntentEngine {
 
     if (_containsAny(
         lower, ['مهمة', 'task', 'تذكير', 'أضف', 'إضافة', 'add task'])) {
-      _lastIntent = AcademicIntent.createTask;
       _lastCourseName = courseName ?? _lastCourseName;
       return ParsedAcademicIntent(
         intent: AcademicIntent.createTask,
@@ -124,7 +120,6 @@ class AcademicIntentEngine {
 
     if (_containsAny(
         lower, ['اختبار', 'امتحان', 'exam', 'باقي', 'كم باقي', 'تاريخ'])) {
-      _lastIntent = AcademicIntent.queryExams;
       return ParsedAcademicIntent(
         intent: AcademicIntent.queryExams,
         context: AcademicIntentContext(
@@ -139,7 +134,6 @@ class AcademicIntentEngine {
 
     if (_containsAny(
         lower, ['معدل', 'gpa', 'توقع', 'درجة', 'grade', 'مجموع'])) {
-      _lastIntent = AcademicIntent.calculateGpa;
       return ParsedAcademicIntent(
         intent: AcademicIntent.calculateGpa,
         context: AcademicIntentContext(
@@ -154,7 +148,6 @@ class AcademicIntentEngine {
 
     if (_containsAny(
         lower, ['غياب', 'حضور', 'attendance', 'حرمان', 'failed'])) {
-      _lastIntent = AcademicIntent.attendanceCheck;
       return ParsedAcademicIntent(
         intent: AcademicIntent.attendanceCheck,
         context: AcademicIntentContext(
@@ -170,15 +163,12 @@ class AcademicIntentEngine {
 
     if (_containsAny(lower, ['تشجيع', 'تحفيز', 'motiv', 'شجع', 'أشعر']) ||
         _containsAny(lower, ['كيف أبدأ', 'مساعدة', 'help'])) {
-      _lastIntent = AcademicIntent.motivation;
       return ParsedAcademicIntent(
         intent: AcademicIntent.motivation,
         context: AcademicIntentContext(rawText: message),
         responseHint: 'سأعطيك دفعة نفسية ومرحلة عمل عملية.',
       );
     }
-
-    _lastIntent = AcademicIntent.generalQuery;
     return ParsedAcademicIntent(
       intent: AcademicIntent.generalQuery,
       context: AcademicIntentContext(

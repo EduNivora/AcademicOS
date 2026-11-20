@@ -1,0 +1,17 @@
+name: Deferred EduNivora Web deployment
+
+# Release 1 is Android-only. Keep this workflow inert until a future Web release
+# is explicitly approved and its browser/runtime acceptance gates are complete.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deferred:
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Web deployment is deferred
+        run: echo "EduNivora Web deployment is deferred; Release 1 ships Android only."

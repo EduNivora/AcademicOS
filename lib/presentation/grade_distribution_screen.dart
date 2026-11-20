@@ -123,19 +123,6 @@ class _GradeDistributionScreenState extends State<GradeDistributionScreen> {
     }
   }
 
-  String _pickMotivation(double pct) {
-    if (pct > 85) {
-      return 'أداء استثنائي! حافظ على هذا الزخم نحو مرتبة الشرف 🚀';
-    }
-    if (pct >= 70) {
-      return 'خطواتك ثابتة وممتازة! التركيز في القادم سيصنع الفارق 🎯';
-    }
-    if (pct >= 60) {
-      return 'ما زالت كل الفرص بيدك، ركز على التعويض في النهائي والعملي 💪';
-    }
-    return 'البدايات لا تحدد النهاية، نظّم خطتك وابدأ جني درجات النهائي الآن ⚡';
-  }
-
   _GradeBreakdown _computeBreakdown() {
     double totalEarned = 0;
     double totalPossible = 0;
@@ -862,7 +849,6 @@ class _GradeDistributionScreenState extends State<GradeDistributionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bd = _computeBreakdown();
     return Scaffold(
       appBar: AppBar(
         title: const Text('توزيع الدرجات والمعدل الأكاديمي'),

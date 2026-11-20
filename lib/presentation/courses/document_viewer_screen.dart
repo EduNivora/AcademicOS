@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -11,9 +12,10 @@ import 'package:flutter_pdf_text/flutter_pdf_text.dart' as pdf_text;
 class DocumentViewerScreen extends StatefulWidget {
   final String filePath;
   final String title;
+  final Uint8List? fileBytes;
 
   const DocumentViewerScreen(
-      {super.key, required this.filePath, required this.title});
+      {super.key, required this.filePath, required this.title, this.fileBytes});
 
   @override
   State<DocumentViewerScreen> createState() => _DocumentViewerScreenState();
@@ -21,10 +23,47 @@ class DocumentViewerScreen extends StatefulWidget {
 
 class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
   bool _isSummarizing = false;
+  String? _resolvedFilePath;
+  bool _isPreparingPreview = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _preparePreviewFile();
+  }
+
+  @override
+  void dispose() {
+    final previewPath = _resolvedFilePath;
+    if (previewPath != null) {
+      unawaited(File(previewPath).delete().then<void>((_) {}, onError: (Object _) {}));
+    }
+    super.dispose();
+  }
+
+  Future<void> _preparePreviewFile() async {
+    try {
+      if (widget.fileBytes != null) {
+        final previewDirectory = Directory(
+          '${Directory.systemTemp.path}/edunivora_pdf_previews',
+        );
+        await previewDirectory.create(recursive: true);
+        final previewFile = File(
+          '${previewDirectory.path}/${DateTime.now().microsecondsSinceEpoch}.pdf',
+        );
+        await previewFile.writeAsBytes(widget.fileBytes!, flush: true);
+        _resolvedFilePath = previewFile.path;
+      }
+    } catch (error) {
+      debugPrint('Unable to prepare local PDF preview: $error');
+    } finally {
+      if (mounted) setState(() => _isPreparingPreview = false);
+    }
+  }
 
   Future<String> _extractTextFromPdf() async {
     try {
-      final file = File(widget.filePath);
+      final file = File(_resolvedFilePath ?? widget.filePath);
       if (!file.existsSync()) return '';
 
       // Extract text locally without uploading the document.
@@ -58,10 +97,10 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
         ),
-        builder: (context) {
+        builder: (sheetContext) {
           return Padding(
             padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom,
+              bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
             ),
             child: DraggableScrollableSheet(
               expand: false,
@@ -78,12 +117,10 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
                           const Text('ملخص المحاضرة (محلي)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                           TextButton.icon(
                             onPressed: () async {
-                              final textToCopy = 'المفاهيم الأساسية:\n' +
-                                  summary.coreConcepts.join(', ') +
-                                  '\n\nالنقاط الجوهرية:\n' +
-                                  summary.keyPoints.join('\n') +
-                                  '\n\nملخص سريع:\n' +
-                                  summary.quickSummary;
+                              final textToCopy =
+                                  'المفاهيم الأساسية:\n${summary.coreConcepts.join(', ')}'
+                                  '\n\nالنقاط الجوهرية:\n${summary.keyPoints.join('\n')}'
+                                  '\n\nملخص سريع:\n${summary.quickSummary}';
                               await Clipboard.setData(ClipboardData(text: textToCopy));
                               if (!mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نسخ الملخص')));
@@ -114,7 +151,7 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: summary.keyPoints.map((p) => Padding(
                             padding: const EdgeInsets.symmetric(vertical: 6),
-                            child: Text('• ' + p),
+                            child: Text('• $p'),
                           )).toList(),
                         ),
                       const SizedBox(height: 12),
@@ -152,11 +189,15 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
       ),
       body: SafeArea(
         child: Builder(builder: (context) {
-          if (!File(widget.filePath).existsSync()) {
-            return Center(child: Text('الملف غير موجود'));
+          if (_isPreparingPreview) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final path = _resolvedFilePath;
+          if (path == null || !File(path).existsSync()) {
+            return const Center(child: Text('تعذر فتح الملف المحفوظ محلياً'));
           }
           return PDFView(
-            filePath: widget.filePath,
+            filePath: path,
             enableSwipe: true,
             swipeHorizontal: false,
             autoSpacing: true,

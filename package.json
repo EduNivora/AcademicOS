@@ -1,0 +1,26 @@
+{
+  "name": "edunivora-neon-backend",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "node --test backend/neon/functions/notices/*.test.mjs backend/neon/functions/ai/*.test.mjs",
+    "check": "node --check backend/neon/functions/notices/app.mjs && node --check backend/neon/functions/notices/index.mjs && node --check backend/neon/functions/notices/token_verifier.mjs && node --check backend/neon/functions/ai/app.mjs && node --check backend/neon/functions/ai/index.mjs && node --check backend/neon/functions/ai/app.test.mjs",
+    "neon:dev": "neon dev",
+    "neon:deploy": "neon deploy",
+    "build:function": "esbuild backend/neon/functions/notices/index.mjs --bundle --platform=node --format=esm --target=node24 --outfile=backend/neon/dist/notices.mjs --external:node:* --external:pg --external:@neon/functions --external:pg-native",
+    "build:ai": "esbuild backend/neon/functions/ai/index.mjs --bundle --platform=node --format=esm --target=node24 --outfile=backend/neon/dist/ai.mjs --external:node:* --minify"
+  },
+  "dependencies": {
+    "@neon/config": "^1.14.0",
+    "@neon/functions": "^0.11.0",
+    "hono": "^4.9.0",
+    "jose": "^6.1.0",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.10"
+  }
+}

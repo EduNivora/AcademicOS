@@ -4,9 +4,10 @@ import 'package:flutter/material.dart';
 class DocumentViewerScreen extends StatelessWidget {
   final String filePath;
   final String title;
+  final Uint8List? fileBytes;
 
   const DocumentViewerScreen(
-      {super.key, required this.filePath, required this.title});
+      {super.key, required this.filePath, required this.title, this.fileBytes});
 
   @override
   Widget build(BuildContext context) {
@@ -24,14 +25,14 @@ class DocumentViewerScreen extends StatelessWidget {
                 const SizedBox(height: 12),
                 const Text('عرض المستند غير مدعوم في الويب داخل التطبيق.'),
                 const SizedBox(height: 8),
-                Text('المسار: ' + filePath, textAlign: TextAlign.center),
+                const Text('الملف محفوظ محلياً، لكن عارض PDF للويب غير مفعّل بعد.'),
               ] else ...[
                 const Icon(Icons.picture_as_pdf, size: 64, color: Colors.grey),
                 const SizedBox(height: 12),
                 const Text(
                     'معاينة المستند داخل التطبيق غير متاحة في هذه النسخة.'),
                 const SizedBox(height: 8),
-                Text('المسار: ' + filePath, textAlign: TextAlign.center),
+                const Text('الملف محفوظ محلياً، لكن المعاينة غير متاحة في هذه الشاشة.'),
               ],
             ],
           ),

@@ -1,6 +1,10 @@
-# Academic OS
+# EduNivora
 
-Academic OS هو نظام إدارة أكاديمية مبني على Flutter ويهدف إلى تنظيم حياة الطالب الجامعي داخل تطبيق واحد. يركز المشروع على دمج المهام الدراسية، المقررات، الجداول، التنبيهات، والتقييم الأكاديمي في واجهة موحدة وسهلة الاستخدام، مع اعتماد على التخزين المحلي الآمن والتصميم المعماري المنظم.
+EduNivora (الاسم التقني للكود: AcademicOS) هي منظومة أكاديمية ذكية مبنية على Flutter تهدف إلى تنظيم حياة الطالب الجامعي في بيئة موحدة متكاملة وسهلة الاستخدام، مع اعتماد نهج الأولوية للعمل دون اتصال (Offline-First) وهيكل معماري منظم (Clean Architecture). ملف قاعدة SQLite محلي غير مشفر حالياً في Release 1، وتُحفظ الأسرار وبيانات المصادقة في `flutter_secure_storage`.
+
+> **ملاحظة الهوية التجارية والتقنية:**
+> - **الاسم التجاري المعتمد والموجّه للمستخدم:** `EduNivora` (يظهر في اسم التطبيق على الشاشة، شاشة البداية، وعناوين الواجهات).
+> - **الهوية التقنية المحمية (دون تغيير):** `applicationId = com.arfatalkamli.academicos` و `namespace = com.arfatalkamli.academicos` للحفاظ على استقرار Google OAuth و Neon Auth و Android Signing.
 
 يُعد هذا المشروع مثالاً عملياً لتطبيق أكاديمي حديث يوازن بين سهولة الاستخدام والهيكل المعماري المرن. ويعتمد على نموذج خفيف من Clean Architecture، حيث يتم فصل طبقات الـ Core، الـ Domain، الـ Data، و الـ Presentation. ويستند التطبيق إلى قاعدة بيانات محلية مع خدمات أمنية ومتعددة، بهدف دعم الطالب في إدارة حياته الأكاديمية اليومية بشكل أكثر فاعلية.
 
@@ -40,8 +44,9 @@ Academic OS هو نظام إدارة أكاديمية مبني على Flutter و
 - شاشة تسجيل الدخول وتسجيل المستخدم محلياً
 - دعم تسجيل الدخول عبر Google
 - قفل التطبيق باستخدام نظام PIN و/أو المصادقة البيومترية
-- تخزين البيانات الحساسة داخل `flutter_secure_storage`
+- تخزين بعض بيانات المصادقة والإعدادات الحساسة داخل `flutter_secure_storage`؛ قاعدة SQLite نفسها غير مشفرة حالياً.
 - إعدادات قفل التطبيق من شاشة الخصوصية والأمان
+- استخدام Argon2id للتحقق من كلمات المرور وأرقام PIN الجديدة، مع ترقية بيانات التحقق القديمة بعد نجاح المصادقة؛ هذا لا يعني أن ملف SQLite مشفر.
 
 ### 4. الجداول الدراسية والتخطيط الأكاديمي
 - عرض جدول أسبوعي للمحاضرات
@@ -70,9 +75,13 @@ Academic OS هو نظام إدارة أكاديمية مبني على Flutter و
 - تنبيهات لمحاضرات قريبة
 - دعم `flutter_local_notifications` و `timezone` لتحديد الوقت بدقة
 
-### 9. إعدادات التطبيق والنسخ الاحتياطي
+### 9. الفصول الدراسية والتقارير الأكاديمية
+- إنشاء الفصول الدراسية وتعديلها وتحديد الفصل النشط
+- تقارير أكاديمية تُنشأ من بيانات SQLite المحلية
+- حفظ التقرير النصي أو نسخه دون رفع السجلات الأكاديمية
+
+### 10. إعدادات التطبيق
 - إعدادات عامة للتطبيق
-- شاشة النسخ الاحتياطي والتصدير
 - دعم اللغة العربية/الإنجليزية
 - دعم الوضع الفاتح/الداكن
 
@@ -96,7 +105,7 @@ Academic OS هو نظام إدارة أكاديمية مبني على Flutter و
 استناداً إلى `pubspec.yaml`، هذه هي التبعيات الفعلية الموجودة في المشروع:
 
 #### Framework and runtime
-- Flutter SDK: `>=3.0.0 <4.0.0`
+- Flutter SDK: `>=3.32.0 <4.0.0`
 - Dart SDK: مرتبط مع Flutter
 
 #### UI and app foundation
@@ -113,7 +122,8 @@ Academic OS هو نظام إدارة أكاديمية مبني على Flutter و
 - `sqflite_common_ffi_web: ^1.0.0`
 - `shared_preferences: ^2.3.0`
 - `flutter_secure_storage: ^9.0.0`
-- `crypto: ^3.0.6`
+- `crypto: ^3.0.6` (legacy verifier migration and cryptographic utilities)
+- `cryptography: ^2.9.0` (Argon2id password and app-lock PIN verifiers)
 
 #### Auth and device security
 - `google_sign_in: ^6.2.1`
@@ -151,9 +161,6 @@ Academic OS هو نظام إدارة أكاديمية مبني على Flutter و
 ```text
 AcademicOS/
 ├─ android/
-├─ ios/
-├─ linux/
-├─ macos/
 ├─ windows/
 ├─ web/
 ├─ test/
@@ -218,6 +225,8 @@ AcademicOS/
 - `lib/presentation/home/home_screen.dart` — الشاشة الرئيسية ولوحة التحكم
 - `lib/presentation/task/add_edit_task_screen.dart` — إضافة/تعديل المهام
 - `lib/presentation/course/course_list_screen.dart` — قائمة المقررات
+- `lib/presentation/terms/academic_terms_screen.dart` — إدارة الفصول الدراسية
+- `lib/presentation/reports/academic_reports_screen.dart` — التقارير الأكاديمية المحلية
 - `lib/presentation/ai_assistant/academic_ai_screen.dart` — شاشة المساعد الأكاديمي
 - `lib/data/database/database_helper.dart` — إعداد قاعدة البيانات المحلية
 - `lib/core/security/secure_storage_service.dart` — تخزين كلمات المرور بشكل آمن
@@ -263,15 +272,7 @@ flutter run -d chrome
 flutter run -d windows
 ```
 
-#### macOS
-```bash
-flutter run -d macos
-```
-
-#### Linux
-```bash
-flutter run -d linux
-```
+المنصات المهيأة حالياً داخل المستودع هي Android وWeb وWindows. مجلدات iOS وmacOS وLinux غير موجودة حالياً، فلا تُعد هذه المنصات مدعومة في إعدادات المستودع الحالية.
 
 ### 5. التحقق من الجودة
 
@@ -293,4 +294,59 @@ flutter test
 
 ## Summary
 
-Academic OS هو تطبيق أكاديمي محلي مصمم لمساعدة الطالب على تنظيم حياته الدراسية بطريقة ذكية ومنظمة. يجمع بين إدارة المهام والمقررات، التذكيرات، والمعدلات، مع بنية واضحة وقاعدة بيانات محلية وآمنة، في تجربة Flutter متكاملة تناسب إدارة الحياة الجامعية اليومية.
+Academic OS هو تطبيق أكاديمي محلي مصمم لمساعدة الطالب على تنظيم حياته الدراسية بطريقة ذكية ومنظمة. يجمع بين إدارة المهام والمقررات، التذكيرات، والمعدلات، مع بنية واضحة وقاعدة بيانات محلية. ملف SQLite غير مشفر حالياً؛ لذلك لا تُعد حماية البيانات عند السكون مكتملة.
+
+
+## Product scope (approved 2026-11-15)
+
+EduNivora is a **guest-first, local-first personal academic application**. A student can open and use core features without signing in. Creating an account with Google or email/password is optional; the central service stores only minimal account identity data and notice receipts, not academic records or files.
+
+Academic terms, courses, schedules, tasks, exams, notes, materials, attachments, settings, and reports remain on the student's device and work offline. Attachments must use durable app-owned storage.
+
+### Public notices — Release 1
+- Notices are intended for all app installations, including guests.
+- Registered students may be identified by account name in delivery/read reports; guest metrics must remain anonymous aggregates only.
+- A minimal protected operator interface is limited to notice publishing and notice reports. Actual delivery, receipt and read behavior remains subject to end-to-end acceptance.
+
+### Personal backup — Release 2 (deferred)
+- Google Drive backup, encrypted archives, upload, download and restore are excluded from Release 1 and must not be exposed as available functionality.
+- The approved future target is a normal, visible `EduNivora` folder in each student's own Google Drive, with student-initiated encrypted backup and validated restore.
+- Backup-related code retained in the repository is unaccepted work-in-progress; it is not a completed or available backup service.
+
+Institutional portals, lecturer/student administration, official university attendance integration, institutional messaging, fees/payments, university dashboards, and academic cloud synchronization are outside the current product scope. See [docs/PRODUCT_SCOPE.md](docs/PRODUCT_SCOPE.md) for the authoritative product specification and [ARCHITECTURE.md](ARCHITECTURE.md) for technical boundaries.
+
+
+## تجهيز وبناء نسخة Web
+
+يحتاج SQLite على Web إلى ملفات WebAssembly وShared Worker التي يوفرها `sqflite_common_ffi_web`. بعد تثبيت Flutter والتبعيات، جهّز runtime ثم ابنِ نسخة Web:
+
+```bash
+flutter pub get
+dart run sqflite_common_ffi_web:setup --force --verbose
+flutter build web --release
+```
+
+يتحقق GitHub Actions من تجهيز runtime وبناء نسخة Web ويرفعها كـ artifact. نجاح البناء لا يثبت وحده استمرارية IndexedDB بعد إعادة التحميل، أو العمل دون اتصال، أو سلامة تعدد التبويبات؛ يلزم اختبار المتصفح لهذه السلوكيات قبل إعلان دعم Web إنتاجياً.
+
+
+## Release 1 cloud metadata backend
+
+EduNivora uses a dedicated Neon PostgreSQL project for optional account
+identity and public notices only. Academic records and attachments remain in
+local SQLite and are never uploaded by this backend. Neon Managed Auth is
+enabled; the Hono API source, migrations and tests are in
+[`backend/neon`](backend/neon/README.md). The last confirmed live Notices API
+deployment is version 7. Its health and public-feed smoke checks returned HTTP
+200, and the unauthenticated admin route returned HTTP 401. The latest reviewed
+source changes (including the current JWT and CORS handling) have not yet been
+deployed. These smoke checks do not prove real-account JWT flows, admin
+publishing, production CORS, or release readiness.
+
+The Flutter client includes the Managed Auth REST adapter and email/OTP
+screens, with unit-test coverage for the request and session flows. Real-account
+end-to-end verification on Android and Web remains outstanding. The public
+announcements feed is available to guests through the Flutter Announcements
+screen and is cached locally for offline reading; academic records and files
+are never uploaded to Neon.
+
+> **Release 1 delivery scope:** EduNivora ships as an Android application only. The Web application, Web administration, and Cloudflare Pages deployment are deferred to a future release. Google Drive backup/restore and production SQLite encryption are also deferred to Release 2. Do not treat the existing Web or backup source files as supported Release 1 delivery features.

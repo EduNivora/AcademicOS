@@ -2,17 +2,24 @@ name: Flutter quality gate
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, chore/edunivora-phase0-execution, feat/durable-attachment-storage, feat/google-neon-auth-native]
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  # A newer commit supersedes stale PR checks; only the latest SHA should occupy the runner.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   quality:
     name: Analyze, test, and build
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -23,32 +30,86 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v4
-        with:
-          packages: 'platform-tools'
-
-      - name: Install required Android SDK platform, NDK, and CMake
-        run: |
-          sdkmanager "platforms;android-28"
-          sdkmanager "ndk;27.0.12077973"
-          sdkmanager "cmake;3.22.1"
+      - name: Cache Gradle dependencies
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.38.0'
+          flutter-version: '3.41.8'
           cache: true
+
+      - name: Set up Android SDK and required NDK
+        uses: android-actions/setup-android@v3
+        with:
+          accept-android-sdk-licenses: true
+          packages: 'ndk;28.2.13676358'
+
+      - name: Install required CMake
+        run: |
+          set -euo pipefail
+          sdkmanager --install "cmake;3.22.1"
+          test -d "$ANDROID_HOME/cmake/3.22.1"
+          echo "Verified Android CMake 3.22.1."
 
       - name: Show toolchain
         run: |
           flutter --version
-          sdkmanager --list_installed | grep -F 'platforms;android-28'
-          sdkmanager --list_installed | grep -F 'ndk;27.0.12077973'
-          sdkmanager --list_installed | grep -F 'cmake;3.22.1'
+          flutter doctor -v
+          echo "Installed Android SDK platforms:"
+          ls "$ANDROID_HOME/platforms" || true
+          echo "Installed Android NDK versions:"
+          ls "$ANDROID_HOME/ndk" || true
 
       - name: Resolve dependencies
-        run: flutter pub get --enforce-lockfile
+        run: flutter pub get 2>&1 | tee pub-get.log
+
+      - name: Generate Android and iOS launcher icons from approved brand asset
+        run: dart run flutter_launcher_icons
+
+      - name: Prepare SQLite WebAssembly runtime
+        run: dart run sqflite_common_ffi_web:setup --force --verbose
+
+      - name: Validate Android launcher icon resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import pathlib
+          import xml.etree.ElementTree as ET
+
+          root = pathlib.Path("android/app/src/main/res")
+          manifest = ET.parse("android/app/src/main/AndroidManifest.xml").getroot()
+          app = manifest.find("application")
+          android = "{http://schemas.android.com/apk/res/android}"
+          assert app is not None
+          assert app.get(android + "icon") == "@mipmap/ic_launcher"
+          assert app.get(android + "roundIcon") == "@mipmap/ic_launcher_round"
+
+          for density in ("mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"):
+              for name in ("ic_launcher.png", "ic_launcher_round.png"):
+                  path = root / f"mipmap-{density}" / name
+                  assert path.is_file() and path.stat().st_size > 1000, path
+
+          for name in ("ic_launcher.xml", "ic_launcher_round.xml"):
+              path = root / "mipmap-anydpi-v26" / name
+              icon = ET.parse(path).getroot()
+              assert icon.tag == "adaptive-icon"
+              assert icon.find("background") is not None
+              assert icon.find("foreground") is not None
+              assert icon.find("monochrome") is not None
+
+          for name in (
+              "ic_launcher_background.xml",
+              "ic_launcher_foreground.xml",
+              "ic_launcher_monochrome.xml",
+          ):
+              assert (root / "drawable" / name).is_file()
+
+          brand = pathlib.Path("assets/branding/edunivora_app_icon.png")
+          assert brand.is_file() and brand.stat().st_size > 100_000
+          print("Android launcher icon: manifest, five densities, adaptive and monochrome assets verified.")
+          PY
 
       - name: Analyze Dart sources
         shell: bash
@@ -81,28 +142,173 @@ jobs:
 
           for error in errors:
               print(error)
+          for warning in warnings:
+              print(warning)
 
           print(
               f"Analyzer summary: {len(errors)} errors, "
               f"{len(warnings)} warnings, {len(infos)} infos."
           )
-          if errors:
+          if errors or warnings:
               sys.exit(1)
           PY
           if [ "$analyze_status" -ne 0 ]; then
-            echo "::warning::Analyzer reported warnings or infos; no analyzer errors were found."
+            echo "::notice::Analyzer reported infos only; no errors or warnings were found."
           fi
 
       - name: Run tests
-        run: flutter test --no-pub
+        run: flutter test --no-pub 2>&1 | tee flutter-test.log
+
+      - name: Verify native SQLite on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          # This action executes each newline as a separate shell command, so keep the
+          # complete POSIX shell program on one folded line.
+          script: >-
+            test_file=integration_test/database_android_integration_test.dart; for attempt in 1 2; do adb wait-for-device; package_ready=0; for probe in $(seq 1 30); do if adb shell cmd package list packages >/dev/null 2>&1; then package_ready=1; break; fi; sleep 5; done; if [ "$package_ready" -eq 1 ] && flutter test "$test_file" --no-pub; then exit 0; fi; echo "Android SQLite integration attempt $attempt failed."; if [ "$attempt" -lt 2 ]; then adb reconnect || true; sleep 15; fi; done; echo "Android SQLite integration test failed after retry."; adb logcat -d -t 2000 || true; exit 1
+
+      - name: Prepare optional production signing
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          GOOGLE_SERVER_CLIENT_ID: ${{ vars.GOOGLE_SERVER_CLIENT_ID }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD GOOGLE_SERVER_CLIENT_ID; do
+            if [ -z "${!name:-}" ]; then missing+=("$name"); fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::notice::Skipping signed ARM64 APK: production signing configuration is incomplete (${missing[*]})."
+            echo "PRODUCTION_SIGNING_READY=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          keystore="$RUNNER_TEMP/edunivora-production-upload.jks"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          chmod 600 "$keystore"
+          test -s "$keystore"
+          keytool -list -keystore "$keystore" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null
+          echo "PRODUCTION_SIGNING_READY=true" >> "$GITHUB_ENV"
+          echo "Production signing configuration verified."
+
+      - name: Build optimized signed ARM64 APK
+        if: env.PRODUCTION_SIGNING_READY == 'true'
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/edunivora-production-upload.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          GOOGLE_SERVER_CLIENT_ID: ${{ vars.GOOGLE_SERVER_CLIENT_ID }}
+        run: >-
+          flutter build apk --release --split-per-abi
+          --target-platform android-arm64
+          --obfuscate
+          --split-debug-info=build/symbols/apk
+          --dart-define=GOOGLE_SERVER_CLIENT_ID="$GOOGLE_SERVER_CLIENT_ID"
+
+      - name: Verify signed ARM64 APK and size
+        if: env.PRODUCTION_SIGNING_READY == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="build/app/outputs/flutter-apk/app-arm64-v8a-release.apk"
+          test -s "$apk"
+          build_tools="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          "$build_tools/aapt" dump badging "$apk" > apk-badging-release.txt
+          grep -q "package: name='com.arfatalkamli.academicos'" apk-badging-release.txt
+          grep -q "application-label:'EduNivora'" apk-badging-release.txt
+          "$build_tools/apksigner" verify --verbose --print-certs "$apk" > apk-signature-release.txt
+          apk_bytes="$(stat -c%s "$apk")"
+          apk_mib="$(awk -v bytes="$apk_bytes" 'BEGIN { printf "%.1f", bytes / 1048576 }')"
+          echo "Verified signed ARM64 APK size: ${apk_mib} MiB"
+          if [ "$apk_bytes" -gt $((60 * 1024 * 1024)) ]; then
+            echo "::error::Signed ARM64 APK exceeds the 60 MiB size target."
+            exit 1
+          fi
+          sha256sum "$apk" | tee SHA256SUMS-release.txt
+
+      - name: Upload signed ARM64 release APK
+        if: env.PRODUCTION_SIGNING_READY == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: edunivora-android-arm64-release-${{ github.sha }}
+          path: |
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            build/symbols/**
+            apk-badging-release.txt
+            apk-signature-release.txt
+            SHA256SUMS-release.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Free unused runner disk space
+        run: |
+          echo "Disk space before cleanup:"
+          df -h /
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf /usr/local/share/chromium
+          sudo rm -rf /usr/local/lib/android/sdk/emulator
+          sudo rm -rf /usr/local/lib/android/sdk/system-images
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune -af || true
+          echo "Disk space after cleanup:"
+          df -h /
 
       - name: Build Android debug APK
-        run: flutter build apk --debug --split-per-abi --no-pub
+        run: flutter build apk --debug --no-pub 2>&1 | tee android-build.log
+
+      - name: Build Web release
+        run: flutter build web --release --no-pub 2>&1 | tee web-build.log
+
+      - name: Verify Android APK package and launcher icon
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="build/app/outputs/flutter-apk/app-debug.apk"
+          test -s "$apk"
+          aapt="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          test -x "$aapt"
+          "$aapt" dump badging "$apk" | tee apk-badging.txt
+          grep -q "package: name='com.arfatalkamli.academicos'" apk-badging.txt
+          grep -q "application-label:'EduNivora'" apk-badging.txt
+          grep -q "application-icon-" apk-badging.txt
+          sha256sum "$apk" | tee apk-sha256.txt
 
       - name: Upload Android debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: academicos-android-debug-split-apks
+          name: academicos-android-debug-apk
           path: build/app/outputs/flutter-apk/*.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Upload Web release
+        uses: actions/upload-artifact@v4
+        with:
+          name: academicos-web-release
+          path: build/web/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Flutter quality diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-quality-diagnostics
+          path: |
+            pub-get.log
+            flutter-analyze.machine.log
+            flutter-test.log
+            android-build.log
+            web-build.log
+          if-no-files-found: ignore
+          retention-days: 7

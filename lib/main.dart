@@ -1,7 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_sign_in/google_sign_in.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'core/security/auth_secure_storage_service.dart';
 import 'data/database/database_helper.dart';
@@ -18,6 +20,7 @@ import 'domain/usecases/task_use_cases.dart';
 import 'core/initializer/app_initializer.dart';
 import 'core/notifications/notification_service.dart';
 import 'core/theme/app_theme.dart';
+import 'core/localization/app_locale.dart';
 import 'package:academic_os/presentation/auth/auth_gate_screen.dart';
 
 void main() async {
@@ -31,7 +34,8 @@ void main() async {
       await NotificationService.instance.initialize();
     } catch (error, stackTrace) {
       debugPrint(
-          'NotificationService initialization failed: $error\n$stackTrace');
+        'NotificationService initialization failed: $error\n$stackTrace',
+      );
     }
   }
 
@@ -39,13 +43,20 @@ void main() async {
     await appInitializer.initialize();
   } catch (error, stackTrace) {
     debugPrint('AppInitializer failed during startup: $error\n$stackTrace');
+    runApp(
+      _StartupFailureApp(
+        onRetry: () async {
+          await databaseHelper.close();
+          main();
+        },
+      ),
+    );
+    return;
   }
 
   final authSecureStorageService = AuthSecureStorageService();
   final authLocalDataSource = AuthLocalDataSourceImpl(authSecureStorageService);
-  final authGoogleDataSource = AuthGoogleDataSourceImpl(
-    googleSignIn: GoogleSignIn(),
-  );
+  final authGoogleDataSource = AuthGoogleDataSourceImpl();
   final authRepository = AuthRepositoryImpl(
     authLocalDataSource,
     authGoogleDataSource,
@@ -74,7 +85,14 @@ void main() async {
 
   final authUseCases = AuthUseCases(
     loginWithUsername: LoginWithUsernameUseCase(authRepository),
+    loginWithEmail: LoginWithEmailUseCase(authRepository),
     registerLocalUser: RegisterLocalUserUseCase(authRepository),
+    registerCloudUser: RegisterCloudUserUseCase(authRepository),
+    verifyEmailOtp: VerifyEmailOtpUseCase(authRepository),
+    resendEmailVerificationOtp: ResendEmailVerificationOtpUseCase(
+      authRepository,
+    ),
+    getCloudAccessToken: GetCloudAccessTokenUseCase(authRepository),
     loginWithGoogle: LoginWithGoogleUseCase(authRepository),
     loginWithCachedGoogleAccount: LoginWithCachedGoogleAccountUseCase(
       authRepository,
@@ -96,6 +114,72 @@ void main() async {
   );
 }
 
+class _StartupFailureApp extends StatelessWidget {
+  const _StartupFailureApp({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'EduNivora',
+      theme: AppTheme.lightTheme(),
+      darkTheme: AppTheme.darkTheme(),
+      builder: (context, child) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
+      home: Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.storage_rounded,
+                      size: 52,
+                      color: AppTheme.warning,
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'تعذّر تجهيز التخزين الأكاديمي',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'لم نتمكن من فتح قاعدة البيانات الدائمة. أوقفنا تشغيل '
+                      'EduNivora لحماية بياناتك من الحفظ المؤقت أو الفقدان. '
+                      'تحقق من مساحة التخزين ثم أعد المحاولة.',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    FilledButton.icon(
+                      onPressed: onRetry,
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('إعادة المحاولة'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class MyApp extends StatefulWidget {
   final AuthUseCases authUseCases;
   final TaskUseCases taskUseCases;
@@ -113,15 +197,53 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  static const String _languagePreferenceKey =
+      'edunivora_language_is_arabic_v1';
+
   bool _isDarkMode = false;
   bool _isArabic = true;
+  bool _languageChangedByUser = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreLanguagePreference();
+  }
+
+  Future<void> _restoreLanguagePreference() async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      final savedLanguage = preferences.getBool(_languagePreferenceKey);
+      if (!mounted || savedLanguage == null || _languageChangedByUser) return;
+      setState(() => _isArabic = savedLanguage);
+    } catch (_) {
+      // Language preference is optional; default to Arabic on read failure.
+    }
+  }
+
+  void _setLanguage(bool isArabic) {
+    _languageChangedByUser = true;
+    if (_isArabic != isArabic) {
+      setState(() => _isArabic = isArabic);
+    }
+    unawaited(_persistLanguagePreference(isArabic));
+  }
+
+  Future<void> _persistLanguagePreference(bool isArabic) async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setBool(_languagePreferenceKey, isArabic);
+    } catch (_) {
+      // A preference write failure must not prevent changing the current UI.
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Academic OS',
-      locale: const Locale('ar', 'SA'),
+      title: 'EduNivora',
+      locale: appLocaleForLanguage(_isArabic),
       supportedLocales: const [Locale('ar', 'SA'), Locale('en', 'US')],
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
@@ -130,7 +252,7 @@ class _MyAppState extends State<MyApp> {
       ],
       builder: (context, child) {
         return Directionality(
-          textDirection: TextDirection.rtl,
+          textDirection: appTextDirectionForLanguage(_isArabic),
           child: child ?? const SizedBox.shrink(),
         );
       },
@@ -144,7 +266,7 @@ class _MyAppState extends State<MyApp> {
         isDarkMode: _isDarkMode,
         isArabic: _isArabic,
         onThemeChanged: (value) => setState(() => _isDarkMode = value),
-        onLanguageChanged: (value) => setState(() => _isArabic = value),
+        onLanguageChanged: _setLanguage,
       ),
     );
   }

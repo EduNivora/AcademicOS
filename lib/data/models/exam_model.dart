@@ -13,15 +13,23 @@ class ExamModel extends ExamEntity {
   });
 
   factory ExamModel.fromMap(Map<String, dynamic> map) {
+    if (map['title'] is! String || (map['title'] as String).trim().isEmpty) {
+      throw const FormatException('Invalid exam backup: title is required.');
+    }
+    final rawDate = map['exam_date'];
+    final examDate = rawDate is String ? DateTime.tryParse(rawDate) : null;
+    if (examDate == null) {
+      throw const FormatException('Invalid exam backup: exam_date is missing or invalid.');
+    }
+
     final idValue = map['id'];
     return ExamModel(
       id: idValue is int ? idValue : int.tryParse(idValue.toString()),
       courseId: map['course_id'] is int
           ? map['course_id'] as int
           : int.tryParse(map['course_id']?.toString() ?? ''),
-      title: map['title']?.toString() ?? '',
-      examDate: DateTime.tryParse(map['exam_date']?.toString() ?? '') ??
-          DateTime.now(),
+      title: map['title'] as String,
+      examDate: examDate,
       location: map['location']?.toString(),
       notes: map['notes']?.toString(),
       courseName: map['course_name']?.toString(),

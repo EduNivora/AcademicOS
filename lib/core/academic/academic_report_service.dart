@@ -13,7 +13,8 @@ class AcademicReportService {
     required List<TaskModel> tasks,
     required List<ExamModel> exams,
     required List<Map<String, dynamic>> schedule,
-    String schema = 'academic_os_backup_v1',
+    List<Map<String, dynamic>> materials = const [],
+    String schema = 'academic_os_backup_v3',
   }) {
     final payload = <String, dynamic>{
       'schema': schema,
@@ -22,6 +23,7 @@ class AcademicReportService {
       'tasks': tasks.map((task) => task.toMap()).toList(),
       'exams': exams.map((exam) => exam.toMap()).toList(),
       'schedule': schedule,
+      'materials': materials,
     };
     return payload;
   }
@@ -43,7 +45,10 @@ class AcademicReportService {
         return aTime.compareTo(bTime);
       });
 
+    final now = DateTime.now();
     final upcomingExams = [...exams]
+      .where((exam) => exam.examDate.isAfter(now))
+      .toList()
       ..sort((a, b) => a.examDate.compareTo(b.examDate));
 
     final totalCredits = courses.fold<int>(0, (sum, course) {
@@ -70,7 +75,7 @@ class AcademicReportService {
         .length;
 
     final lines = <String>[
-      'Academic OS — Academic Report',
+      'EduNivora — Academic Report',
       'Generated: ${DateTime.now().toLocal()}',
       '',
       'Summary:',

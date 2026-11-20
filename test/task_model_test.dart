@@ -23,7 +23,6 @@ void main() {
         reminderDate: DateTime(2026, 12, 30, 20),
         reminderOffsetMinutes: 15,
       );
-
       final map = task.toMap();
       expect(map['id'], 5);
       expect(map['title'], 'Sample');
@@ -41,7 +40,6 @@ void main() {
       expect(map['reminder_enabled'], 1);
       expect(map['reminder_date'], '2026-12-30T20:00:00.000');
       expect(map['reminder_offset_minutes'], 15);
-
       final parsed = TaskModel.fromMap(map);
       expect(parsed.id, 5);
       expect(parsed.title, 'Sample');
@@ -62,15 +60,13 @@ void main() {
     });
 
     test('fromMap handles missing optional fields', () {
-      final map = {
+      final parsed = TaskModel.fromMap({
         'id': 2,
         'title': 'No due date',
         'description': 'No due date description',
         'type': 'homework',
         'is_completed': 0,
-      };
-
-      final parsed = TaskModel.fromMap(map);
+      });
       expect(parsed.id, 2);
       expect(parsed.dueDate, isNull);
       expect(parsed.type, TaskType.homework);
@@ -79,6 +75,35 @@ void main() {
       expect(parsed.isCompleted, isFalse);
       expect(parsed.reminderEnabled, isFalse);
       expect(parsed.reminderOffsetMinutes, 30);
+    });
+
+    test('rejects missing required task fields', () {
+      expect(
+        () => TaskModel.fromMap({'id': 1, 'title': 'Incomplete'}),
+        throwsFormatException,
+      );
+    });
+
+    test('rejects invalid date values and reversed time ranges', () {
+      expect(
+        () => TaskModel.fromMap({
+          'id': 1,
+          'title': 'Task',
+          'description': '',
+          'due_date': 'not-a-date',
+        }),
+        throwsFormatException,
+      );
+      expect(
+        () => TaskModel.fromMap({
+          'id': 1,
+          'title': 'Task',
+          'description': '',
+          'start_date_time': '2026-01-02T10:00:00',
+          'end_date_time': '2026-01-02T09:00:00',
+        }),
+        throwsFormatException,
+      );
     });
   });
 }

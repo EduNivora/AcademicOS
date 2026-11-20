@@ -41,21 +41,36 @@ class _PinLockScreenState extends State<PinLockScreen> {
       return;
     }
 
-    final success = await widget.appLockService.verifyPin(pin);
-    if (!mounted) return;
+    try {
+      final success = await widget.appLockService.verifyPin(pin);
+      if (!mounted) return;
 
-    setState(() {
-      _isLoading = false;
-    });
+      if (success) {
+        setState(() => _isLoading = false);
+        await widget.onVerified();
+        return;
+      }
 
-    if (success) {
-      await widget.onVerified();
-      return;
+      final remaining = await widget.appLockService.getPinLockoutRemaining();
+      if (!mounted) return;
+      final seconds = remaining == null
+          ? null
+          : (remaining.inMilliseconds / 1000).ceil();
+      setState(() {
+        _isLoading = false;
+        _errorMessage = seconds == null
+            ? 'رمز PIN غير صحيح. حاول مرة أخرى.'
+            : 'تم إيقاف المحاولات مؤقتاً. حاول بعد $seconds ثانية.';
+      });
+    } catch (error, stackTrace) {
+      debugPrint('PIN verification failed safely: $error\n$stackTrace');
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage =
+            'تعذر التحقق الآمن من PIN. الوصول ما زال مقفلاً؛ أعد المحاولة لاحقاً.';
+      });
     }
-
-    setState(() {
-      _errorMessage = 'رمز PIN غير صحيح. حاول مرة أخرى.';
-    });
   }
 
   Future<void> _authenticateBiometric() async {

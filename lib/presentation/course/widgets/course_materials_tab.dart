@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
@@ -29,6 +27,7 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
     setState(() => _isLoading = true);
     final rows =
         await DatabaseHelper.instance.getMaterialsByCourseId(widget.courseId);
+    if (!mounted) return;
     setState(() {
       _materials = rows.map(CourseMaterialModel.fromMap).toList();
       _isLoading = false;
@@ -39,50 +38,70 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
     final FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'doc', 'docx', 'txt'],
+      withData: true,
     );
-    if (result == null) return;
+    if (result == null || !mounted) return;
     final file = result.files.first;
-    String? path = file.path;
-    if (path == null && file.bytes != null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('معاينة الملفات غير مدعومة في المتصفح.')));
+    final bytes = file.bytes;
+    if (bytes == null || bytes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذر قراءة محتوى الملف المحدد.')),
+      );
       return;
     }
 
-    final fileName = p.basename(path!);
-    final ext = p.extension(fileName).replaceFirst('.', '').toLowerCase();
-    try {
-      final appDir = Directory.systemTemp.path;
-      final dest = p.join(appDir, 'academic_os_materials');
-      await Directory(dest).create(recursive: true);
-      final destPath =
-          p.join(dest, '${DateTime.now().millisecondsSinceEpoch}_$fileName');
-      await File(path).copy(destPath);
+    if (bytes.length > 50 * 1024 * 1024) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('حجم الملف يتجاوز الحد المسموح (50 MB).')),
+      );
+      return;
+    }
 
+    final fileName = p.basename(file.name);
+    final ext = p.extension(fileName).replaceFirst('.', '').toLowerCase();
+    if (!{'pdf', 'doc', 'docx', 'txt'}.contains(ext)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('نوع الملف غير مدعوم.')),
+      );
+      return;
+    }
+
+    try {
       final model = CourseMaterialModel(
         courseId: widget.courseId,
         title: fileName,
-        filePath: destPath,
+        filePath: 'dbblob://${DateTime.now().microsecondsSinceEpoch}',
         fileType: ext,
+        fileBytes: bytes,
       );
       await DatabaseHelper.instance.insertMaterial(model.toMap());
       await _loadMaterials();
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('تم إضافة الملف بنجاح.')));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم حفظ الملف داخل مساحة التطبيق.')),
+      );
     } catch (e) {
-      debugPrint('Failed to save material: $e');
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('فشل حفظ الملف.')));
+      debugPrint('Failed to persist material: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('فشل حفظ الملف. لم يتم تسجيله كمرفق.')),
+      );
     }
   }
 
   Future<void> _openMaterial(CourseMaterialModel material) async {
+    if (material.fileBytes == null || material.fileBytes!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('محتوى هذا المرفق غير متاح أو لم تتم استعادته. أعد إرفاق الملف الأصلي.')),
+      );
+      return;
+    }
     if (material.fileType == 'pdf') {
       Navigator.push(
         context,
         MaterialPageRoute(
             builder: (_) => DocumentViewerScreen(
-                filePath: material.filePath, title: material.title)),
+                filePath: material.filePath, title: material.title, fileBytes: material.fileBytes)),
       );
     } else {
       showDialog(
@@ -102,8 +121,45 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
   }
 
   Future<void> _deleteMaterial(int id) async {
-    await DatabaseHelper.instance.deleteMaterial(id);
-    await _loadMaterials();
+    final matching = _materials.where((material) => material.id == id);
+    if (matching.isEmpty) return;
+    final material = matching.first;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('حذف المرفق؟'),
+        content: Text(
+          'سيتم حذف «' + material.title + '» وبيانات الملف المحفوظة على هذا الجهاز.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await DatabaseHelper.instance.deleteMaterial(id);
+      await _loadMaterials();
+    } catch (error, stackTrace) {
+      debugPrint('Deleting course attachment failed: $error\\n$stackTrace');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر حذف المرفق: ' + error.toString())),
+      );
+    }
   }
 
   @override

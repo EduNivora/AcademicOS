@@ -31,10 +31,7 @@ jobs:
           test -n "$NEON_API_KEY" || { echo "::error::Missing GitHub Actions secret NEON_API_KEY"; exit 1; }
           test -n "$GEMINI_API_KEY" || { echo "::error::Missing GitHub Actions secret GEMINI_API_KEY"; exit 1; }
 
-      - name: Checkout AI implementation branch
-        uses: actions/checkout@v4
-        with:
-          ref: feat/edunivora-gemini-ai
+      - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:

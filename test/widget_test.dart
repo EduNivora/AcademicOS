@@ -25,6 +25,28 @@ class _FakeAuthRepository implements AuthRepository {
       true;
 
   @override
+  Future<bool> loginWithEmail(String email, String password) async => true;
+
+  @override
+  Future<bool> registerCloudUser({
+    required String name,
+    required String email,
+    required String password,
+  }) async => true;
+
+  @override
+  Future<bool> verifyEmailOtp({
+    required String email,
+    required String otp,
+  }) async => true;
+
+  @override
+  Future<void> resendEmailVerificationOtp(String email) async {}
+
+  @override
+  Future<String?> getCloudAccessToken() async => null;
+
+  @override
   Future<bool> registerLocalUser(String username, String password,
           {String? email, String? displayName}) async =>
       true;
@@ -88,7 +110,13 @@ void main() {
 
     final authUseCases = AuthUseCases(
       loginWithUsername: LoginWithUsernameUseCase(authRepo),
+      loginWithEmail: LoginWithEmailUseCase(authRepo),
       registerLocalUser: RegisterLocalUserUseCase(authRepo),
+      registerCloudUser: RegisterCloudUserUseCase(authRepo),
+      verifyEmailOtp: VerifyEmailOtpUseCase(authRepo),
+      resendEmailVerificationOtp:
+          ResendEmailVerificationOtpUseCase(authRepo),
+      getCloudAccessToken: GetCloudAccessTokenUseCase(authRepo),
       loginWithGoogle: LoginWithGoogleUseCase(authRepo),
       loginWithCachedGoogleAccount:
           LoginWithCachedGoogleAccountUseCase(authRepo),
@@ -121,7 +149,9 @@ void main() {
       ),
     );
 
-    await tester.pumpAndSettle();
+    // The app includes ongoing visual animations, so pump a bounded frame
+    // instead of waiting for every animation to settle forever.
+    await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.byType(MaterialApp), findsOneWidget);
   });

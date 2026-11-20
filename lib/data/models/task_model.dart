@@ -21,23 +21,42 @@ class TaskModel extends TaskEntity {
   });
 
   factory TaskModel.fromMap(Map<String, dynamic> map) {
+    if (map['title'] is! String || (map['title'] as String).trim().isEmpty) {
+      throw const FormatException('Invalid task backup: title is required.');
+    }
+    if (map['description'] is! String) {
+      throw const FormatException('Invalid task backup: description must be a string.');
+    }
+
+    DateTime? parseOptionalDate(String key) {
+      final value = map[key];
+      if (value == null) return null;
+      final parsed = DateTime.tryParse(value.toString());
+      if (parsed == null) {
+        throw FormatException('Invalid task backup: "$key" is not a valid date.');
+      }
+      return parsed;
+    }
+
+    final startDateTime = parseOptionalDate('start_date_time');
+    final endDateTime = parseOptionalDate('end_date_time');
+    if (startDateTime != null &&
+        endDateTime != null &&
+        endDateTime.isBefore(startDateTime)) {
+      throw const FormatException('Invalid task backup: end_date_time precedes start_date_time.');
+    }
+
     final idValue = map['id'];
     return TaskModel(
       id: idValue is int ? idValue : int.tryParse(idValue.toString()),
-      title: map['title']?.toString() ?? '',
-      description: map['description']?.toString() ?? '',
+      title: map['title'] as String,
+      description: map['description'] as String,
       type: TaskTypeX.fromName(map['type']?.toString()),
       priority: TaskPriorityX.fromName(map['priority']?.toString()),
       recurrence: TaskRecurrenceX.fromName(map['recurrence']?.toString()),
-      dueDate: map['due_date'] != null
-          ? DateTime.tryParse(map['due_date'].toString())
-          : null,
-      startDateTime: map['start_date_time'] != null
-          ? DateTime.tryParse(map['start_date_time'].toString())
-          : null,
-      endDateTime: map['end_date_time'] != null
-          ? DateTime.tryParse(map['end_date_time'].toString())
-          : null,
+      dueDate: parseOptionalDate('due_date'),
+      startDateTime: startDateTime,
+      endDateTime: endDateTime,
       isCompleted: map['is_completed'] == 1 || map['is_completed'] == true,
       courseId: map['course_id'] is int
           ? map['course_id'] as int
@@ -46,9 +65,7 @@ class TaskModel extends TaskEntity {
       notes: map['notes']?.toString() ?? '',
       reminderEnabled:
           map['reminder_enabled'] == 1 || map['reminder_enabled'] == true,
-      reminderDate: map['reminder_date'] != null
-          ? DateTime.tryParse(map['reminder_date'].toString())
-          : null,
+      reminderDate: parseOptionalDate('reminder_date'),
       reminderOffsetMinutes: map['reminder_offset_minutes'] is int
           ? map['reminder_offset_minutes'] as int
           : int.tryParse(map['reminder_offset_minutes']?.toString() ?? '') ??

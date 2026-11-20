@@ -33,14 +33,16 @@ class NotificationService {
       );
       await _plugin.initialize(initializationSettings);
 
-      final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>();
+      final androidPlugin = _plugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
       await androidPlugin?.requestNotificationsPermission();
 
       const taskChannel = AndroidNotificationChannel(
         'academic_os_tasks',
-        'Task reminders',
-        description: 'Reminders for tasks and deadlines',
+        'EduNivora — تذكيرات المهام',
+        description: 'تذكيرات المهام والمواعيد النهائية في EduNivora',
         importance: Importance.high,
         playSound: true,
         enableVibration: true,
@@ -48,8 +50,8 @@ class NotificationService {
 
       const courseChannel = AndroidNotificationChannel(
         'academic_os_courses',
-        'Lecture reminders',
-        description: 'Reminders for lectures and course events',
+        'EduNivora — تذكيرات المحاضرات',
+        description: 'تذكيرات المحاضرات والمقررات الدراسية في EduNivora',
         importance: Importance.high,
         playSound: true,
         enableVibration: true,
@@ -94,11 +96,13 @@ class NotificationService {
       return AndroidScheduleMode.exactAllowWhileIdle;
     }
 
-    final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+    final androidPlugin = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     try {
-      final canScheduleExact =
-          await androidPlugin?.canScheduleExactNotifications();
+      final canScheduleExact = await androidPlugin
+          ?.canScheduleExactNotifications();
       if (canScheduleExact == true) {
         return AndroidScheduleMode.exactAllowWhileIdle;
       }
@@ -146,13 +150,7 @@ class NotificationService {
     final timeParts = startTime.split(':');
     final hour = int.tryParse(timeParts.first) ?? 0;
     final minute = int.tryParse(timeParts.length > 1 ? timeParts[1] : '0') ?? 0;
-    final lectureStart = DateTime(
-      now.year,
-      now.month,
-      now.day,
-      hour,
-      minute,
-    );
+    final lectureStart = DateTime(now.year, now.month, now.day, hour, minute);
 
     var diffDays = (targetWeekday - now.weekday + 7) % 7;
     if (diffDays == 0 && lectureStart.isBefore(now)) {
@@ -350,6 +348,16 @@ class NotificationService {
       debugPrint(
         'NotificationService.cancelLectureReminder error: $error\n$stackTrace',
       );
+    }
+  }
+
+  Future<bool> cancelAllNotifications() async {
+    try {
+      await _plugin.cancelAll();
+      return true;
+    } catch (error, stackTrace) {
+      debugPrint('NotificationService.cancelAllNotifications error: $error\\n$stackTrace');
+      return false;
     }
   }
 

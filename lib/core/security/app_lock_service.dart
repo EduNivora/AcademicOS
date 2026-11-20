@@ -13,20 +13,52 @@ class AppLockService {
   }
 
   Future<void> setPin(String pin) async {
-    final salt = _secureStorageService.generateSalt();
-    final pinHash = _secureStorageService.hashPassword(pin, salt);
-    await _secureStorageService.saveAppLockPinHash(pinHash);
-    await _secureStorageService.saveAppLockPinSalt(salt);
+    final verifier = await _secureStorageService.createPasswordVerifier(pin);
+    await _secureStorageService.saveAppLockPinHash(verifier);
+    await _secureStorageService.resetAppLockPinAttempts();
+  }
+
+  Future<Duration?> getPinLockoutRemaining() {
+    return _secureStorageService.getAppLockPinLockoutRemaining();
   }
 
   Future<bool> verifyPin(String pin) async {
+    final lockout = await getPinLockoutRemaining();
+    if (lockout != null && lockout > Duration.zero) return false;
+
     final storedHash = await _secureStorageService.getAppLockPinHash();
-    final salt = await _secureStorageService.getAppLockPinSalt();
-    if (storedHash == null || salt == null) {
-      return false;
+    if (storedHash == null || storedHash.isEmpty) return false;
+
+    var verified = false;
+    if (storedHash.startsWith('argon2id')) {
+      verified = await _secureStorageService.verifyPasswordVerifier(
+        pin,
+        storedHash,
+      );
+    } else {
+      final legacySalt = await _secureStorageService.getAppLockPinSalt();
+      if (legacySalt != null) {
+        final legacyHash =
+            _secureStorageService.hashPassword(pin, legacySalt);
+        verified = _secureStorageService.constantTimeEquals(
+          legacyHash,
+          storedHash,
+        );
+        if (verified) {
+          final upgraded =
+              await _secureStorageService.createPasswordVerifier(pin);
+          await _secureStorageService.saveAppLockPinHash(upgraded);
+        }
+      }
     }
-    final computedHash = _secureStorageService.hashPassword(pin, salt);
-    return computedHash == storedHash;
+
+    if (verified) {
+      await _secureStorageService.resetAppLockPinAttempts();
+      return true;
+    }
+
+    await _secureStorageService.recordFailedAppLockPinAttempt();
+    return false;
   }
 
   Future<void> removePin() async {
@@ -53,13 +85,9 @@ class AppLockService {
   }
 
   Future<bool> shouldLockApp() async {
-    if (!await isPinSet()) {
-      return false;
-    }
+    if (!await isPinSet()) return false;
     final lastActive = await getLastActiveAt();
-    if (lastActive == null) {
-      return true;
-    }
+    if (lastActive == null) return true;
     final timeoutMinutes = await getLockTimeout();
     final elapsed = DateTime.now().difference(lastActive);
     return elapsed.inMinutes >= timeoutMinutes;
