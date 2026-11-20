@@ -823,7 +823,25 @@ class DatabaseHelper {
 
   Future<int> deleteCourse(int id) async {
     final db = await database;
-    return await db.delete(_courseTable, where: 'id = ?', whereArgs: [id]);
+    return db.transaction((txn) async {
+      final existing = await txn.query(
+        _courseTable,
+        columns: ['id'],
+        where: 'id = ?',
+        whereArgs: [id],
+        limit: 1,
+      );
+      if (existing.isEmpty) return 0;
+
+      // Remove every dependent row in the same transaction so no orphan
+      // references or attachment blobs remain if deletion fails midway.
+      await txn.delete(_materialsTable, where: 'course_id = ?', whereArgs: [id]);
+      await txn.delete(scheduleTable, where: 'course_id = ?', whereArgs: [id]);
+      await txn.delete(_examTable, where: 'course_id = ?', whereArgs: [id]);
+      await txn.delete(_taskTable, where: 'course_id = ?', whereArgs: [id]);
+
+      return txn.delete(_courseTable, where: 'id = ?', whereArgs: [id]);
+    });
   }
 
   Future<int> updateCourseGrades(
