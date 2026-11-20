@@ -1,5 +1,6 @@
 import '../../data/database/database_helper.dart';
 import '../../data/models/course_material_model.dart';
+import '../../data/models/exam_model.dart';
 import 'dart:typed_data';
 import '../../data/models/student_profile_model.dart';
 import '../../domain/entities/course_entity.dart';
@@ -224,6 +225,9 @@ class AcademicAssistantActionExecutor {
       'add_lecture' => _addLecture(call.arguments),
       'update_lecture' => _updateLecture(call.arguments),
       'delete_lecture' => _deleteLecture(call.arguments, confirmed: confirmed),
+      'create_exam' => _createExam(call.arguments),
+      'update_exam' => _updateExam(call.arguments),
+      'delete_exam' => _deleteExam(call.arguments, confirmed: confirmed),
       'generate_report' => _generateReport(call.arguments),
       _ => const AcademicAssistantToolResult(
         message: 'هذه العملية غير متاحة للمساعد حالياً.',
@@ -833,6 +837,100 @@ class AcademicAssistantActionExecutor {
     await NotificationService.instance.cancelLectureReminder(scheduleId);
     return AcademicAssistantToolResult(
       message: 'تم حذف المحاضرة من الجدول وإلغاء تنبيهها.',
+      changedData: true,
+    );
+  }
+
+  Future<AcademicAssistantToolResult> _createExam(
+    Map<String, dynamic> args,
+  ) async {
+    final title = _string(args, 'title');
+    final examDate = _date(args['exam_date']);
+    if (title.isEmpty || examDate == null) {
+      return const AcademicAssistantToolResult(
+        message: 'لإنشاء الاختبار أحتاج عنوانه وتاريخه ووقته بصيغة ISO-8601.',
+      );
+    }
+    final courseResult = await _resolveCourse(args);
+    if (courseResult.error != null) {
+      return AcademicAssistantToolResult(message: courseResult.error!);
+    }
+    final exam = ExamModel(
+      courseId: courseResult.course?.id,
+      courseName: courseResult.course?.name,
+      title: title,
+      examDate: examDate,
+      location: _string(args, 'location'),
+      notes: _string(args, 'notes'),
+    );
+    final id = await database.insertExam(exam);
+    return AcademicAssistantToolResult(
+      message: 'تم إنشاء الاختبار «$title» بتاريخ ${examDate.toLocal()}'
+          '${courseResult.course == null ? '' : ' وربطه بمادة ${courseResult.course!.name}'} (رقم $id).',
+      changedData: true,
+    );
+  }
+
+  Future<AcademicAssistantToolResult> _updateExam(
+    Map<String, dynamic> args,
+  ) async {
+    final id = _integer(args['exam_id']);
+    if (id == null) {
+      return const AcademicAssistantToolResult(message: 'حدد رقم الاختبار الذي تريد تعديله.');
+    }
+    final existing = await database.getExamById(id);
+    if (existing == null) {
+      return const AcademicAssistantToolResult(message: 'لم أجد الاختبار المطلوب.');
+    }
+    final courseResult = await _resolveCourse(args);
+    if (courseResult.error != null) {
+      return AcademicAssistantToolResult(message: courseResult.error!);
+    }
+    final examDate = args.containsKey('exam_date')
+        ? _date(args['exam_date'])
+        : existing.examDate;
+    if (examDate == null) {
+      return const AcademicAssistantToolResult(message: 'تاريخ الاختبار الجديد غير صحيح.');
+    }
+    final updated = ExamModel(
+      id: id,
+      courseId: courseResult.course?.id ?? existing.courseId,
+      courseName: courseResult.course?.name ?? existing.courseName,
+      title: _string(args, 'title').isEmpty ? existing.title : _string(args, 'title'),
+      examDate: examDate,
+      location: _string(args, 'location').isEmpty ? existing.location : _string(args, 'location'),
+      notes: _string(args, 'notes').isEmpty ? existing.notes : _string(args, 'notes'),
+      colorHex: existing.colorHex,
+    );
+    await database.updateExam(updated);
+    return AcademicAssistantToolResult(
+      message: 'تم تحديث الاختبار «${updated.title}».',
+      changedData: true,
+    );
+  }
+
+  Future<AcademicAssistantToolResult> _deleteExam(
+    Map<String, dynamic> args, {
+    required bool confirmed,
+  }) async {
+    final id = _integer(args['exam_id']);
+    if (id == null) {
+      return const AcademicAssistantToolResult(message: 'حدد رقم الاختبار الذي تريد حذفه.');
+    }
+    final exam = await database.getExamById(id);
+    if (exam == null) {
+      return const AcademicAssistantToolResult(message: 'الاختبار غير موجود.');
+    }
+    if (!confirmed) {
+      return AcademicAssistantToolResult(
+        message: 'حذف الاختبار يحتاج إلى تأكيدك.',
+        requiresConfirmation: true,
+        confirmationPrompt: 'هل تؤكد حذف الاختبار «${exam.title}»؟',
+      );
+    }
+    await database.deleteExam(id);
+    return AcademicAssistantToolResult(
+      message: 'تم حذف الاختبار «${exam.title}» بعد تأكيدك.',
       changedData: true,
     );
   }
