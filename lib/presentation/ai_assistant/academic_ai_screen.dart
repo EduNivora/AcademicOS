@@ -272,13 +272,16 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
 - add_lecture: course_id أو course_name, day (اسم يوم عربي), start_time, end_time بصيغة HH:mm, location
 - update_lecture: schedule_id, course_id أو course_name, day, start_time, end_time, location, reminder_enabled, reminder_offset_minutes
 - delete_lecture: schedule_id
+- create_exam: title, exam_date بصيغة ISO-8601, course_id أو course_name, location, notes
+- update_exam: exam_id, title, exam_date بصيغة ISO-8601, course_id أو course_name, location, notes
+- delete_exam: exam_id
 - generate_report: period (daily|weekly|monthly|final)
 
 قواعد إلزامية:
 1. لا تخترع معرفات أو مواد غير موجودة في السياق.
 2. استخدم course_id عند توفره، وإلا استخدم الاسم المطابق تماماً.
 3. لا تنشئ مهمة أو محاضرة إذا كانت المعلومات الأساسية ناقصة؛ اترك actions فارغة واطلب توضيحاً في reply.
-4. لا تنفذ الحذف بنفسك؛ أرسل delete_task أو delete_material أو delete_lecture فقط، وسيطلب التطبيق تأكيد المستخدم.
+4. لا تنفذ الحذف بنفسك؛ أرسل إجراء الحذف المطلوب فقط، وسيطلب التطبيق تأكيد المستخدم قبل حذف أي سجل.
 5. لا تدّعِ نجاح أي عملية؛ التطبيق سينفذ الأدوات ويتحقق من الحفظ.
 6. يمكن إنشاء عدة مهام في actions عند طلب خطة، لكن لا تتجاوز 10 إجراءات.
 7. لا تنشئ أي إجراء متعلق بتوزيع الدرجات أو المعدل؛ هذه الوظائف مؤجلة.
@@ -313,6 +316,9 @@ $userMessage''';
               'add_lecture',
               'update_lecture',
               'delete_lecture',
+              'create_exam',
+              'update_exam',
+              'delete_exam',
               'generate_report',
             }.contains(item['name']),
           )
@@ -398,6 +404,8 @@ $userMessage''';
     final courses = await widget.courseUseCases.getCourses();
     final tasks = await widget.taskUseCases.getTasks();
     final schedules = await DatabaseHelper.instance.getSchedules();
+    final exams = await DatabaseHelper.instance.getExams();
+    final materials = await DatabaseHelper.instance.getAllMaterials();
     final profile = await StudentProfile.load();
     final context = {
       'academicProfile': {
@@ -438,7 +446,13 @@ $userMessage''';
           )
           .toList(),
       'weeklySchedule': schedules.take(100).toList(),
-      'exams': widget.exams
+      'materials': materials.take(100).map((item) => {
+        'id': item['id'],
+        'courseId': item['course_id'],
+        'title': item['title'],
+        'fileType': item['file_type'],
+      }).toList(),
+      'exams': exams
           .take(30)
           .map(
             (exam) => {
