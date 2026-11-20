@@ -2297,6 +2297,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                           tasks: widget.taskState.tasks,
                           exams: _exams,
                           authUseCases: widget.authUseCases,
+                          taskUseCases: widget.taskUseCases,
+                          onTasksChanged: widget.onRefresh,
                         ),
                       ),
                     );
