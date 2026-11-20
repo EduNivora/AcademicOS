@@ -99,6 +99,12 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
   }
 
   void _generatePlan() {
+    if (_savedDayCount > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('هذه الخطة حُفظت كمهام بالفعل. لا يمكن استبدالها تلقائياً حتى لا تتكرر المهام المحفوظة.')),
+      );
+      return;
+    }
     final scope = _parseInt(_scopeController, fallback: 10);
     final totalDays = _parseInt(_daysController, fallback: 7);
     final hours = _parseInt(_hoursController, fallback: 2);
