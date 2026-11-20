@@ -458,6 +458,16 @@ class NotificationService {
     }
   }
 
+  Future<bool> cancelAllNotifications() async {
+    try {
+      await _plugin.cancelAll();
+      return true;
+    } catch (error, stackTrace) {
+      debugPrint('NotificationService.cancelAllNotifications error: $error\n$stackTrace');
+      return false;
+    }
+  }
+
   Future<void> syncReminders({
     required List<TaskEntity> tasks,
     required List<CourseEntity> courses,

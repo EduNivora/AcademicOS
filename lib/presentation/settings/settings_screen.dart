@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/config/edunivora_identity.dart';
 import '../../core/security/app_lock_service.dart';
+import '../../core/notifications/notification_service.dart';
 import '../../core/widgets/edunivora_ui.dart';
 import '../../data/database/database_helper.dart';
 import '../about/about_app_screen.dart';
@@ -17,6 +18,7 @@ class SettingsScreen extends StatefulWidget {
   final bool? isArabic;
   final ValueChanged<bool>? onLanguageChanged;
   final AppLockService? appLockService;
+  final Future<void> Function()? onDataCleared;
 
   const SettingsScreen({
     super.key,
@@ -25,6 +27,7 @@ class SettingsScreen extends StatefulWidget {
     this.isArabic,
     this.onLanguageChanged,
     this.appLockService,
+    this.onDataCleared,
   });
 
   @override
@@ -64,13 +67,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(
-          isAr ? 'حذف كل البيانات المحلية؟' : 'Delete all local data?',
+          isAr ? 'حذف البيانات الأكاديمية المحلية؟' : 'Delete local academic data?',
         ),
         content: Text(
           isAr
               ? 'سيتم حذف المواد والمهام والاختبارات والجدول والمرفقات من هذا الجهاز. '
                     'لا يمكن التراجع عن هذا الإجراء.'
-              : 'All courses, tasks, exams, schedules, and attachments stored on this device will be permanently removed. This action cannot be undone.',
+              : 'Subjects, tasks, exams, schedules, and attachments stored on this device will be permanently removed. This action cannot be undone.',
         ),
         actions: [
           TextButton(
@@ -101,17 +104,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
         await txn.delete('exams');
         await txn.delete('tasks');
         await txn.delete('courses');
+        await txn.delete('academic_terms');
       });
 
+      final notificationsCancelled =
+          await NotificationService.instance.cancelAllNotifications();
+      try {
+        await widget.onDataCleared?.call();
+      } catch (refreshError, refreshStackTrace) {
+        debugPrint('Refreshing home after data clear failed: $refreshError\\n$refreshStackTrace');
+      }
+
       if (!mounted) return;
+      final successMessage = isAr
+          ? (notificationsCancelled
+              ? 'تم حذف البيانات الأكاديمية وإلغاء التذكيرات المحلية.'
+              : 'تم حذف البيانات الأكاديمية، لكن تعذر إلغاء بعض التذكيرات.')
+          : (notificationsCancelled
+              ? 'Academic data deleted and local reminders cancelled.'
+              : 'Academic data deleted, but some reminders could not be cancelled.');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            isAr
-                ? 'تم حذف البيانات الأكاديمية المحلية.'
-                : 'Local academic data cleared.',
-          ),
-        ),
+        SnackBar(content: Text(successMessage)),
       );
     } catch (error, stackTrace) {
       debugPrint('Clearing local academic data failed: $error\n$stackTrace');

@@ -133,8 +133,45 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
   }
 
   Future<void> _deleteMaterial(int id) async {
-    await DatabaseHelper.instance.deleteMaterial(id);
-    await _loadMaterials();
+    final matching = _materials.where((material) => material.id == id);
+    if (matching.isEmpty) return;
+    final material = matching.first;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('حذف المرفق؟'),
+        content: Text(
+          'سيتم حذف «' + material.title + '» وبيانات الملف المحفوظة على هذا الجهاز.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await DatabaseHelper.instance.deleteMaterial(id);
+      await _loadMaterials();
+    } catch (error, stackTrace) {
+      debugPrint('Deleting course attachment failed: $error\\n$stackTrace');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر حذف المرفق: ' + error.toString())),
+      );
+    }
   }
 
   @override

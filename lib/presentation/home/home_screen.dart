@@ -27,6 +27,7 @@ import '../course/course_detail_screen.dart';
 import '../course/course_list_screen.dart';
 import '../../core/notifications/notification_service.dart';
 import '../notifications/communications_screen.dart';
+import '../about/contact_screen.dart';
 import '../admin/admin_announcements_screen.dart';
 import '../schedule/weekly_schedule_screen.dart';
 import '../focus/focus_timer_screen.dart';
@@ -190,12 +191,48 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
   TaskSortMode _sortMode = TaskSortMode.none;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   List<Map<String, dynamic>> _todayLectures = [];
+  String _activeTermName = '';
   bool _showTaskControls = false;
 
   int get _completedTasksCount =>
       widget.taskState.tasks.where((task) => task.isCompleted).length;
   int get _pendingTasksCount =>
       widget.taskState.tasks.length - _completedTasksCount;
+
+  double _percentageToGpa(double percent) {
+    if (percent >= 95) return 4.0;
+    if (percent >= 90) return 3.8;
+    if (percent >= 85) return 3.6;
+    if (percent >= 80) return 3.3;
+    if (percent >= 75) return 3.0;
+    if (percent >= 70) return 2.7;
+    if (percent >= 65) return 2.3;
+    if (percent >= 60) return 2.0;
+    if (percent >= 50) return 1.5;
+    return 1.0;
+  }
+
+  double get _estimatedGpa {
+    if (_courses.isEmpty) return 0;
+
+    var totalWeighted = 0.0;
+    var totalCredits = 0;
+
+    for (final course in _courses) {
+      final credits = (course.creditHours ?? course.credits);
+      final mid = course.midGrade ?? 0;
+      final practical = course.practicalGrade ?? 0;
+      final finalGrade = course.finalGrade ?? 0;
+      final percent = ((mid * 0.3) + (practical * 0.3) + (finalGrade * 0.4))
+          .clamp(0, 100)
+          .toDouble();
+      totalWeighted += _percentageToGpa(percent) * credits;
+      totalCredits += credits;
+    }
+
+    if (totalCredits == 0) return 0;
+    return (totalWeighted / totalCredits).clamp(0, 4.0);
+  }
 
   Future<void> _showGlobalSearch() async {
     if (!mounted) return;
@@ -290,6 +327,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
 
       if (!mounted) return;
       setState(() {
+        _activeTermName = _studentProfile.semester;
         _todayLectures = todaySchedules;
         _exams = exams;
       });
@@ -399,7 +437,16 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
   Future<void> _loadStudentProfile() async {
     final profile = await StudentProfile.load();
     if (!mounted) return;
-    setState(() => _studentProfile = profile);
+    setState(() {
+      _studentProfile = profile;
+      _activeTermName = profile.semester;
+    });
+  }
+
+  Future<void> _refreshAfterLocalDataClear() async {
+    await _loadCourses();
+    await _loadSavedSettingsAndTasks();
+    await _loadScheduleAndTerm();
   }
 
   Future<void> _loadSavedSettingsAndTasks() async {
@@ -505,11 +552,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
         tasks: tasks,
         courses: courses,
       );
-      final schedules = await DatabaseHelper.instance.getSchedules();
-      await NotificationService.instance.syncLectureReminders(
-        schedules: schedules,
-        courses: courses,
-      );
     } catch (error, stackTrace) {
       debugPrint('HomeScreen._loadTasks error: $error\n$stackTrace');
     }
@@ -574,6 +616,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     }
   }
 
+  // ignore: unused_element
   void _showAboutDialog(BuildContext context) {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
@@ -639,7 +682,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                   Text(
                     isAr
                         ? 'EduNivora هي بيئة تشغيل وإنتاجية أكاديمية متكاملة مصممة خصيصاً لطلاب الجامعات لتنظيم وإدارة مسيرتهم الدراسية بكفاءة واحترافية، وجمع كافة الأدوات الأكاديمية في منصة واحدة تعمل دون اتصال بالإنترنت مع خصوصية تامة.'
-                        : 'EduNivora is an all-in-one offline-first academic productivity platform crafted for university students to manage courses, tasks, schedules, grades, and focus sessions with full privacy.',
+                        : 'EduNivora is an all-in-one offline-first academic productivity platform crafted for university students to manage materials, tasks, schedules, reports, and focus sessions with full privacy.',
                     style: theme.textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 14),
@@ -652,7 +695,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                           Expanded(
                             child: Text(
                               isAr
-                                  ? 'إدارة المواد: متابعة تفاصيل المواد، المحاضرين، والساعات المعتمدة.'
+                                  ? 'إدارة المقررات: متابعة تفاصيل المواد، المحاضرين، والساعات المعتمدة.'
                                   : 'Courses: track subjects, instructors, materials, and credits.',
                             ),
                           ),
@@ -801,7 +844,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     if (task.courseId == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('هذه المهمة غير مرتبطة بمادة.')),
+        const SnackBar(content: Text('هذه المهمة غير مرتبطة بمقرر.')),
       );
       return;
     }
@@ -811,7 +854,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
       if (course == null) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('لم يتم العثور على المادة المرتبط.')),
+          const SnackBar(content: Text('لم يتم العثور على المقرر المرتبط.')),
         );
         return;
       }
@@ -834,7 +877,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('تعذّر فتح تفاصيل المادة.')));
+      ).showSnackBar(const SnackBar(content: Text('تعذّر فتح تفاصيل المقرر.')));
     }
   }
 
@@ -1318,7 +1361,18 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
       },
     );
 
-    if (result != true) return;
+    void disposeControllers() {
+      controllerName.dispose();
+      controllerUniversity.dispose();
+      controllerMajor.dispose();
+      controllerDepartment.dispose();
+      controllerSemester.dispose();
+      controllerLevel.dispose();
+    }
+    if (result != true) {
+      disposeControllers();
+      return;
+    }
     final profile = StudentProfile(
       fullName: controllerName.text.trim(),
       university: controllerUniversity.text.trim(),
@@ -1330,8 +1384,12 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
       avatar: selectedAvatar,
     );
     await StudentProfile.save(profile);
+    disposeControllers();
     if (!mounted) return;
-    setState(() => _studentProfile = profile);
+    setState(() {
+      _studentProfile = profile;
+      _activeTermName = profile.semester;
+    });
     _showWarmSnackBar('تم تحديث الملف الأكاديمي بنجاح');
   }
 
@@ -1489,11 +1547,13 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     final userName = _studentProfile.fullName.isNotEmpty
         ? _studentProfile.fullName
         : (currentUser?.displayName ?? (currentUser?.username ?? 'Mohammed'));
-    final termText = _studentProfile.semester.isNotEmpty
-        ? 'الفصل الدراسي: ${_studentProfile.semester}'
+    final termText = _activeTermName.isNotEmpty
+        ? 'الفصل الدراسي: $_activeTermName'
         : (_studentProfile.academicLevel.isNotEmpty
-              ? 'المستوى الدراسي: ${_studentProfile.academicLevel}'
-              : (widget.isArabic ? 'لم يُحدد الفصل الدراسي' : 'Term not set'));
+              ? 'الفصل الدراسي: ${_studentProfile.academicLevel}'
+              : (widget.isArabic
+                    ? 'الفصل الدراسي: الثاني 1447 هـ'
+                    : 'Term: Second 1447 AH'));
 
     return Container(
       padding: EdgeInsets.fromLTRB(16, topPadding + 8, 16, 26),
@@ -1707,6 +1767,13 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     int completionRate,
     bool isDark,
   ) {
+    final targetGpa = double.tryParse(_studentProfile.targetGpa) ?? 0;
+    final gpaDisplay = targetGpa > 0
+        ? '${(_estimatedGpa * 25).clamp(0, 100).round()}%'
+        : (_courses.isEmpty
+            ? '92%'
+            : '${(_estimatedGpa * 25).clamp(0, 100).round()}%');
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
@@ -1714,10 +1781,20 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
         children: [
           Expanded(
             child: _buildStatRefCard(
+              icon: Icons.emoji_events_rounded,
+              iconColor: const Color(0xFFF59E0B),
+              value: gpaDisplay,
+              label: widget.isArabic ? 'معدلك' : 'GPA',
+              isDark: isDark,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _buildStatRefCard(
               icon: Icons.menu_book_rounded,
               iconColor: const Color(0xFF2563EB),
               value: '${_courses.length}',
-              label: widget.isArabic ? 'موادك' : 'Courses',
+              label: widget.isArabic ? 'مقرراتك' : 'Courses',
               isDark: isDark,
             ),
           ),
@@ -1835,7 +1912,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => ScheduleScreen(authUseCases: widget.authUseCases)),
+                    MaterialPageRoute(
+                      builder: (_) => ScheduleScreen(authUseCases: widget.authUseCases),
+                    ),
                   );
                 },
                 child: Row(
@@ -2146,7 +2225,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                           },
                         ),
                       ),
-                    );
+                    ).then((_) => _loadScheduleAndTerm());
                   },
                 ),
               ),
@@ -2156,7 +2235,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                   icon: Icons.school_rounded,
                   iconColor: const Color(0xFF1D4ED8),
                   bgColor: const Color(0xFFEFF6FF),
-                  title: widget.isArabic ? 'المواد' : 'Subjects',
+                  title: widget.isArabic ? 'المواد' : 'Materials',
                   isDark: isDark,
                   onTap: () {
                     Navigator.push(
@@ -2174,6 +2253,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                 ),
               ),
               const SizedBox(width: 10),
+              const SizedBox(width: 10),
               Expanded(
                 child: _buildQuickAccessRefCard(
                   icon: Icons.psychology_rounded,
@@ -2187,6 +2267,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                       MaterialPageRoute(
                         builder: (_) => StudyPlannerScreen(
                           courseUseCases: widget.courseUseCases,
+                          taskUseCases: widget.taskUseCases,
+                          onTasksChanged: widget.onRefresh,
                         ),
                       ),
                     );
@@ -2447,65 +2529,13 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                     }
                   },
                 ),
-                _buildRefDrawerTile(
-                  icon: Icons.menu_book_rounded,
-                  title: widget.isArabic ? 'المواد' : 'Subjects',
-                  isDark: isDark,
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => CourseListScreen(
-                          courseUseCases: widget.courseUseCases,
-                          taskUseCases: widget.taskUseCases,
-                        ),
-                      ),
-                    ).then((res) {
-                      if (res == true) _loadCourses();
-                    });
-                  },
-                ),
-                _buildRefDrawerTile(
-                  icon: Icons.check_circle_outline_rounded,
-                  title: widget.isArabic ? 'المهام' : 'Tasks',
-                  isDark: isDark,
-                  onTap: () {
-                    Navigator.pop(context);
-                    setState(() {
-                      _selectedBottomNav = 1;
-                      _showTaskControls = true;
-                    });
-                  },
-                ),
-                _buildRefDrawerTile(
-                  icon: Icons.auto_awesome_rounded,
-                  title: 'المساعد الذكي',
-                  isDark: isDark,
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => AcademicAiScreen(
-                          courses: _courses,
-                          tasks: widget.taskState.tasks,
-                          exams: _exams,
-                          authUseCases: widget.authUseCases,
-                          courseUseCases: widget.courseUseCases,
-                          taskUseCases: widget.taskUseCases,
-                          onDataChanged: () async {
-                            await _loadTasks();
-                            await _loadStudentProfile();
-                          },
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                
+                
+                
+                
                 _buildRefDrawerTile(
                   icon: Icons.campaign_outlined,
-                  title: widget.isArabic ? 'التعميمات' : 'Announcements',
+                  title: widget.isArabic ? 'التعميمات والإشعارات' : 'Announcements & Notifications',
                   isDark: isDark,
                   onTap: () {
                     Navigator.pop(context);
@@ -2532,9 +2562,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                 ),
                 _buildRefDrawerTile(
                   icon: Icons.psychology_outlined,
-                  title: widget.isArabic
-                      ? 'مخطط المذاكرة الذكي'
-                      : 'Study Planner',
+                  title: widget.isArabic ? 'مخطط المذاكرة' : 'Study Planner',
                   isDark: isDark,
                   onTap: () {
                     Navigator.pop(context);
@@ -2543,11 +2571,14 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                       MaterialPageRoute(
                         builder: (_) => StudyPlannerScreen(
                           courseUseCases: widget.courseUseCases,
+                          taskUseCases: widget.taskUseCases,
+                          onTasksChanged: widget.onRefresh,
                         ),
                       ),
                     );
                   },
                 ),
+                
                 _buildRefDrawerTile(
                   icon: Icons.timer_outlined,
                   title: widget.isArabic ? 'وضع التركيز' : 'Focus Mode',
@@ -2562,22 +2593,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                     );
                   },
                 ),
-                _buildRefDrawerTile(
-                  icon: Icons.analytics_outlined,
-                  title: widget.isArabic
-                      ? 'التقارير الأكاديمية'
-                      : 'Academic Reports',
-                  isDark: isDark,
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const AcademicReportsScreen(),
-                      ),
-                    );
-                  },
-                ),
+                
                 const SizedBox(height: 12),
                 // Section 3: الحساب
                 _buildRefDrawerCategoryHeader(
@@ -2596,6 +2612,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                     _showProfileEditor();
                   },
                 ),
+                
                 const SizedBox(height: 12),
                 // Section 4: التفضيلات والنظام
                 _buildRefDrawerCategoryHeader(
@@ -2662,6 +2679,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                           isArabic: widget.isArabic,
                           onLanguageChanged: widget.onLanguageChanged,
                           appLockService: _appLockService,
+                          onDataCleared: _refreshAfterLocalDataClear,
                         ),
                       ),
                     );
@@ -2703,7 +2721,10 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                   isDark: isDark,
                   onTap: () {
                     Navigator.pop(context);
-                    _showAboutDialog(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const AboutAppScreen()),
+                    );
                   },
                 ),
                 _buildRefDrawerTile(
@@ -2721,6 +2742,18 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                   },
                 ),
                 _buildRefDrawerTile(
+                  icon: Icons.contact_support_outlined,
+                  title: widget.isArabic ? 'التواصل' : 'Contact',
+                  isDark: isDark,
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ContactScreen()),
+                    );
+                  },
+                ),
+                _buildRefDrawerTile(
                   icon: Icons.help_outline_rounded,
                   title: widget.isArabic ? 'مركز المساعدة' : 'Help Center',
                   isDark: isDark,
@@ -2728,9 +2761,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                     Navigator.pop(context);
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => const HelpCenterScreen(),
-                      ),
+                      MaterialPageRoute(builder: (_) => const HelpCenterScreen()),
                     );
                   },
                 ),
@@ -2915,7 +2946,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                   onTap: () async {
                     await Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => ScheduleScreen(authUseCases: widget.authUseCases)),
+                      MaterialPageRoute(
+                      builder: (_) => ScheduleScreen(authUseCases: widget.authUseCases),
+                    ),
                     );
                     _loadScheduleAndTerm();
                   },
