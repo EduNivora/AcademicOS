@@ -37,7 +37,7 @@ import '../reports/academic_reports_screen.dart';
 import '../terms/academic_terms_screen.dart';
 import '../study_plan/study_planner_screen.dart';
 import '../task/add_edit_task_screen.dart';
-import '../screens/grade_distribution_screen.dart';
+import '../grades/grade_tools_hub_screen.dart';
 import '../../data/database/database_helper.dart';
 import '../../data/models/exam_model.dart';
 
@@ -2342,7 +2342,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const GradeDistributionScreen(),
+                        builder: (_) => GradeToolsHubScreen(
+                          courseUseCases: widget.courseUseCases,
+                        ),
                       ),
                     );
                   },
