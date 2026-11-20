@@ -161,18 +161,18 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
   bool _isTaskCreationCommand(String input) {
     final value = input.trim().toLowerCase();
     if (RegExp(r'^(كيف|ما هي طريقة|طريقة|كيف أقدر|كيف اقدر)').hasMatch(value)) return false;
-    return RegExp(r'(أضف|اضف|أنشئ|انشئ|سجل|سجّل|create|add).*(مهمة|واجب|تذكير|task)|(?:مهمة|واجب|تذكير).*(أضف|اضف|أنشئ|انشئ|create|add)').hasMatch(value);
+    return RegExp(r'(أضف|اضف|أنشئ|انشئ|إضافة|اضافة|إنشاء|انشاء|أريد|اريد|أبغى|ابغى|أحتاج|احتاج|سجل|سجّل|اعمل|سوّي|create|add).*(مهمة|واجب|تذكير|task)|(?:مهمة|واجب|تذكير).*(أضف|اضف|أنشئ|انشئ|إضافة|اضافة|إنشاء|انشاء|create|add)').hasMatch(value);
   }
 
   bool _isScheduleCreationCommand(String input) {
     final value = input.trim().toLowerCase();
     if (RegExp(r'^(كيف|ما هي طريقة|طريقة|كيف أقدر|كيف اقدر)').hasMatch(value)) return false;
-    return RegExp(r'(أضف|اضف|أنشئ|انشئ|جدول|جدولة|سجل|سجّل|add|schedule).*(محاضرة|حصة|موعد|lecture)|(?:محاضرة|حصة|موعد).*(أضف|اضف|أنشئ|انشئ|جدول|جدولة|add|schedule)').hasMatch(value);
+    return RegExp(r'(أضف|اضف|أنشئ|انشئ|إضافة|اضافة|أريد|اريد|أبغى|ابغى|أحتاج|احتاج|جدول|جدولة|سجل|سجّل|add|schedule).*(محاضرة|حصة|موعد|lecture)|(?:محاضرة|حصة|موعد).*(أضف|اضف|أنشئ|انشئ|جدول|جدولة|add|schedule)').hasMatch(value);
   }
 
   String _suggestedTaskTitle(String input) {
     return input.replaceFirst(
-      RegExp(r'^\s*(?:من فضلك\s*)?(?:أضف|اضف|أنشئ|انشئ|سجل|سجّل|create|add)\s*(?:لي\s*)?(?:مهمة|واجب|تذكير|task)?\s*(?:بعنوان|اسمها|عنوانها|:|-)?\s*', caseSensitive: false),
+      RegExp(r'^\s*(?:(?:من فضلك|أريد|اريد|أبغى|ابغى|أحتاج|احتاج)\s*)?(?:(?:أن\s*)?(?:أضف|اضف|أضيف|اضيف|أنشئ|انشئ|إضافة|اضافة|إنشاء|انشاء|سجل|سجّل|اعمل|create|add)\s*)?(?:لي\s*)?(?:مهمة|واجب|تذكير|task)?\s*(?:بعنوان|باسم|اسمها|عنوانها|:|-)?\s*', caseSensitive: false),
       '',
     ).trim();
   }
