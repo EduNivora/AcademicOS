@@ -369,15 +369,21 @@ class _GpaCalculatorScreenState extends State<GpaCalculatorScreen> {
                                     DropdownMenuItem(value: 'D', child: Text('D')),
                                     DropdownMenuItem(value: 'F', child: Text('F')),
                                   ],
-                                  onChanged: (value) {
+                                  onChanged: (value) async {
                                     if (value == null) return;
                                     final numeric = _letterPoints(value);
                                     final newPercent = (numeric / 4) * 100;
+                                    // Store the same normalized component percentage.
+                                    // _gradeToPercent applies the 30/30/40 weighting.
                                     final updated = course.copyWith(
-                                      midGrade: newPercent * 0.3,
-                                      practicalGrade: newPercent * 0.3,
-                                      finalGrade: newPercent * 0.4,
+                                      midGrade: newPercent,
+                                      practicalGrade: newPercent,
+                                      finalGrade: newPercent,
                                     );
+                                    if (course.id != null) {
+                                      await _updateCourseGrade(course.id!, updated);
+                                    }
+                                    if (!mounted) return;
                                     setState(() {
                                       final index = _courses.indexWhere((c) => c.id == course.id);
                                       if (index >= 0) _courses[index] = updated;
