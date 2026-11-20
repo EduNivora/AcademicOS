@@ -2622,72 +2622,10 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                     }
                   },
                 ),
-                _buildRefDrawerTile(
-                  icon: Icons.menu_book_rounded,
-                  title: widget.isArabic ? 'الكورسات' : 'Courses',
-                  isDark: isDark,
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => CourseListScreen(
-                          courseUseCases: widget.courseUseCases,
-                          taskUseCases: widget.taskUseCases,
-                        ),
-                      ),
-                    ).then((res) {
-                      if (res == true) _loadCourses();
-                    });
-                  },
-                ),
-                _buildRefDrawerTile(
-                  icon: Icons.bar_chart_rounded,
-                  title: widget.isArabic
-                      ? 'توزيع الدرجات والمعدل'
-                      : 'Grade Distribution',
-                  isDark: isDark,
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const GradeDistributionScreen(),
-                      ),
-                    );
-                  },
-                ),
-                _buildRefDrawerTile(
-                  icon: Icons.check_circle_outline_rounded,
-                  title: widget.isArabic ? 'المهام' : 'Tasks',
-                  isDark: isDark,
-                  onTap: () {
-                    Navigator.pop(context);
-                    setState(() {
-                      _selectedBottomNav = 1;
-                      _showTaskControls = true;
-                    });
-                  },
-                ),
-                _buildRefDrawerTile(
-                  icon: Icons.auto_awesome_rounded,
-                  title: 'AI Copilot',
-                  isDark: isDark,
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => AcademicAiScreen(
-                          courses: _courses,
-                          tasks: widget.taskState.tasks,
-                          exams: _exams,
-                          authUseCases: widget.authUseCases,
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                
+                
+                
+                
                 _buildRefDrawerTile(
                   icon: Icons.campaign_outlined,
                   title: widget.isArabic ? 'التعميمات' : 'Announcements',
@@ -2727,24 +2665,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                     );
                   },
                 ),
-                _buildRefDrawerTile(
-                  icon: Icons.psychology_outlined,
-                  title: widget.isArabic
-                      ? 'مخطط المذاكرة الذكي'
-                      : 'Study Planner',
-                  isDark: isDark,
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => StudyPlannerScreen(
-                          courseUseCases: widget.courseUseCases,
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                
                 _buildRefDrawerTile(
                   icon: Icons.timer_outlined,
                   title: widget.isArabic ? 'وضع التركيز' : 'Focus Mode',
@@ -2759,22 +2680,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                     );
                   },
                 ),
-                _buildRefDrawerTile(
-                  icon: Icons.analytics_outlined,
-                  title: widget.isArabic
-                      ? 'التقارير الأكاديمية'
-                      : 'Academic Reports',
-                  isDark: isDark,
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const AcademicReportsScreen(),
-                      ),
-                    );
-                  },
-                ),
+                
                 const SizedBox(height: 12),
                 // Section 3: الحساب
                 _buildRefDrawerCategoryHeader(
@@ -2793,15 +2699,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                     _showProfileEditor();
                   },
                 ),
-                _buildRefDrawerTile(
-                  icon: Icons.badge_outlined,
-                  title: widget.isArabic ? 'بيانات الطالب' : 'Student Info',
-                  isDark: isDark,
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showProfileEditor();
-                  },
-                ),
+                
                 _buildRefDrawerTile(
                   icon: Icons.logout_rounded,
                   title: widget.isArabic ? 'تسجيل الخروج' : 'Logout',
@@ -2948,7 +2846,10 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                   isDark: isDark,
                   onTap: () {
                     Navigator.pop(context);
-                    _showAboutDialog(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const AboutAppScreen()),
+                    );
                   },
                 ),
                 _buildRefDrawerTile(
@@ -2965,20 +2866,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                     );
                   },
                 ),
-                _buildRefDrawerTile(
-                  icon: Icons.help_outline_rounded,
-                  title: widget.isArabic ? 'مركز المساعدة' : 'Help Center',
-                  isDark: isDark,
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const HelpCenterScreen(),
-                      ),
-                    );
-                  },
-                ),
+                
                 const SizedBox(height: 20),
               ],
             ),
