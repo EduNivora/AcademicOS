@@ -518,6 +518,12 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     setState(() => _studentProfile = profile);
   }
 
+  Future<void> _refreshAfterLocalDataClear() async {
+    await _loadCourses();
+    await _loadSavedSettingsAndTasks();
+    await _loadScheduleAndTerm();
+  }
+
   Future<void> _loadSavedSettingsAndTasks() async {
     _motivationQuote = _pickMotivationQuote();
     await _loadSavedSettings();
@@ -2809,6 +2815,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                           isArabic: widget.isArabic,
                           onLanguageChanged: widget.onLanguageChanged,
                           appLockService: _appLockService,
+                          onDataCleared: _refreshAfterLocalDataClear,
                         ),
                       ),
                     );
