@@ -32,7 +32,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
           ),
           answer: LocalizedCopy(
             ar: 'EduNivora هو تطبيق أكاديمي يعمل بنهج الأولوية للعمل دون اتصال (Offline-First) لإدارة المهام الدراسية، المواد، ملفات PDF، الجدول الأسبوعي، خطط الدراسة، مؤقت التركيز، والتقارير الأكاديمية.',
-            en: 'EduNivora is an offline-first academic app for managing study tasks, courses and PDFs, weekly schedules, study planning, focus timers, and academic reports.',
+            en: 'EduNivora is an offline-first academic app for managing study tasks, materials and PDFs, weekly schedules, study planning, focus timers, and academic reports.',
           ),
         ),
         _HelpFaqItem(
@@ -42,7 +42,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
           ),
           answer: LocalizedCopy(
             ar: 'من بوابة الدخول يمكنك إنشاء حساب سحابي أو محلي، أو تسجيل الدخول عبر Google، أو اختيار الدخول كضيف للاستخدام المحلي الفوري وإضافة موادك ومهامك مباشرةً.',
-            en: 'From the sign-in screen you can create an account, sign in with Google, or continue as a guest to immediately use local features and add your courses and tasks.',
+            en: 'From the sign-in screen you can create an account, sign in with Google, or continue as a guest to immediately use local features and add your materials and tasks.',
           ),
         ),
       ],
@@ -144,7 +144,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
       title: LocalizedCopy(ar: 'وحدات التطبيق', en: 'App Modules'),
       subtitle: LocalizedCopy(
         ar: 'المهام، المواد، الجدول، الاختبارات، التركيز، المساعد، التقارير، والإعلانات',
-        en: 'Tasks, Courses, Schedule, Exams, Focus, Local AI, Reports & Notices',
+        en: 'Tasks, Materials, Schedule, Exams, Focus, Intelligent Assistant, Reports & Notices',
       ),
       items: <_HelpFaqItem>[
         _HelpFaqItem(
@@ -160,11 +160,11 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
         _HelpFaqItem(
           question: LocalizedCopy(
             ar: 'المواد والملفات ومعاينة PDF وWord وPowerPoint',
-            en: 'Courses, Materials & PDF Viewer',
+            en: 'Materials & File Viewer',
           ),
           answer: LocalizedCopy(
             ar: 'أنشئ موادك الدراسية واربط بها المهام وملفات المذاكرة مع معاينة ملفات PDF وWord وPowerPoint داخل التطبيق دون الحاجة للإنترنت.',
-            en: 'Organize courses by academic term, link tasks and study attachments, and preview PDF, Word, and PowerPoint files inside the app.',
+            en: 'Organize materials, link tasks and study attachments, and preview PDF, Word, and PowerPoint files inside the app.',
           ),
         ),
         _HelpFaqItem(
@@ -199,8 +199,8 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
         ),
         _HelpFaqItem(
           question: LocalizedCopy(
-            ar: 'المساعد الأكاديمي المحلي (Local AI Assistant)',
-            en: 'Local AI Assistant',
+            ar: 'المساعد الذكي',
+            en: 'Intelligent Assistant',
           ),
           answer: LocalizedCopy(
             ar: 'مساعد محلي داخل التطبيق يقدم إرشادات سريعة لتنظيم الدراسة والمهام دون الحاجة لإرسال بياناتك لخادم خارجي.',
@@ -239,7 +239,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
           ),
           answer: LocalizedCopy(
             ar: 'استخدم القائمة الجانبية (Drawer) في الشاشة الرئيسية للوصول إلى المواد، الجدول، مؤقت التركيز، التقارير، المساعد المحلي، والإعدادات. ومن شاشة الإعدادات يمكنك الوصول إلى قفل التطبيق، عن التطبيق، الفريق والمؤسسين، مركز المساعدة، تواصل معنا، والخصوصية والشروط.',
-            en: 'Use the Home screen navigation drawer to open Courses, Schedule, Focus Timer, Reports, Local AI, and Settings. Inside Settings you can access App Lock, About App, Team & Founders, Help Center, Contact Us, and Privacy & Terms.',
+            en: 'Use the Home screen navigation drawer to open Materials, Schedule, Focus Timer, Reports, Intelligent Assistant, and Settings. Inside Settings you can access App Lock, About App, Team & Founders, Help Center, Contact Us, and Privacy & Terms.',
           ),
         ),
       ],
@@ -274,7 +274,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
           ),
           answer: LocalizedCopy(
             ar: 'نعم، تُحفظ المهام والمواد والجدول محلياً في SQLite وتعمل الوظائف الأساسية بالكامل دون إنترنت. يلزم الإنترنت فقط للمصادقة السحابية (Neon Auth / Google) وتحميل الإعلانات السحابية.',
-            en: 'Yes. Tasks, courses, schedules are stored locally in SQLite and core features work offline. Internet is only needed for optional cloud auth (Neon Auth / Google) and cloud announcements.',
+            en: 'Yes. Tasks, materials, schedules are stored locally in SQLite and core features work offline. Internet is only needed for optional cloud auth (Neon Auth / Google) and cloud announcements.',
           ),
         ),
         _HelpFaqItem(
@@ -476,7 +476,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                   : 'No matching help topics',
               description: isArabic
                   ? 'جرّب كلمات مفتاحية أخرى مثل: المهام، المواد، PIN، أو Google.'
-                  : 'Try another keyword such as tasks, courses, PIN, or Google.',
+                  : 'Try another keyword such as tasks, materials, PIN, or Google.',
               actionLabel: isArabic ? 'إظهار جميع المواضيع' : 'Show all topics',
               onAction: () {
                 _searchController.clear();

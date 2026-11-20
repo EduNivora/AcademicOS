@@ -68,7 +68,7 @@ class _PrivacyTab extends StatelessWidget {
               : '1. Local Data Storage (SQLite)',
           body: isArabic
               ? 'يحفظ EduNivora بياناتك الدراسية الأساسية (المهام، المواد، الجدول الأسبوعي، خطط الاختبارات) محلياً على جهازك باستخدام قاعدة بيانات SQLite لتعمل دون اتصال بالإنترنت. ملاحظة شفافة: قاعدة بيانات SQLite المحلية غير مشفرة حالياً في وضع السكون، بينما تُحفظ بيانات الجلسة والإعدادات الحساسة عبر التخزين الآمن في النظام (Secure Storage).'
-              : 'EduNivora stores your core study data (tasks, courses, weekly schedule, exam plans) locally on your device in SQLite for offline-first access. Transparency note: the local SQLite database file is not currently encrypted at rest, while sensitive auth tokens and security preferences use platform Secure Storage.',
+              : 'EduNivora stores your core study data (tasks, materials, weekly schedule, exam plans) locally on your device in SQLite for offline-first access. Transparency note: the local SQLite database file is not currently encrypted at rest, while sensitive auth tokens and security preferences use platform Secure Storage.',
         ),
         const SizedBox(height: 12),
         _LegalSectionCard(
@@ -89,8 +89,8 @@ class _PrivacyTab extends StatelessWidget {
               ? '3. تحكم المستخدم وحذف البيانات'
               : '3. User Control & Data Deletion',
           body: isArabic
-              ? 'يمكنك تعديل أو حذف مهامك ومقرراتك في أي وقت من داخل التطبيق، كما يمكنك مسح البيانات المحلية من شاشة الإعدادات أو عبر إلغاء تثبيت التطبيق من جهازك.'
-              : 'You can edit or delete your tasks and courses inside the app at any time, or clear local data from Settings or by uninstalling the app.',
+              ? 'يمكنك تعديل أو حذف مهامك وموادك في أي وقت من داخل التطبيق، كما يمكنك مسح البيانات المحلية من شاشة الإعدادات أو عبر إلغاء تثبيت التطبيق من جهازك.'
+              : 'You can edit or delete your tasks and materials inside the app at any time, or clear local data from Settings or by uninstalling the app.',
         ),
         const SizedBox(height: 12),
         _LegalSectionCard(
@@ -134,7 +134,7 @@ class _TermsTab extends StatelessWidget {
           iconColor: AppTheme.primary,
           title: isArabic ? '1. نطاق الاستخدام' : '1. Scope of Use',
           body: isArabic
-              ? 'تطبيق EduNivora مخصص للأغراض التعليمية والأكاديمية الشخصية لمساعدة الطلاب على تنظيم دراستهم ومقرراتهم ومواعيدهم. استخدامك للتطبيق يعني التزامك بهذه المسودة لحين اعتماد النسخة القانونية النهائية.'
+              ? 'تطبيق EduNivora مخصص للأغراض التعليمية والأكاديمية الشخصية لمساعدة الطلاب على تنظيم دراستهم وموادهم ومواعيدهم. استخدامك للتطبيق يعني التزامك بهذه المسودة لحين اعتماد النسخة القانونية النهائية.'
               : 'EduNivora is provided for personal academic and educational organization. By using the app, you agree to abide by these draft terms until the finalized legal version is officially published.',
         ),
         const SizedBox(height: 12),

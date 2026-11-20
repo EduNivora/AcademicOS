@@ -190,7 +190,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
   TaskSortMode _sortMode = TaskSortMode.none;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   List<Map<String, dynamic>> _todayLectures = [];
-  String _activeTermName = '';
   bool _showTaskControls = false;
 
   int get _completedTasksCount =>
@@ -326,7 +325,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
 
       if (!mounted) return;
       setState(() {
-        _activeTermName = _studentProfile.semester;
         _todayLectures = todaySchedules;
         _exams = exams;
       });
@@ -438,7 +436,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     if (!mounted) return;
     setState(() {
       _studentProfile = profile;
-      _activeTermName = profile.semester;
     });
   }
 
@@ -694,8 +691,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                           Expanded(
                             child: Text(
                               isAr
-                                  ? 'إدارة المقررات: متابعة تفاصيل المواد، المحاضرين، والساعات المعتمدة.'
-                                  : 'Courses: track subjects, instructors, materials, and credits.',
+                                  ? 'إدارة المواد: متابعة التفاصيل والمحاضرين والساعات المعتمدة.'
+                                  : 'Materials: organize subjects, instructors, and credit hours.',
                             ),
                           ),
                         ],
@@ -843,7 +840,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     if (task.courseId == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('هذه المهمة غير مرتبطة بمقرر.')),
+        const SnackBar(content: Text('هذه المهمة غير مرتبطة بمادة.')),
       );
       return;
     }
@@ -853,7 +850,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
       if (course == null) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('لم يتم العثور على المقرر المرتبط.')),
+          const SnackBar(content: Text('لم يتم العثور على المادة المرتبطة.')),
         );
         return;
       }
@@ -876,7 +873,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('تعذّر فتح تفاصيل المقرر.')));
+      ).showSnackBar(const SnackBar(content: Text('تعذّر فتح تفاصيل المادة.')));
     }
   }
 
@@ -891,7 +888,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     final riskText = dashboard.atRiskCourses.isEmpty
         ? (widget.isArabic
               ? 'لا توجد مواد في خطر حاليًا.'
-              : 'No courses currently at risk.')
+              : 'No materials currently need attention.')
         : (widget.isArabic
               ? 'مواد تحتاج عناية إضافية: ${dashboard.atRiskCourses.join(" • ")}'
               : 'Needs attention: ${dashboard.atRiskCourses.join(" • ")}');
@@ -1193,17 +1190,25 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
 
   Map<String, List<TaskEntity>> _groupTasksByCourse() {
     final groups = <String, List<TaskEntity>>{};
+    final materialsById = {
+      for (final material in _courses)
+        if (material.id != null) material.id!: material,
+    };
     for (final task in _filteredTasks()) {
+      final material = task.courseId == null
+          ? null
+          : materialsById[task.courseId];
       final groupName =
-          (task.courseName != null && task.courseName!.trim().isNotEmpty)
-          ? task.courseName!
-          : 'بدون كورس';
+          material?.name ??
+          (task.courseName != null && task.courseName!.trim().isNotEmpty
+              ? task.courseName!
+              : 'بدون مادة');
       groups.putIfAbsent(groupName, () => []).add(task);
     }
     final sortedKeys = groups.keys.toList()
       ..sort((a, b) {
-        if (a == 'بدون كورس') return 1;
-        if (b == 'بدون كورس') return -1;
+        if (a == 'بدون مادة') return 1;
+        if (b == 'بدون مادة') return -1;
         return a.compareTo(b);
       });
     return {for (final key in sortedKeys) key: groups[key]!};
@@ -1394,7 +1399,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     if (!mounted) return;
     setState(() {
       _studentProfile = profile;
-      _activeTermName = profile.semester;
     });
     _showWarmSnackBar('تم تحديث الملف الأكاديمي بنجاح');
   }
@@ -1553,13 +1557,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     final userName = _studentProfile.fullName.isNotEmpty
         ? _studentProfile.fullName
         : (currentUser?.displayName ?? (currentUser?.username ?? 'Mohammed'));
-    final termText = _activeTermName.isNotEmpty
-        ? 'الفصل الدراسي: $_activeTermName'
-        : (_studentProfile.academicLevel.isNotEmpty
-              ? 'الفصل الدراسي: ${_studentProfile.academicLevel}'
-              : (widget.isArabic
-                    ? 'الفصل الدراسي: الثاني 1447 هـ'
-                    : 'Term: Second 1447 AH'));
+    final termText = _studentProfile.semester.trim().isNotEmpty
+        ? 'الفصل الدراسي: ${_studentProfile.semester}'
+        : '';
 
     return Container(
       padding: EdgeInsets.fromLTRB(16, topPadding + 8, 16, 26),
@@ -1703,15 +1703,17 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      termText,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.85),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
+                    if (termText.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        termText,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.85),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -1800,7 +1802,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
               icon: Icons.menu_book_rounded,
               iconColor: const Color(0xFF2563EB),
               value: '${_courses.length}',
-              label: widget.isArabic ? 'مقرراتك' : 'Courses',
+              label: widget.isArabic ? 'موادك' : 'Materials',
               isDark: isDark,
             ),
           ),

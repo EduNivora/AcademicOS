@@ -8,11 +8,11 @@ enum AcademicReportPeriod { daily, weekly, monthly, finalReport }
 
 extension AcademicReportPeriodX on AcademicReportPeriod {
   String get arabicLabel => switch (this) {
-        AcademicReportPeriod.daily => 'اليومي',
-        AcademicReportPeriod.weekly => 'الأسبوعي',
-        AcademicReportPeriod.monthly => 'الشهري',
-        AcademicReportPeriod.finalReport => 'النهائي',
-      };
+    AcademicReportPeriod.daily => 'اليومي',
+    AcademicReportPeriod.weekly => 'الأسبوعي',
+    AcademicReportPeriod.monthly => 'الشهري',
+    AcademicReportPeriod.finalReport => 'النهائي',
+  };
 }
 
 class AcademicReportService {
@@ -52,6 +52,20 @@ class AcademicReportService {
     DateTime? generatedAt,
   }) {
     final now = (generatedAt ?? DateTime.now()).toLocal();
+    final coursesById = {
+      for (final course in courses)
+        if (course.id != null) course.id!: course,
+    };
+    String materialName(int? materialId, String? legacyName) {
+      if (materialId != null) {
+        final material = coursesById[materialId];
+        if (material != null) return material.name;
+      }
+      return legacyName?.trim().isNotEmpty == true
+          ? legacyName!.trim()
+          : 'مادة غير محددة';
+    }
+
     final today = DateTime(now.year, now.month, now.day);
     final DateTime? start;
     final DateTime? end;
@@ -80,8 +94,7 @@ class AcademicReportService {
       return task.isCompleted &&
           task.completedAt != null &&
           inPeriod(task.completedAt!);
-    }).toList()
-      ..sort((a, b) => a.completedAt!.compareTo(b.completedAt!));
+    }).toList()..sort((a, b) => a.completedAt!.compareTo(b.completedAt!));
     final completedWithoutTimestamp = tasks
         .where((task) => task.isCompleted && task.completedAt == null)
         .toList();
@@ -102,22 +115,23 @@ class AcademicReportService {
     final dayName = _arabicDayName(today.weekday);
     final weeklySchedule = [...schedule]
       ..sort((a, b) {
-        final dayCompare = _weekdayOrder(a['day_of_week']?.toString())
-            .compareTo(_weekdayOrder(b['day_of_week']?.toString()));
+        final dayCompare = _weekdayOrder(
+          a['day_of_week']?.toString(),
+        ).compareTo(_weekdayOrder(b['day_of_week']?.toString()));
         if (dayCompare != 0) return dayCompare;
-        return (a['start_time']?.toString() ?? '')
-            .compareTo(b['start_time']?.toString() ?? '');
+        return (a['start_time']?.toString() ?? '').compareTo(
+          b['start_time']?.toString() ?? '',
+        );
       });
     final scheduledForPeriod = period == AcademicReportPeriod.daily
         ? weeklySchedule
-            .where((item) => item['day_of_week']?.toString() == dayName)
-            .toList()
+              .where((item) => item['day_of_week']?.toString() == dayName)
+              .toList()
         : weeklySchedule;
 
     final upcomingExams = exams.where((exam) {
       return !exam.examDate.isBefore(today) && inPeriod(exam.examDate);
-    }).toList()
-      ..sort((a, b) => a.examDate.compareTo(b.examDate));
+    }).toList()..sort((a, b) => a.examDate.compareTo(b.examDate));
 
     final lines = <String>[
       'EduNivora — التقرير الأكاديمي ${period.arabicLabel}',
@@ -133,9 +147,8 @@ class AcademicReportService {
       lines.add('• لا توجد مهام مسجلة كمكتملة خلال هذه الفترة.');
     } else {
       for (final task in completed) {
-        final course = task.courseName == null || task.courseName!.isEmpty
-            ? ''
-            : ' — ${task.courseName}';
+        final courseLabel = materialName(task.courseId, task.courseName);
+        final course = courseLabel == 'مادة غير محددة' ? '' : ' — $courseLabel';
         lines.add(
           '• ${task.title}$course — ${_formatDateTime(task.completedAt!.toLocal())}',
         );
@@ -150,7 +163,9 @@ class AcademicReportService {
     } else {
       for (final task in pending) {
         final due = task.endDateTime ?? task.dueDate;
-        final dueText = due == null ? 'دون موعد محدد' : _formatDateTime(due.toLocal());
+        final dueText = due == null
+            ? 'دون موعد محدد'
+            : _formatDateTime(due.toLocal());
         lines.add('• ${task.title} — $dueText');
       }
     }
@@ -162,21 +177,29 @@ class AcademicReportService {
     }
 
     lines.add('');
-    lines.add(period == AcademicReportPeriod.daily
-        ? 'المحاضرات المجدولة اليوم: ${scheduledForPeriod.length}'
-        : 'بنود الجدول الأسبوعي المرجعي: ${scheduledForPeriod.length}');
+    lines.add(
+      period == AcademicReportPeriod.daily
+          ? 'المحاضرات المجدولة اليوم: ${scheduledForPeriod.length}'
+          : 'بنود الجدول الأسبوعي المرجعي: ${scheduledForPeriod.length}',
+    );
     if (scheduledForPeriod.isEmpty) {
       lines.add('• لا توجد محاضرات مدرجة في الجدول لهذه الفترة.');
     } else {
       for (final item in scheduledForPeriod) {
-        final name = item['course_name']?.toString() ?? 'مادة غير محددة';
+        final rawCourseId = item['course_id'];
+        final courseId = rawCourseId is int
+            ? rawCourseId
+            : int.tryParse(rawCourseId?.toString() ?? '');
+        final name = materialName(courseId, item['course_name']?.toString());
         final day = item['day_of_week']?.toString() ?? '';
         final startTime = item['start_time']?.toString() ?? '';
         final endTime = item['end_time']?.toString() ?? '';
         lines.add('• $name — $day — $startTime إلى $endTime');
       }
     }
-    lines.add('ملاحظة: الجدول يثبت أن المحاضرة مجدولة فقط، ولا يثبت الحضور أو المذاكرة.');
+    lines.add(
+      'ملاحظة: الجدول يثبت أن المحاضرة مجدولة فقط، ولا يثبت الحضور أو المذاكرة.',
+    );
 
     lines.add('');
     lines.add('الاختبارات القادمة ضمن الفترة: ${upcomingExams.length}');
@@ -185,7 +208,7 @@ class AcademicReportService {
     } else {
       for (final exam in upcomingExams) {
         lines.add(
-          '• ${exam.title} — ${_formatDateTime(exam.examDate.toLocal())} — ${exam.courseName ?? 'عام'}',
+          '• ${exam.title} — ${_formatDateTime(exam.examDate.toLocal())} — ${materialName(exam.courseId, exam.courseName)}',
         );
       }
     }
@@ -210,35 +233,34 @@ class AcademicReportService {
     required List<TaskModel> tasks,
     required List<ExamModel> exams,
     required List<Map<String, dynamic>> schedule,
-  }) =>
-      generatePeriodReport(
-        period: AcademicReportPeriod.finalReport,
-        courses: courses,
-        tasks: tasks,
-        exams: exams,
-        schedule: schedule,
-      );
+  }) => generatePeriodReport(
+    period: AcademicReportPeriod.finalReport,
+    courses: courses,
+    tasks: tasks,
+    exams: exams,
+    schedule: schedule,
+  );
 
   static String _arabicDayName(int weekday) => switch (weekday) {
-        DateTime.monday => 'الاثنين',
-        DateTime.tuesday => 'الثلاثاء',
-        DateTime.wednesday => 'الأربعاء',
-        DateTime.thursday => 'الخميس',
-        DateTime.friday => 'الجمعة',
-        DateTime.saturday => 'السبت',
-        _ => 'الأحد',
-      };
+    DateTime.monday => 'الاثنين',
+    DateTime.tuesday => 'الثلاثاء',
+    DateTime.wednesday => 'الأربعاء',
+    DateTime.thursday => 'الخميس',
+    DateTime.friday => 'الجمعة',
+    DateTime.saturday => 'السبت',
+    _ => 'الأحد',
+  };
 
   static int _weekdayOrder(String? day) => switch (day) {
-        'السبت' => 0,
-        'الأحد' => 1,
-        'الاثنين' => 2,
-        'الثلاثاء' => 3,
-        'الأربعاء' => 4,
-        'الخميس' => 5,
-        'الجمعة' => 6,
-        _ => 7,
-      };
+    'السبت' => 0,
+    'الأحد' => 1,
+    'الاثنين' => 2,
+    'الثلاثاء' => 3,
+    'الأربعاء' => 4,
+    'الخميس' => 5,
+    'الجمعة' => 6,
+    _ => 7,
+  };
 
   static String _formatDate(DateTime date) =>
       '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';

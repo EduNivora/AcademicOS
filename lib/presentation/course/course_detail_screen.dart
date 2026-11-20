@@ -129,9 +129,9 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
       await _loadData();
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذر تحديث حالة المهمة.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('تعذر تحديث حالة المهمة.')));
     }
   }
 
@@ -194,7 +194,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
           return StatefulBuilder(
             builder: (dialogContext, setStateDialog) {
               return AlertDialog(
-                title: const Text('إضافة امتحان للمقرر'),
+                title: const Text('إضافة اختبار للمادة'),
                 content: SizedBox(
                   width: 360,
                   child: Column(
@@ -202,8 +202,9 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                     children: [
                       TextFormField(
                         controller: titleController,
-                        decoration:
-                            const InputDecoration(labelText: 'عنوان الامتحان'),
+                        decoration: const InputDecoration(
+                          labelText: 'عنوان الامتحان',
+                        ),
                       ),
                       const SizedBox(height: 12),
                       InkWell(
@@ -211,10 +212,12 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                           final date = await showDatePicker(
                             context: dialogContext,
                             initialDate: selectedDate,
-                            firstDate: DateTime.now()
-                                .subtract(const Duration(days: 365)),
-                            lastDate:
-                                DateTime.now().add(const Duration(days: 3650)),
+                            firstDate: DateTime.now().subtract(
+                              const Duration(days: 365),
+                            ),
+                            lastDate: DateTime.now().add(
+                              const Duration(days: 3650),
+                            ),
                           );
                           if (date == null || !dialogContext.mounted) return;
                           final time = await showTimePicker(
@@ -234,7 +237,9 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 14),
+                            horizontal: 12,
+                            vertical: 14,
+                          ),
                           decoration: BoxDecoration(
                             border: Border.all(color: Colors.grey.shade300),
                             borderRadius: BorderRadius.circular(12),
@@ -279,9 +284,9 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
       if (confirmed != true || !mounted) return;
       final title = titleController.text.trim();
       if (title.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('أدخل عنوان الامتحان.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('أدخل عنوان الامتحان.')));
         return;
       }
       final db = await DatabaseHelper.instance.database;
@@ -302,128 +307,132 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
   Widget build(BuildContext context) {
     if (_course == null && !_isLoading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('المقرر')),
-        body: const Center(child: Text('لم يتم العثور على هذا المقرر.')),
+        appBar: AppBar(title: const Text('المادة')),
+        body: const Center(child: Text('لم يتم العثور على هذه المادة.')),
       );
     }
 
     final pendingTasks = _tasks.where((task) => !task.isCompleted).length;
-    final nextExam = _exams
-        .where((exam) => (exam['exam_date'] as String?) != null)
-        .map((exam) =>
-            DateTime.tryParse(exam['exam_date'] as String) ?? DateTime.now())
-        .where((date) => date.isAfter(DateTime.now()))
-        .toList()
-      ..sort();
+    final nextExam =
+        _exams
+            .where((exam) => (exam['exam_date'] as String?) != null)
+            .map(
+              (exam) =>
+                  DateTime.tryParse(exam['exam_date'] as String) ??
+                  DateTime.now(),
+            )
+            .where((date) => date.isAfter(DateTime.now()))
+            .toList()
+          ..sort();
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_course?.name ?? 'المادة'),
-      ),
+      appBar: AppBar(title: Text(_course?.name ?? 'المادة')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
-              ? Center(child: Text(_errorMessage!))
-              : Column(
-                  children: [
-                    Padding(
+          ? Center(child: Text(_errorMessage!))
+          : Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Card(
+                    child: Padding(
                       padding: const EdgeInsets.all(16),
-                      child: Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
                             children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      _course?.name ?? '',
-                                      style: const TextStyle(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
+                              Expanded(
+                                child: Text(
+                                  _course?.name ?? '',
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
                                   ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 8,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.blue.shade50,
-                                      borderRadius: BorderRadius.circular(999),
-                                    ),
-                                    child: Text(
-                                      '$pendingTasks مهمة معلقة',
-                                      style: TextStyle(
-                                        color: Colors.blue.shade800,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
-                              const SizedBox(height: 12),
-                              Wrap(
-                                spacing: 10,
-                                runSpacing: 8,
-                                children: [
-                                  Chip(label: Text(_course?.code ?? '')),
-                                  Chip(
-                                      label: Text(
-                                          '${_course?.credits ?? 0} وحدة')),
-                                  if (_course?.instructor != null &&
-                                      _course!.instructor.trim().isNotEmpty)
-                                    Chip(label: Text(_course!.instructor)),
-                                ],
-                              ),
-                              const SizedBox(height: 10),
-                              Row(
-                                children: [
-                                  const Icon(Icons.event_available_outlined,
-                                      size: 18),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    nextExam.isNotEmpty
-                                        ? 'القادم: ${_formatDate(nextExam.first)}'
-                                        : 'لا توجد امتحانات قادمة',
-                                    style: TextStyle(
-                                      color: nextExam.isNotEmpty
-                                          ? Colors.green.shade700
-                                          : Colors.grey.shade700,
-                                    ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.shade50,
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Text(
+                                  '$pendingTasks مهمة معلقة',
+                                  style: TextStyle(
+                                    color: Colors.blue.shade800,
+                                    fontWeight: FontWeight.bold,
                                   ),
-                                ],
+                                ),
                               ),
                             ],
                           ),
-                        ),
-                      ),
-                    ),
-                    TabBar(
-                      controller: _tabController,
-                      tabs: const [
-                        Tab(text: 'المهام'),
-                        Tab(text: 'الجدول'),
-                        Tab(text: 'الامتحانات'),
-                        Tab(text: 'المحاضرات والمرفقات'),
-                      ],
-                    ),
-                    Expanded(
-                      child: TabBarView(
-                        controller: _tabController,
-                        children: [
-                          _buildTasksTab(),
-                          _buildScheduleTab(),
-                          _buildExamsTab(),
-                          // Materials tab
-                          CourseMaterialsTab(courseId: _course!.id!),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 8,
+                            children: [
+                              Chip(label: Text(_course?.code ?? '')),
+                              Chip(
+                                label: Text('${_course?.credits ?? 0} وحدة'),
+                              ),
+                              if (_course?.instructor != null &&
+                                  _course!.instructor.trim().isNotEmpty)
+                                Chip(label: Text(_course!.instructor)),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.event_available_outlined,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                nextExam.isNotEmpty
+                                    ? 'القادم: ${_formatDate(nextExam.first)}'
+                                    : 'لا توجد امتحانات قادمة',
+                                style: TextStyle(
+                                  color: nextExam.isNotEmpty
+                                      ? Colors.green.shade700
+                                      : Colors.grey.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
+                  ),
+                ),
+                TabBar(
+                  controller: _tabController,
+                  tabs: const [
+                    Tab(text: 'المهام'),
+                    Tab(text: 'الجدول'),
+                    Tab(text: 'الامتحانات'),
+                    Tab(text: 'المحاضرات والمرفقات'),
                   ],
                 ),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildTasksTab(),
+                      _buildScheduleTab(),
+                      _buildExamsTab(),
+                      // Materials tab
+                      CourseMaterialsTab(courseId: _course!.id!),
+                    ],
+                  ),
+                ),
+              ],
+            ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openQuickAddMenu,
         icon: const Icon(Icons.add),
@@ -470,7 +479,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
 
   Widget _buildScheduleTab() {
     if (_schedule.isEmpty) {
-      return const Center(child: Text('لا توجد محاضرات مسجلة لهذا المقرر.'));
+      return const Center(child: Text('لا توجد محاضرات مسجلة لهذه المادة.'));
     }
 
     return ListView.builder(
@@ -506,8 +515,10 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
               ],
             ),
             trailing: reminder
-                ? const Icon(Icons.notifications_active_outlined,
-                    color: Colors.orange)
+                ? const Icon(
+                    Icons.notifications_active_outlined,
+                    color: Colors.orange,
+                  )
                 : const Icon(Icons.notifications_off_outlined),
           ),
         );
@@ -517,14 +528,16 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
 
   Widget _buildExamsTab() {
     if (_exams.isEmpty) {
-      return const Center(child: Text('لا توجد امتحانات مسجلة لهذا المقرر.'));
+      return const Center(child: Text('لا توجد اختبارات مسجلة لهذه المادة.'));
     }
 
     final sorted = List<Map<String, dynamic>>.from(_exams)
       ..sort((a, b) {
-        final aDate = DateTime.tryParse(a['exam_date'] as String? ?? '') ??
+        final aDate =
+            DateTime.tryParse(a['exam_date'] as String? ?? '') ??
             DateTime.fromMillisecondsSinceEpoch(0);
-        final bDate = DateTime.tryParse(b['exam_date'] as String? ?? '') ??
+        final bDate =
+            DateTime.tryParse(b['exam_date'] as String? ?? '') ??
             DateTime.fromMillisecondsSinceEpoch(0);
         return aDate.compareTo(bDate);
       });
@@ -536,7 +549,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
         final exam = sorted[index];
         final examDate =
             DateTime.tryParse(exam['exam_date'] as String? ?? '') ??
-                DateTime.now();
+            DateTime.now();
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
           child: ListTile(

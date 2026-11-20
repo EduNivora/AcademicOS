@@ -35,9 +35,6 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
   DateTime? _endDateTime;
   bool _isSaving = false;
   bool _isCompleted = false;
-  bool _reminderEnabled = false;
-  DateTime? _reminderDate;
-  int _reminderOffsetMinutes = 30;
   List<CourseEntity> _availableCourses = [];
   CourseEntity? _selectedCourse;
   bool _isCourseLoading = true;
@@ -62,9 +59,6 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
     _dueDate = widget.existingTask?.dueDate;
     _endDateTime = widget.existingTask?.endDateTime;
     _isCompleted = widget.existingTask?.isCompleted ?? false;
-    _reminderEnabled = widget.existingTask?.reminderEnabled ?? false;
-    _reminderDate = widget.existingTask?.reminderDate;
-    _reminderOffsetMinutes = widget.existingTask?.reminderOffsetMinutes ?? 30;
     if (widget.existingTask != null) {
       _selectedCourse = widget.existingTask!.courseId != null
           ? CourseEntity(
@@ -126,11 +120,6 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
         selectedTime.hour,
         selectedTime.minute,
       );
-      if (_reminderEnabled) {
-        _reminderDate = _endDateTime!.subtract(
-          Duration(minutes: _reminderOffsetMinutes),
-        );
-      }
     });
   }
 
@@ -145,34 +134,26 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
   Future<void> _saveTask() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final startDateTime =
-        widget.existingTask?.startDateTime ?? DateTime.now();
+    final startDateTime = widget.existingTask?.startDateTime ?? DateTime.now();
     if (_endDateTime != null && !_endDateTime!.isAfter(startDateTime)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('يجب أن يكون وقت الانتهاء بعد وقت البدء التلقائي.')),
+        const SnackBar(
+          content: Text('يجب أن يكون وقت الانتهاء بعد وقت البدء التلقائي.'),
+        ),
       );
       return;
     }
 
-    if (_reminderEnabled) {
-      if (_endDateTime == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('حدد وقت الانتهاء أولاً لتفعيل التنبيه.')),
-        );
-        return;
-      }
-      _reminderDate = _endDateTime!.subtract(
-        Duration(minutes: _reminderOffsetMinutes),
-      );
-      if (_reminderDate!.isBefore(DateTime.now())) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('وقت التنبيه المحسوب أصبح في الماضي. اختر وقت انتهاء لاحقاً.')),
-        );
-        return;
-      }
-    } else {
-      _reminderDate = null;
-    }
+    final reminderEnabled = _endDateTime != null;
+    const reminderOffsetMinutes = 15;
+    final calculatedReminderDate = _endDateTime?.subtract(
+      const Duration(minutes: reminderOffsetMinutes),
+    );
+    final reminderDate =
+        calculatedReminderDate != null &&
+            calculatedReminderDate.isBefore(DateTime.now())
+        ? DateTime.now()
+        : calculatedReminderDate;
 
     final task = TaskEntity(
       id: widget.existingTask?.id,
@@ -191,9 +172,9 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
       courseId: _selectedCourse?.id,
       courseName: _selectedCourse?.name,
       notes: _notesController.text.trim(),
-      reminderEnabled: _reminderEnabled,
-      reminderDate: _reminderEnabled ? _reminderDate : null,
-      reminderOffsetMinutes: _reminderOffsetMinutes,
+      reminderEnabled: reminderEnabled,
+      reminderDate: reminderDate,
+      reminderOffsetMinutes: reminderOffsetMinutes,
     );
 
     setState(() => _isSaving = true);
@@ -282,17 +263,12 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
                 children: [
                   Text(
                     title,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     value,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                 ],
               ),
@@ -328,23 +304,25 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
                   children: [
                     TextFormField(
                       controller: _titleController,
-                      decoration:
-                          const InputDecoration(labelText: 'عنوان المهمة'),
+                      decoration: const InputDecoration(
+                        labelText: 'عنوان المهمة',
+                      ),
                       validator: (value) =>
                           value == null || value.trim().isEmpty
-                              ? 'أدخل عنوان المهمة'
-                              : null,
+                          ? 'أدخل عنوان المهمة'
+                          : null,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _descriptionController,
-                      decoration:
-                          const InputDecoration(labelText: 'وصف المهمة'),
+                      decoration: const InputDecoration(
+                        labelText: 'وصف المهمة',
+                      ),
                       maxLines: 4,
                       validator: (value) =>
                           value == null || value.trim().isEmpty
-                              ? 'أدخل وصف المهمة'
-                              : null,
+                          ? 'أدخل وصف المهمة'
+                          : null,
                     ),
                     const SizedBox(height: 16),
                     Row(
@@ -365,8 +343,9 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
                                 setState(() => _selectedType = value);
                               }
                             },
-                            decoration:
-                                const InputDecoration(labelText: 'نوع المهمة'),
+                            decoration: const InputDecoration(
+                              labelText: 'نوع المهمة',
+                            ),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -449,7 +428,7 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
                                   (course) => course.id == value,
                                   orElse: () => CourseEntity(
                                     id: value,
-                                    name: 'المقرر مرتبط',
+                                    name: 'المادة مرتبطة',
                                     instructor: '',
                                     code: '',
                                   ),
@@ -489,7 +468,9 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Row(
@@ -504,7 +485,9 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
                                 Text(
                                   widget.existingTask?.startDateTime == null
                                       ? 'يُسجل تلقائياً عند حفظ المهمة'
-                                      : _formatDateTime(widget.existingTask!.startDateTime!),
+                                      : _formatDateTime(
+                                          widget.existingTask!.startDateTime!,
+                                        ),
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
                               ],
@@ -540,41 +523,13 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
                       title: const Text('المهمة مكتملة'),
                       controlAffinity: ListTileControlAffinity.leading,
                     ),
-                    SwitchListTile.adaptive(
-                      value: _reminderEnabled,
-                      onChanged: (value) {
-                        setState(() {
-                          _reminderEnabled = value;
-                          _reminderDate = value && _endDateTime != null
-                              ? _endDateTime!.subtract(
-                                  Duration(minutes: _reminderOffsetMinutes),
-                                )
-                              : null;
-                        });
-                      },
-                      title: const Text('تفعيل تذكير المهمة'),
-                      subtitle: const Text(
-                        'سيُحسب وقت التنبيه تلقائياً من وقت الانتهاء.',
-                      ),
-                    ),
-                    if (_reminderEnabled) ...[
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<int>(
-                        value: _reminderOffsetMinutes,
-                        decoration: const InputDecoration(
-                          labelText: 'التنبيه قبل (دقيقة)',
+                    if (_endDateTime != null)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          'سيُضبط التنبيه تلقائياً قبل موعد الانتهاء بـ 15 دقيقة.',
                         ),
-                        items: const [
-                          DropdownMenuItem(value: 5, child: Text('5 دقائق')),
-                          DropdownMenuItem(value: 15, child: Text('15 دقيقة')),
-                          DropdownMenuItem(value: 30, child: Text('30 دقيقة')),
-                          DropdownMenuItem(value: 60, child: Text('1 ساعة')),
-                          DropdownMenuItem(value: 1440, child: Text('1 يوم')),
-                        ],
-                        onChanged: (value) => setState(
-                            () => _reminderOffsetMinutes = value ?? 30),
                       ),
-                    ],
                     const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,

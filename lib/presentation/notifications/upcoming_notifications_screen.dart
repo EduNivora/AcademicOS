@@ -117,7 +117,7 @@ class _UpcomingNotificationsScreenState
         (course) => _ReminderItem(
           type: 'course',
           title: course.name,
-          subtitle: course.notes ?? 'محاضرة مقررة',
+          subtitle: course.notes ?? 'محاضرة مجدولة',
           date: course.lectureDate!,
           badge: 'محاضرة',
         ),

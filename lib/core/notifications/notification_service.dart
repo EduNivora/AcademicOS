@@ -494,13 +494,10 @@ class NotificationService {
       }
     }
 
+    // Legacy course-level lecture reminders are intentionally disabled.
+    // Lecture reminders now come only from the weekly schedule records.
     for (final course in courses) {
-      if (course.id == null) {
-        continue;
-      }
-      if (course.lectureReminderEnabled) {
-        await scheduleCourseReminder(course);
-      } else {
+      if (course.id != null) {
         await cancelCourseReminder(course.id!);
       }
     }
