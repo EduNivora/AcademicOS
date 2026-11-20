@@ -2301,7 +2301,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                           onTasksChanged: widget.onRefresh,
                         ),
                       ),
-                    );
+                    ).then((_) => _loadScheduleAndTerm());
                   },
                 ),
               ),
