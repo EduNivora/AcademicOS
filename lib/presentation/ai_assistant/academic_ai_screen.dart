@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/academic/academic_assistant_service.dart';
@@ -44,7 +45,8 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
   late final AcademicAssistantActionExecutor _actionExecutor;
   final List<_ChatMessage> _messages = [
     const _ChatMessage(
-      text: 'مرحباً، أنا المساعد الذكي في AcademicOS. أستطيع مساعدتك في فهم المواد وتنظيم المهام والاستعداد للاختبارات.',
+      text:
+          'مرحباً، أنا المساعد الذكي في EduNivora. أستطيع مساعدتك في فهم المواد وتنظيم المهام والاستعداد للاختبارات.',
       isUser: false,
     ),
   ];
@@ -57,6 +59,7 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
   ];
 
   bool _isSending = false;
+  PlatformFile? _pendingAttachment;
   bool _isCheckingSession = true;
   bool _hasCloudSession = false;
   bool _isGeminiReady = false;
@@ -98,6 +101,71 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
     super.dispose();
   }
 
+  Future<void> _pickAttachment() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'txt'],
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty || !mounted) return;
+      final file = result.files.single;
+      if (file.bytes == null || file.bytes!.isEmpty) {
+        _showMessage('تعذر قراءة الملف. جرّب اختيار الملف مرة أخرى.');
+        return;
+      }
+      if (file.size > 50 * 1024 * 1024) {
+        _showMessage('حجم الملف يتجاوز الحد المسموح وهو 50 MB.');
+        return;
+      }
+      setState(() => _pendingAttachment = file);
+    } catch (error) {
+      if (mounted) _showMessage('تعذر إرفاق الملف: $error');
+    }
+  }
+
+  Future<String> _savePendingAttachment(String instruction) async {
+    final file = _pendingAttachment;
+    if (file == null) return 'لا يوجد ملف مرفق.';
+    if (!RegExp(r'(أضف|اضف|أرفق|ارفق|احفظ|حفظ)').hasMatch(instruction)) {
+      return 'الملف «${file.name}» مرفق. اكتب مثلاً: أضف الملف إلى مادة أمن الشبكات.';
+    }
+    final match = RegExp(r'مادة\s+(.+)$').firstMatch(instruction);
+    if (match == null) {
+      return 'حدد المادة التي تريد ربط الملف بها، مثلاً: أضف الملف إلى مادة أمن الشبكات.';
+    }
+    final courseName = match
+        .group(1)!
+        .replaceFirst(RegExp(r'\s+(?:غداً|غدا|اليوم|في|من)\b.*$'), '')
+        .replaceAll(RegExp(r'[،,.]+$'), '')
+        .trim();
+    if (courseName.isEmpty) return 'اكتب اسم المادة بوضوح.';
+    final extension = (file.extension ?? file.name.split('.').last)
+        .toLowerCase();
+    final result = await _actionExecutor.execute(
+      AcademicAssistantToolCall(
+        name: 'add_material_file',
+        arguments: {
+          'course_name': courseName,
+          'file_name': file.name,
+          'file_type': extension,
+          'file_bytes': file.bytes!,
+        },
+      ),
+    );
+    if (result.changedData) {
+      setState(() => _pendingAttachment = null);
+      await widget.onDataChanged?.call();
+    }
+    return result.message;
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Future<void> _sendPrompt(String text) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty || _isSending) return;
@@ -110,48 +178,55 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
 
     String reply;
     try {
-      final token = await widget.authUseCases?.getCloudAccessToken.call();
-      if (token == null || token.isEmpty) {
-        if (mounted) {
-          setState(() {
-            _hasCloudSession = false;
-            _isGeminiReady = false;
-          });
-        }
-        reply = await _runLocalCommand(trimmed) ?? _buildLocalAssistantReply(trimmed);
+      if (_pendingAttachment != null) {
+        reply = await _savePendingAttachment(trimmed);
       } else {
-        final configured = await _remote.isConfigured();
-        if (mounted) {
-          setState(() {
-            _hasCloudSession = true;
-            _isGeminiReady = configured;
-          });
-        }
-        if (!configured) {
-          reply = await _runLocalCommand(trimmed) ??
-              'خدمة Gemini غير مهيأة على الخادم حالياً. يمكنني تنفيذ الأوامر المحلية المدعومة الآن:\n\n${_buildLocalAssistantReply(trimmed)}';
-        } else if (_looksLikeActionRequest(trimmed)) {
-          final planned = await _remote.sendMessage(
-            accessToken: token,
-            message: _buildActionPlanningPrompt(trimmed),
-            context: await _buildAcademicContext(),
-          );
-          final plan = _parseActionPlan(planned);
-          if (plan == null) {
+        final token = await widget.authUseCases?.getCloudAccessToken.call();
+        if (token == null || token.isEmpty) {
+          if (mounted) {
+            setState(() {
+              _hasCloudSession = false;
+              _isGeminiReady = false;
+            });
+          }
+          reply =
+              await _runLocalCommand(trimmed) ??
+              _buildLocalAssistantReply(trimmed);
+        } else {
+          final configured = await _remote.isConfigured();
+          if (mounted) {
+            setState(() {
+              _hasCloudSession = true;
+              _isGeminiReady = configured;
+            });
+          }
+          if (!configured) {
+            reply =
+                await _runLocalCommand(trimmed) ??
+                'خدمة Gemini غير مهيأة على الخادم حالياً. يمكنني تنفيذ الأوامر المحلية المدعومة الآن:\n\n${_buildLocalAssistantReply(trimmed)}';
+          } else if (_looksLikeActionRequest(trimmed)) {
+            final planned = await _remote.sendMessage(
+              accessToken: token,
+              message: _buildActionPlanningPrompt(trimmed),
+              context: await _buildAcademicContext(),
+            );
+            final plan = _parseActionPlan(planned);
+            if (plan == null) {
+              reply = await _remote.sendMessage(
+                accessToken: token,
+                message: trimmed,
+                context: await _buildAcademicContext(),
+              );
+            } else {
+              reply = await _executeActionPlan(plan);
+            }
+          } else {
             reply = await _remote.sendMessage(
               accessToken: token,
               message: trimmed,
               context: await _buildAcademicContext(),
             );
-          } else {
-            reply = await _executeActionPlan(plan);
           }
-        } else {
-          reply = await _remote.sendMessage(
-            accessToken: token,
-            message: trimmed,
-            context: await _buildAcademicContext(),
-          );
         }
       }
     } on AcademicAiRemoteException catch (error) {
@@ -178,8 +253,8 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
   }
 
   bool _looksLikeActionRequest(String value) => RegExp(
-        r'(أضف|اضف|أنشئ|انشئ|احذف|حذف|عدّل|عدل|حدّث|حدث|أكمل|اكمل|ضع|أدرج|تقرير)',
-      ).hasMatch(value);
+    r'(أضف|اضف|أنشئ|انشئ|احذف|حذف|عدّل|عدل|حدّث|حدث|أكمل|اكمل|ضع|أدرج|تقرير)',
+  ).hasMatch(value);
 
   String _buildActionPlanningPrompt(String userMessage) {
     return '''أنت محرك تنفيذ داخل AcademicOS. حلل طلب المستخدم ثم أعد JSON صالحاً فقط دون Markdown بالشكل:
@@ -225,26 +300,25 @@ $userMessage''';
       final actions = (decoded['actions'] as List)
           .whereType<Map>()
           .map((item) => Map<String, dynamic>.from(item))
-          .where((item) => const {
-                'update_profile',
-                'create_material',
-                'update_material',
-                'delete_material',
-                'create_task',
-                'complete_task',
-                'update_task',
-                'delete_task',
-                'add_lecture',
-                'update_lecture',
-                'delete_lecture',
-                'generate_report',
-              }.contains(item['name']))
+          .where(
+            (item) => const {
+              'update_profile',
+              'create_material',
+              'update_material',
+              'delete_material',
+              'create_task',
+              'complete_task',
+              'update_task',
+              'delete_task',
+              'add_lecture',
+              'update_lecture',
+              'delete_lecture',
+              'generate_report',
+            }.contains(item['name']),
+          )
           .take(10)
           .toList();
-      return {
-        'reply': decoded['reply']?.toString() ?? '',
-        'actions': actions,
-      };
+      return {'reply': decoded['reply']?.toString() ?? '', 'actions': actions};
     } catch (_) {
       return null;
     }
@@ -335,31 +409,46 @@ $userMessage''';
         'academicLevel': profile.academicLevel,
       },
       'currentDate': DateTime.now().toIso8601String(),
-      'courses': courses.take(60).map((course) => {
-        'id': course.id,
-        'name': course.name,
-        'code': course.code,
-        'credits': course.credits,
-      }).toList(),
-      'tasks': tasks.take(60).map((task) => {
-        'id': task.id,
-        'title': task.title,
-        'type': task.type.name,
-        'priority': task.priority.name,
-        'dueDate': task.dueDate?.toIso8601String(),
-        'endDateTime': task.endDateTime?.toIso8601String(),
-        'completedAt': task.completedAt?.toIso8601String(),
-        'completed': task.isCompleted,
-        'courseId': task.courseId,
-        'courseName': task.courseName,
-      }).toList(),
+      'courses': courses
+          .take(60)
+          .map(
+            (course) => {
+              'id': course.id,
+              'name': course.name,
+              'code': course.code,
+              'credits': course.credits,
+            },
+          )
+          .toList(),
+      'tasks': tasks
+          .take(60)
+          .map(
+            (task) => {
+              'id': task.id,
+              'title': task.title,
+              'type': task.type.name,
+              'priority': task.priority.name,
+              'dueDate': task.dueDate?.toIso8601String(),
+              'endDateTime': task.endDateTime?.toIso8601String(),
+              'completedAt': task.completedAt?.toIso8601String(),
+              'completed': task.isCompleted,
+              'courseId': task.courseId,
+              'courseName': task.courseName,
+            },
+          )
+          .toList(),
       'weeklySchedule': schedules.take(100).toList(),
-      'exams': widget.exams.take(30).map((exam) => {
-        'id': exam.id,
-        'title': exam.title,
-        'courseName': exam.courseName,
-        'examDate': exam.examDate.toIso8601String(),
-      }).toList(),
+      'exams': widget.exams
+          .take(30)
+          .map(
+            (exam) => {
+              'id': exam.id,
+              'title': exam.title,
+              'courseName': exam.courseName,
+              'examDate': exam.examDate.toIso8601String(),
+            },
+          )
+          .toList(),
     };
     return jsonEncode(context);
   }
@@ -370,22 +459,24 @@ $userMessage''';
     final statusColor = _isGeminiReady
         ? Colors.green
         : _hasCloudSession
-            ? Colors.orange
-            : Colors.blueGrey;
+        ? Colors.orange
+        : Colors.blueGrey;
     final statusText = _isCheckingSession
         ? 'جارٍ التحقق من الاتصال...'
         : _isGeminiReady
-            ? 'Gemini 3.8 Flash جاهز'
-            : _hasCloudSession
-                ? 'الحساب متصل — خدمة Gemini بانتظار المفتاح'
-                : 'المساعد المحلي يعمل';
+        ? 'Gemini 3.8 Flash جاهز'
+        : _hasCloudSession
+        ? 'الحساب متصل — خدمة Gemini بانتظار المفتاح'
+        : 'المساعد المحلي يعمل';
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('المساعد الذكي'),
         actions: [
           TextButton.icon(
-            onPressed: _isSending ? null : () => setState(() => _messages.clear()),
+            onPressed: _isSending
+                ? null
+                : () => setState(() => _messages.clear()),
             icon: const Icon(Icons.refresh_rounded),
             label: const Text('إعادة'),
           ),
@@ -406,13 +497,19 @@ $userMessage''';
                 Container(
                   width: 10,
                   height: 10,
-                  decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle),
+                  decoration: BoxDecoration(
+                    color: statusColor,
+                    shape: BoxShape.circle,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     statusText,
-                    style: TextStyle(fontWeight: FontWeight.bold, color: statusColor),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: statusColor,
+                    ),
                   ),
                 ),
               ],
@@ -454,24 +551,36 @@ $userMessage''';
               itemBuilder: (context, index) {
                 final message = _messages[index];
                 return Align(
-                  alignment: message.isUser ? Alignment.centerRight : Alignment.centerLeft,
+                  alignment: message.isUser
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft,
                   child: Container(
                     margin: const EdgeInsets.only(bottom: 10),
                     padding: const EdgeInsets.all(12),
-                    constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.82),
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.of(context).size.width * 0.82,
+                    ),
                     decoration: BoxDecoration(
                       color: message.isUser
                           ? Colors.blue.shade600
-                          : (isDark ? Theme.of(context).colorScheme.surfaceContainerHighest : Colors.white),
+                          : (isDark
+                                ? Theme.of(
+                                    context,
+                                  ).colorScheme.surfaceContainerHighest
+                                : Colors.white),
                       borderRadius: BorderRadius.circular(18),
                       border: Border.all(
-                        color: message.isUser ? Colors.blue.shade500 : Colors.grey.shade300,
+                        color: message.isUser
+                            ? Colors.blue.shade500
+                            : Colors.grey.shade300,
                       ),
                     ),
                     child: Text(
                       message.text,
                       style: TextStyle(
-                        color: message.isUser ? Colors.white : Theme.of(context).colorScheme.onSurface,
+                        color: message.isUser
+                            ? Colors.white
+                            : Theme.of(context).colorScheme.onSurface,
                         height: 1.5,
                       ),
                     ),
@@ -497,29 +606,66 @@ $userMessage''';
                 ),
               ],
             ),
-            child: Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _messageController,
-                    readOnly: _isSending,
-                    decoration: InputDecoration(
-                      hintText: 'اكتب طلبك أو سؤالك...',
-                      filled: true,
-                      fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
+                if (_pendingAttachment != null)
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: InputChip(
+                        avatar: const Icon(Icons.attach_file_rounded, size: 18),
+                        label: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 220),
+                          child: Text(
+                            _pendingAttachment!.name,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        onDeleted: _isSending
+                            ? null
+                            : () => setState(() => _pendingAttachment = null),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     ),
-                    onSubmitted: _sendPrompt,
                   ),
-                ),
-                const SizedBox(width: 8),
-                FloatingActionButton.small(
-                  onPressed: _isSending ? null : () => _sendPrompt(_messageController.text),
-                  child: const Icon(Icons.send_rounded),
+                Row(
+                  children: [
+                    IconButton(
+                      tooltip: 'إرفاق ملف بالمادة',
+                      onPressed: _isSending ? null : _pickAttachment,
+                      icon: const Icon(Icons.attach_file_rounded),
+                    ),
+                    Expanded(
+                      child: TextField(
+                        controller: _messageController,
+                        readOnly: _isSending,
+                        decoration: InputDecoration(
+                          hintText: 'اكتب طلبك أو سؤالك...',
+                          filled: true,
+                          fillColor: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                        ),
+                        onSubmitted: _sendPrompt,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FloatingActionButton.small(
+                      onPressed: _isSending
+                          ? null
+                          : () => _sendPrompt(_messageController.text),
+                      child: const Icon(Icons.send_rounded),
+                    ),
+                  ],
                 ),
               ],
             ),

@@ -215,7 +215,9 @@ class NotificationService {
         ),
       );
     } catch (error, stackTrace) {
-      debugPrint('NotificationService.showReportReadyNotification error: $error\n$stackTrace');
+      debugPrint(
+        'NotificationService.showReportReadyNotification error: $error\n$stackTrace',
+      );
     }
   }
 
@@ -412,11 +414,14 @@ class NotificationService {
 
     for (final schedule in schedules) {
       final rawId = schedule['id'];
-      final scheduleId = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '');
+      final scheduleId = rawId is int
+          ? rawId
+          : int.tryParse(rawId?.toString() ?? '');
       if (scheduleId == null) continue;
       activeScheduleIds.add(scheduleId);
 
-      final enabled = schedule['reminder_enabled'] == 1 ||
+      final enabled =
+          schedule['reminder_enabled'] == 1 ||
           schedule['reminder_enabled'] == true;
       final rawCourseId = schedule['course_id'];
       final courseId = rawCourseId is int
@@ -454,7 +459,9 @@ class NotificationService {
         }
       }
     } catch (error, stackTrace) {
-      debugPrint('NotificationService.syncLectureReminders cleanup error: $error\n$stackTrace');
+      debugPrint(
+        'NotificationService.syncLectureReminders cleanup error: $error\n$stackTrace',
+      );
     }
   }
 
@@ -463,7 +470,9 @@ class NotificationService {
       await _plugin.cancelAll();
       return true;
     } catch (error, stackTrace) {
-      debugPrint('NotificationService.cancelAllNotifications error: $error\n$stackTrace');
+      debugPrint(
+        'NotificationService.cancelAllNotifications error: $error\n$stackTrace',
+      );
       return false;
     }
   }

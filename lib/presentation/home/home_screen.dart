@@ -1,6 +1,5 @@
 // ignore_for_file: use_build_context_synchronously
 
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/academic/academic_dashboard_service.dart';
@@ -1237,8 +1236,12 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
       text: _studentProfile.university,
     );
     final controllerMajor = TextEditingController(text: _studentProfile.major);
-    final controllerDepartment = TextEditingController(text: _studentProfile.department);
-    final controllerSemester = TextEditingController(text: _studentProfile.semester);
+    final controllerDepartment = TextEditingController(
+      text: _studentProfile.department,
+    );
+    final controllerSemester = TextEditingController(
+      text: _studentProfile.semester,
+    );
     final controllerLevel = TextEditingController(
       text: _studentProfile.academicLevel,
     );
@@ -1292,7 +1295,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                     const SizedBox(height: 10),
                     TextField(
                       controller: controllerSemester,
-                      decoration: const InputDecoration(labelText: 'الفصل الدراسي'),
+                      decoration: const InputDecoration(
+                        labelText: 'الفصل الدراسي',
+                      ),
                     ),
                     const SizedBox(height: 10),
                     TextField(
@@ -1369,6 +1374,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
       controllerSemester.dispose();
       controllerLevel.dispose();
     }
+
     if (result != true) {
       disposeControllers();
       return;
@@ -1771,8 +1777,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     final gpaDisplay = targetGpa > 0
         ? '${(_estimatedGpa * 25).clamp(0, 100).round()}%'
         : (_courses.isEmpty
-            ? '92%'
-            : '${(_estimatedGpa * 25).clamp(0, 100).round()}%');
+              ? '92%'
+              : '${(_estimatedGpa * 25).clamp(0, 100).round()}%');
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1913,7 +1919,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => ScheduleScreen(authUseCases: widget.authUseCases),
+                      builder: (_) =>
+                          ScheduleScreen(authUseCases: widget.authUseCases),
                     ),
                   );
                 },
@@ -2529,13 +2536,12 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                     }
                   },
                 ),
-                
-                
-                
-                
+
                 _buildRefDrawerTile(
                   icon: Icons.campaign_outlined,
-                  title: widget.isArabic ? 'التعميمات والإشعارات' : 'Announcements & Notifications',
+                  title: widget.isArabic
+                      ? 'التعميمات والإشعارات'
+                      : 'Announcements & Notifications',
                   isDark: isDark,
                   onTap: () {
                     Navigator.pop(context);
@@ -2578,7 +2584,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                     );
                   },
                 ),
-                
+
                 _buildRefDrawerTile(
                   icon: Icons.timer_outlined,
                   title: widget.isArabic ? 'وضع التركيز' : 'Focus Mode',
@@ -2593,7 +2599,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                     );
                   },
                 ),
-                
+
                 const SizedBox(height: 12),
                 // Section 3: الحساب
                 _buildRefDrawerCategoryHeader(
@@ -2612,7 +2618,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                     _showProfileEditor();
                   },
                 ),
-                
+
                 const SizedBox(height: 12),
                 // Section 4: التفضيلات والنظام
                 _buildRefDrawerCategoryHeader(
@@ -2761,7 +2767,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                     Navigator.pop(context);
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const HelpCenterScreen()),
+                      MaterialPageRoute(
+                        builder: (_) => const HelpCenterScreen(),
+                      ),
                     );
                   },
                 ),
@@ -2947,8 +2955,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                     await Navigator.push(
                       context,
                       MaterialPageRoute(
-                      builder: (_) => ScheduleScreen(authUseCases: widget.authUseCases),
-                    ),
+                        builder: (_) =>
+                            ScheduleScreen(authUseCases: widget.authUseCases),
+                      ),
                     );
                     _loadScheduleAndTerm();
                   },
