@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:academic_os/core/academic/academic_assistant_action_executor.dart';
+import 'package:academic_os/data/database/database_helper.dart';
 import 'package:academic_os/domain/entities/course_entity.dart';
 import 'package:academic_os/domain/entities/task_entity.dart';
 import 'package:academic_os/data/models/student_profile_model.dart';
@@ -214,6 +215,70 @@ void main() {
         expect(courseRepository.courses, hasLength(1));
       },
     );
+
+    test('manages exams in the database and confirms deletion', () async {
+      final database = DatabaseHelper.instance;
+      await database.close();
+      courseRepository.courses.add(
+        const CourseEntity(
+          id: 77,
+          name: 'أمن الشبكات',
+          instructor: 'محاضر',
+          code: 'NET-77',
+        ),
+      );
+
+      final created = await executor.execute(
+        const AcademicAssistantToolCall(
+          name: 'create_exam',
+          arguments: {
+            'title': 'اختبار الشبكات',
+            'exam_date': '2027-02-15T09:30:00.000',
+            'course_name': 'أمن الشبكات',
+          },
+        ),
+      );
+      expect(created.changedData, isTrue);
+      final saved = (await database.getExams())
+          .singleWhere((exam) => exam.title == 'اختبار الشبكات');
+      expect(saved.courseId, 77);
+
+      final updated = await executor.execute(
+        AcademicAssistantToolCall(
+          name: 'update_exam',
+          arguments: {
+            'exam_id': saved.id,
+            'title': 'اختبار الشبكات النهائي',
+            'exam_date': '2027-02-16T10:00:00.000',
+          },
+        ),
+      );
+      expect(updated.changedData, isTrue);
+      expect(
+        (await database.getExamById(saved.id!))?.title,
+        'اختبار الشبكات النهائي',
+      );
+
+      final pendingDelete = await executor.execute(
+        AcademicAssistantToolCall(
+          name: 'delete_exam',
+          arguments: {'exam_id': saved.id},
+        ),
+      );
+      expect(pendingDelete.requiresConfirmation, isTrue);
+      expect(await database.getExamById(saved.id!), isNotNull);
+
+      final deleted = await executor.execute(
+        AcademicAssistantToolCall(
+          name: 'delete_exam',
+          arguments: {'exam_id': saved.id},
+        ),
+        confirmed: true,
+      );
+      expect(deleted.changedData, isTrue);
+      expect(await database.getExamById(saved.id!), isNull);
+      await database.close();
+    });
 
     test('requires confirmation before deleting a task', () async {
       taskRepository.tasks.add(
