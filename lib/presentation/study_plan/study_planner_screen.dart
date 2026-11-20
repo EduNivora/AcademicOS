@@ -99,15 +99,24 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
   }
 
   void _generatePlan() {
+    final rawScope = _parseInt(_scopeController, fallback: 10);
+    final rawDays = _parseInt(_daysController, fallback: 7);
+    final rawHours = _parseInt(_hoursController, fallback: 2);
+    if (rawScope < 1 || rawScope > 500 || rawDays < 1 || rawDays > 90 || rawHours < 1 || rawHours > 24) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('أدخل نطاقاً من 1 إلى 500، وعدد أيام من 1 إلى 90، وساعات يومية من 1 إلى 24.')),
+      );
+      return;
+    }
     if (_savedDayCount > 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('هذه الخطة حُفظت كمهام بالفعل. لا يمكن استبدالها تلقائياً حتى لا تتكرر المهام المحفوظة.')),
       );
       return;
     }
-    final scope = _parseInt(_scopeController, fallback: 10);
-    final totalDays = _parseInt(_daysController, fallback: 7);
-    final hours = _parseInt(_hoursController, fallback: 2);
+    final scope = rawScope;
+    final totalDays = rawDays;
+    final hours = rawHours;
 
     final items = <_StudyDay>[];
     final unitsPerDay = math.max(1, (scope / totalDays).ceil());
@@ -352,11 +361,13 @@ class _StudyPlannerScreenState extends State<StudyPlannerScreen> {
                                             await widget.onTasksChanged?.call();
                                           }
                                         } catch (error) {
-                                          if (mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              SnackBar(content: Text('تعذر تحديث حالة جلسة المذاكرة: ' + error.toString())),
-                                            );
-                                          }
+                                          if (!mounted) return;
+                                          setState(() {
+                                            _studyDays[index] = day.copyWith(isCompleted: day.isCompleted);
+                                          });
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text('تعذر تحديث حالة جلسة المذاكرة: ' + error.toString())),
+                                          );
                                         }
                                       }
                                     },
