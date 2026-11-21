@@ -266,13 +266,27 @@ class AcademicAssistantActionExecutor {
         case 'delete_material':
           if (id == null) return false;
           final courses = await courseUseCases.getCourses();
-          return !courses.any((item) => item.id == id);
+          if (courses.any((item) => item.id == id)) return false;
+          final db = await database.database;
+          for (final table in ['tasks', 'schedule', 'exams', 'course_materials']) {
+            final rows = await db.query(
+              table,
+              columns: ['id'],
+              where: 'course_id = ?',
+              whereArgs: [id],
+              limit: 1,
+            );
+            if (rows.isNotEmpty) return false;
+          }
+          return true;
         case 'add_material_file':
           if (id == null) return false;
           final row = await database.getMaterialById(id);
           final rawBytes = call.arguments['file_bytes'];
           final expectedLength = rawBytes is List ? rawBytes.length : -1;
+          final courseResult = await _resolveCourse(call.arguments);
           return row != null &&
+              courseResult.course?.id == row['course_id'] &&
               row['title'] == _string(call.arguments, 'file_name') &&
               row['file_bytes'] is List &&
               (row['file_bytes'] as List).length == expectedLength &&
@@ -287,8 +301,14 @@ class AcademicAssistantActionExecutor {
           if (call.name == 'complete_task') return task.isCompleted;
           final title = _string(call.arguments, 'title');
           final description = _string(call.arguments, 'description');
+          final priority = _string(call.arguments, 'priority');
+          final endDate = _date(call.arguments['end_date_time']);
+          final reminderOffset = _integer(call.arguments['reminder_offset_minutes']);
           return (title.isEmpty || task.title == title) &&
               (description.isEmpty || task.description == description) &&
+              (priority.isEmpty || task.priority == TaskPriorityX.fromName(priority)) &&
+              (endDate == null || task.endDateTime?.isAtSameMomentAs(endDate) == true) &&
+              (reminderOffset == null || task.reminderOffsetMinutes == reminderOffset) &&
               (call.arguments['reminder_enabled'] is! bool ||
                   task.reminderEnabled == call.arguments['reminder_enabled']);
         case 'delete_task':
@@ -304,9 +324,20 @@ class AcademicAssistantActionExecutor {
           final day = _string(call.arguments, 'day');
           final start = _string(call.arguments, 'start_time');
           final end = _string(call.arguments, 'end_time');
+          final location = _string(call.arguments, 'location');
+          final reminderOffset = _integer(call.arguments['reminder_offset_minutes']);
+          final courseResult = await _resolveCourse(call.arguments);
+          final reminderValue = row['reminder_enabled'];
+          final reminderEnabled = reminderValue == 1 || reminderValue == true;
           return (day.isEmpty || row['day_of_week'] == day) &&
               (start.isEmpty || row['start_time'] == start) &&
-              (end.isEmpty || row['end_time'] == end);
+              (end.isEmpty || row['end_time'] == end) &&
+              (location.isEmpty || row['location'] == location) &&
+              (courseResult.course == null || row['course_id'] == courseResult.course!.id) &&
+              (call.arguments['reminder_enabled'] is! bool ||
+                  reminderEnabled == call.arguments['reminder_enabled']) &&
+              (reminderOffset == null ||
+                  row['reminder_offset_minutes'] == reminderOffset);
         case 'delete_lecture':
           if (id == null) return false;
           final schedules = await database.getSchedules();
@@ -318,8 +349,14 @@ class AcademicAssistantActionExecutor {
           if (exam == null) return false;
           final title = _string(call.arguments, 'title');
           final date = _date(call.arguments['exam_date']);
+          final location = _string(call.arguments, 'location');
+          final notes = _string(call.arguments, 'notes');
+          final courseResult = await _resolveCourse(call.arguments);
           return (title.isEmpty || exam.title == title) &&
-              (date == null || exam.examDate.isAtSameMomentAs(date));
+              (date == null || exam.examDate.isAtSameMomentAs(date)) &&
+              (location.isEmpty || exam.location == location) &&
+              (notes.isEmpty || exam.notes == notes) &&
+              (courseResult.course == null || exam.courseId == courseResult.course!.id);
         case 'delete_exam':
           if (id == null) return false;
           return await database.getExamById(id) == null;
