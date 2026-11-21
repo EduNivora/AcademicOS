@@ -114,7 +114,7 @@ export async function reserveAiQuota(pool, subject, {
 export function createAiHandler({ verifyIdentity, apiKey, pool, allowedOrigins = [], fetchImpl = fetch,
   minuteLimit = 5, dailyLimit = 50 }) {
   if (typeof verifyIdentity !== "function" || typeof fetchImpl !== "function" ||
-      !pool || typeof pool.connect !== "function") {
+      !pool || typeof pool.connect !== "function" || typeof pool.query !== "function") {
     throw new TypeError("Missing required AI handler dependency");
   }
   return async (request) => {
@@ -129,7 +129,18 @@ export function createAiHandler({ verifyIdentity, apiKey, pool, allowedOrigins =
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
     const url = new URL(request.url);
     if (request.method === "GET" && url.pathname === "/health") {
-      return json(200, { ok: true, service: "edunivora-ai", configured: typeof apiKey === "string" && apiKey.length >= 10 }, headers);
+      try {
+        await pool.query("SELECT 1");
+      } catch {
+        return fail(503, "ai_quota_store_unavailable",
+          "قاعدة بيانات حصص المساعد غير متاحة حاليًا.", headers);
+      }
+      return json(200, {
+        ok: true,
+        service: "edunivora-ai",
+        configured: typeof apiKey === "string" && apiKey.length >= 10,
+        quotaStore: "ready",
+      }, headers);
     }
     const isScheduleParse = url.pathname === "/v1/schedule/parse";
     if (request.method !== "POST" || (!isScheduleParse && url.pathname !== "/v1/chat")) {
