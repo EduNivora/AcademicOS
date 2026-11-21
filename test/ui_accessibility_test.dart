@@ -1,6 +1,13 @@
 import 'package:academic_os/core/theme/app_theme.dart';
 import 'package:academic_os/core/widgets/edunivora_ui.dart';
+import 'package:academic_os/domain/entities/course_entity.dart';
+import 'package:academic_os/domain/entities/task_entity.dart';
 import 'package:academic_os/domain/entities/user_entity.dart';
+import 'package:academic_os/domain/repositories/course_repository.dart';
+import 'package:academic_os/domain/repositories/task_repository.dart';
+import 'package:academic_os/domain/usecases/course_use_cases.dart';
+import 'package:academic_os/domain/usecases/task_use_cases.dart';
+import 'package:academic_os/presentation/ai_assistant/academic_ai_screen.dart';
 import 'package:academic_os/domain/repositories/auth_repository.dart';
 import 'package:academic_os/domain/usecases/auth_use_cases.dart';
 import 'package:academic_os/presentation/auth/login_screen.dart';
@@ -45,6 +52,55 @@ class _AccessibilityAuthRepository implements AuthRepository {
     required String email,
     required String otp,
   }) async => true;
+}
+
+
+class _AccessibilityTaskRepository implements TaskRepository {
+  @override
+  Future<int> addTask(TaskEntity task) async => 1;
+  @override
+  Future<int> deleteTask(int id) async => 1;
+  @override
+  Future<List<TaskEntity>> fetchTasks() async => [];
+  @override
+  Future<TaskEntity?> fetchTaskById(int id) async => null;
+  @override
+  Future<int> updateTask(TaskEntity task) async => 1;
+}
+
+class _AccessibilityCourseRepository implements CourseRepository {
+  @override
+  Future<int> addCourse(CourseEntity course) async => 1;
+  @override
+  Future<int> deleteCourse(int id) async => 1;
+  @override
+  Future<List<CourseEntity>> fetchCourses() async => [];
+  @override
+  Future<CourseEntity?> fetchCourseById(int id) async => null;
+  @override
+  Future<int> updateCourse(CourseEntity course) async => 1;
+}
+
+CourseUseCases _courseUseCases() {
+  final repository = _AccessibilityCourseRepository();
+  return CourseUseCases(
+    getCourses: GetCoursesUseCase(repository),
+    getCourseById: GetCourseByIdUseCase(repository),
+    addCourse: AddCourseUseCase(repository),
+    updateCourse: UpdateCourseUseCase(repository),
+    deleteCourse: DeleteCourseUseCase(repository),
+  );
+}
+
+TaskUseCases _taskUseCases() {
+  final repository = _AccessibilityTaskRepository();
+  return TaskUseCases(
+    getTasks: GetTasksUseCase(repository),
+    getTaskById: GetTaskByIdUseCase(repository),
+    addTask: AddTaskUseCase(repository),
+    updateTask: UpdateTaskUseCase(repository),
+    deleteTask: DeleteTaskUseCase(repository),
+  );
 }
 
 AuthUseCases _authUseCases() {
@@ -228,5 +284,30 @@ void main() {
       semantics.dispose();
     });
   }
+
+
+  testWidgets('assistant composer has accessible label and send action tooltip', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _testApp(
+        dark: false,
+        home: AcademicAiScreen(
+          courseUseCases: _courseUseCases(),
+          taskUseCases: _taskUseCases(),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('رسالتك للمساعد الذكي'), findsOneWidget);
+    expect(find.byTooltip('إرفاق ملف بالمادة'), findsOneWidget);
+    expect(find.byTooltip('إرسال الرسالة'), findsOneWidget);
+    expect(find.byType(TextField), findsOneWidget);
+
+    final semantics = tester.ensureSemantics();
+    await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    semantics.dispose();
+  });
 
 }
