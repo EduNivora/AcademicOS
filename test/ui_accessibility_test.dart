@@ -304,6 +304,11 @@ void main() {
     expect(find.byTooltip('إرفاق ملف بالمادة'), findsOneWidget);
     expect(find.byTooltip('إرسال الرسالة'), findsOneWidget);
     expect(find.byType(TextField), findsOneWidget);
+    expect(tester.widget<TextField>(find.byType(TextField)).maxLines, 4);
+
+    await tester.enterText(find.byType(TextField), 'مرحباً');
+    await tester.tap(find.byTooltip('إرسال الرسالة'));
+    await tester.pumpAndSettle();
 
     final semantics = tester.ensureSemantics();
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
