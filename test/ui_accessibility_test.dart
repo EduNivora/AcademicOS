@@ -307,6 +307,7 @@ void main() {
 
     final semantics = tester.ensureSemantics();
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(textContrastGuideline));
     semantics.dispose();
   });
 
