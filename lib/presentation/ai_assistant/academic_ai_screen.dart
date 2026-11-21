@@ -419,7 +419,13 @@ $userMessage''';
         );
         if (result.succeeded) {
           succeededCount++;
-          if (result.changedData) await onSuccess?.call();
+          if (result.changedData) {
+            try {
+              await onSuccess?.call();
+            } catch (callbackError) {
+              debugPrint('Assistant success callback failed: ${callbackError.runtimeType}');
+            }
+          }
           continue;
         }
 
@@ -532,7 +538,13 @@ $userMessage''';
         result = await _actionExecutor.execute(call, confirmed: true);
       }
       if (result.succeeded && result.changedData) {
-        await widget.onDataChanged?.call();
+        try {
+          await widget.onDataChanged?.call();
+        } catch (refreshError) {
+          // A UI refresh failure must not relabel an already committed
+          // academic write as a failed action in the execution ledger.
+          debugPrint('Assistant data refresh failed: ${refreshError.runtimeType}');
+        }
       }
       return result;
     } catch (error) {
