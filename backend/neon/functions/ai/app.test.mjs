@@ -18,6 +18,7 @@ const createPool = ({ minuteExceeded = false, dayExceeded = false, unavailable =
         async query(sql) {
           calls.push(sql);
           if (sql === "BEGIN" || sql === "COMMIT" || sql === "ROLLBACK") return { rows: [] };
+          if (sql.startsWith("DELETE FROM public.ai_usage_windows")) return { rows: [], rowCount: 0 };
           if (sql.includes("'minute'")) return { rows: minuteExceeded ? [] : [{ request_count: 1 }] };
           if (sql.includes("'day'")) return { rows: dayExceeded ? [] : [{ request_count: 1 }] };
           throw new Error("unexpected quota SQL");
