@@ -823,7 +823,11 @@ $userMessage''';
                       child: TextField(
                         controller: _messageController,
                         readOnly: _isSending,
+                        textInputAction: TextInputAction.send,
+                        minLines: 1,
+                        maxLines: 4,
                         decoration: InputDecoration(
+                          labelText: 'رسالتك للمساعد الذكي',
                           hintText: 'اكتب طلبك أو سؤالك...',
                           filled: true,
                           fillColor: Theme.of(
@@ -843,6 +847,7 @@ $userMessage''';
                     ),
                     const SizedBox(width: 8),
                     FloatingActionButton.small(
+                      tooltip: 'إرسال الرسالة',
                       onPressed: _isSending
                           ? null
                           : () => _sendPrompt(_messageController.text),
