@@ -232,3 +232,19 @@ test("health fails when the quota database is unavailable", async () => {
   assert.equal(response.status, 503);
   assert.equal((await response.json()).error.code, "ai_quota_store_unavailable");
 });
+
+
+test("rejects a verified identity without a Neon UUID subject before quota access", async () => {
+  let connected = false;
+  const pool = {
+    async query() { return { rows: [] }; },
+    async connect() { connected = true; throw new Error("must not connect"); },
+  };
+  const response = await make({
+    pool,
+    verifyIdentity: async () => ({ sub: "not-a-neon-uuid" }),
+  })(request("سؤال"));
+  assert.equal(response.status, 401);
+  assert.equal((await response.json()).error.code, "invalid_token");
+  assert.equal(connected, false);
+});
