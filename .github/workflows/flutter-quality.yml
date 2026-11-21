@@ -6,6 +6,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      release_build:
+        description: 'Build APK and Web release artifacts only after all acceptance gates pass.'
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -176,6 +182,7 @@ jobs:
             test_file=integration_test/database_android_integration_test.dart; for attempt in 1 2; do adb wait-for-device; package_ready=0; for probe in $(seq 1 30); do if adb shell cmd package list packages >/dev/null 2>&1; then package_ready=1; break; fi; sleep 5; done; if [ "$package_ready" -eq 1 ] && flutter test "$test_file" --no-pub; then exit 0; fi; echo "Android SQLite integration attempt $attempt failed."; if [ "$attempt" -lt 2 ]; then adb reconnect || true; sleep 15; fi; done; echo "Android SQLite integration test failed after retry."; adb logcat -d -t 2000 || true; exit 1
 
       - name: Prepare optional production signing
+        if: github.event_name == 'workflow_dispatch' && inputs.release_build == true
         shell: bash
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -203,6 +210,7 @@ jobs:
           echo "Production signing configuration verified."
 
       - name: Build optimized signed ARM64 APK
+        if: github.event_name == 'workflow_dispatch' && inputs.release_build == true
         if: env.PRODUCTION_SIGNING_READY == 'true'
         env:
           ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/edunivora-production-upload.jks
@@ -218,6 +226,7 @@ jobs:
           --dart-define=GOOGLE_SERVER_CLIENT_ID="$GOOGLE_SERVER_CLIENT_ID"
 
       - name: Verify signed ARM64 APK and size
+        if: github.event_name == 'workflow_dispatch' && inputs.release_build == true
         if: env.PRODUCTION_SIGNING_READY == 'true'
         shell: bash
         run: |
@@ -239,6 +248,7 @@ jobs:
           sha256sum "$apk" | tee SHA256SUMS-release.txt
 
       - name: Upload signed ARM64 release APK
+        if: github.event_name == 'workflow_dispatch' && inputs.release_build == true
         if: env.PRODUCTION_SIGNING_READY == 'true'
         uses: actions/upload-artifact@v4
         with:
@@ -253,6 +263,7 @@ jobs:
           retention-days: 30
 
       - name: Free unused runner disk space
+        if: github.event_name == 'workflow_dispatch' && inputs.release_build == true
         run: |
           echo "Disk space before cleanup:"
           df -h /
@@ -267,12 +278,15 @@ jobs:
           df -h /
 
       - name: Build Android debug APK
+        if: github.event_name == 'workflow_dispatch' && inputs.release_build == true
         run: flutter build apk --debug --no-pub 2>&1 | tee android-build.log
 
       - name: Build Web release
+        if: github.event_name == 'workflow_dispatch' && inputs.release_build == true
         run: flutter build web --release --no-pub 2>&1 | tee web-build.log
 
       - name: Verify Android APK package and launcher icon
+        if: github.event_name == 'workflow_dispatch' && inputs.release_build == true
         shell: bash
         run: |
           set -euo pipefail
@@ -287,6 +301,7 @@ jobs:
           sha256sum "$apk" | tee apk-sha256.txt
 
       - name: Upload Android debug APK
+        if: github.event_name == 'workflow_dispatch' && inputs.release_build == true
         uses: actions/upload-artifact@v4
         with:
           name: academicos-android-debug-apk
@@ -295,6 +310,7 @@ jobs:
           retention-days: 14
 
       - name: Upload Web release
+        if: github.event_name == 'workflow_dispatch' && inputs.release_build == true
         uses: actions/upload-artifact@v4
         with:
           name: academicos-web-release
