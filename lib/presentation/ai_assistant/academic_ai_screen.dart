@@ -745,7 +745,7 @@ $userMessage''';
                     ),
                     decoration: BoxDecoration(
                       color: message.isUser
-                          ? Colors.blue.shade600
+                          ? Colors.blue.shade800
                           : (isDark
                                 ? Theme.of(
                                     context,
@@ -754,7 +754,7 @@ $userMessage''';
                       borderRadius: BorderRadius.circular(18),
                       border: Border.all(
                         color: message.isUser
-                            ? Colors.blue.shade500
+                            ? Colors.blue.shade700
                             : Colors.grey.shade300,
                       ),
                     ),
