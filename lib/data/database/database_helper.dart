@@ -355,7 +355,7 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS assistant_action_runs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        source TEXT NOT NULL CHECK (source IN ('cloud_plan', 'local_command')),
+        source TEXT NOT NULL CHECK (source IN ('cloud_plan', 'local_command', 'attachment')),
         status TEXT NOT NULL CHECK (status IN (
           'preflighting', 'awaiting_confirmation', 'running',
           'succeeded', 'failed', 'partial_failure', 'cancelled',
@@ -401,7 +401,7 @@ class DatabaseHelper {
     required String source,
     required List<String> actionNames,
   }) async {
-    if (!{'cloud_plan', 'local_command'}.contains(source)) {
+    if (!{'cloud_plan', 'local_command', 'attachment'}.contains(source)) {
       throw ArgumentError.value(source, 'source', 'Unsupported assistant run source.');
     }
     if (actionNames.isEmpty || actionNames.length > 10 ||
