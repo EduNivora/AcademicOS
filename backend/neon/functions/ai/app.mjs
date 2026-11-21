@@ -51,8 +51,66 @@ export function createNeonIdentityVerifier({ authBaseUrl, jwksUrl, fetchImpl = f
   };
 }
 
-export function createAiHandler({ verifyIdentity, apiKey, allowedOrigins = [], fetchImpl = fetch }) {
-  if (typeof verifyIdentity !== "function" || typeof fetchImpl !== "function") {
+export class AiQuotaExceededError extends Error {
+  constructor(windowKind) {
+    super("AI request quota exceeded");
+    this.windowKind = windowKind;
+  }
+}
+
+export async function reserveAiQuota(pool, subject, {
+  minuteLimit = 5,
+  dailyLimit = 50,
+} = {}) {
+  if (!pool || typeof pool.connect !== "function") {
+    throw new TypeError("A PostgreSQL pool is required for AI quota enforcement");
+  }
+  if (typeof subject !== "string" ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(subject)) {
+    throw new TypeError("A verified UUID account subject is required");
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const minute = await client.query(
+      `INSERT INTO public.ai_usage_windows (user_id, window_kind, window_start, request_count)
+       VALUES ($1::uuid, 'minute', date_trunc('minute', NOW()), 1)
+       ON CONFLICT (user_id, window_kind, window_start)
+       DO UPDATE SET request_count = public.ai_usage_windows.request_count + 1
+       WHERE public.ai_usage_windows.request_count < $2
+       RETURNING request_count`,
+      [subject, minuteLimit],
+    );
+    if (minute.rows.length === 0) throw new AiQuotaExceededError("minute");
+
+    const daily = await client.query(
+      `INSERT INTO public.ai_usage_windows (user_id, window_kind, window_start, request_count)
+       VALUES ($1::uuid, 'day', date_trunc('day', NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC', 1)
+       ON CONFLICT (user_id, window_kind, window_start)
+       DO UPDATE SET request_count = public.ai_usage_windows.request_count + 1
+       WHERE public.ai_usage_windows.request_count < $2
+       RETURNING request_count`,
+      [subject, dailyLimit],
+    );
+    if (daily.rows.length === 0) throw new AiQuotaExceededError("day");
+
+    await client.query("COMMIT");
+  } catch (error) {
+    try { await client.query("ROLLBACK"); }
+    catch (rollbackError) {
+      console.error("EduNivora AI quota rollback failed", rollbackError?.name ?? "UnknownError");
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export function createAiHandler({ verifyIdentity, apiKey, pool, allowedOrigins = [], fetchImpl = fetch,
+  minuteLimit = 5, dailyLimit = 50 }) {
+  if (typeof verifyIdentity !== "function" || typeof fetchImpl !== "function" ||
+      !pool || typeof pool.connect !== "function") {
     throw new TypeError("Missing required AI handler dependency");
   }
   return async (request) => {
@@ -132,6 +190,26 @@ export function createAiHandler({ verifyIdentity, apiKey, allowedOrigins = [], f
       });
       input.push({ type: "user_input", content: body.message.trim() });
     }
+    try {
+      await reserveAiQuota(pool, identity.sub, { minuteLimit, dailyLimit });
+    } catch (error) {
+      if (error instanceof AiQuotaExceededError) {
+        const retryAfter = error.windowKind === "minute"
+          ? 60
+          : Math.max(1, Math.ceil((Date.UTC(
+              new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate() + 1,
+            ) - Date.now()) / 1000));
+        return fail(429, "ai_quota_exceeded",
+          error.windowKind === "minute"
+            ? "وصلت إلى الحد المسموح من الطلبات في الدقيقة. حاول بعد قليل."
+            : "وصلت إلى الحد اليومي لاستخدام المساعد. حاول غدًا.",
+          { ...headers, "Retry-After": String(retryAfter) });
+      }
+      console.error("EduNivora AI quota store unavailable", error?.name ?? "UnknownError");
+      return fail(503, "ai_quota_unavailable",
+        "تعذر التحقق من حصة استخدام المساعد. حاول لاحقًا.", headers);
+    }
+
     let upstream;
     try {
       upstream = await fetchImpl(ENDPOINT, {
