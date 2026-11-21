@@ -64,6 +64,7 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
   bool _isCheckingSession = true;
   bool _hasCloudSession = false;
   bool _isGeminiReady = false;
+  late final Future<void> _ledgerRecovery;
 
   @override
   void initState() {
@@ -72,7 +73,7 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
       courseUseCases: widget.courseUseCases,
       taskUseCases: widget.taskUseCases,
     );
-    _recoverAssistantLedger();
+    _ledgerRecovery = _recoverAssistantLedger();
     _refreshSessionState();
   }
 
@@ -321,7 +322,9 @@ $userMessage''';
 
     final ledger = DatabaseHelper.instance;
     int? runId;
+    var currentStep = -1;
     try {
+      await _ledgerRecovery;
       runId = await ledger.createAssistantActionRun(
         source: source,
         actionNames: calls.map((call) => call.name).toList(growable: false),
@@ -395,6 +398,7 @@ $userMessage''';
       var succeededCount = 0;
 
       for (var index = 0; index < calls.length; index++) {
+        currentStep = index;
         await ledger.updateAssistantActionStep(
           runId: runId,
           stepIndex: index,
@@ -445,6 +449,14 @@ $userMessage''';
     } catch (error) {
       if (runId != null) {
         try {
+          if (currentStep >= 0) {
+            await ledger.updateAssistantActionStep(
+              runId: runId,
+              stepIndex: currentStep,
+              status: 'interrupted',
+              failureCode: 'execution_interrupted',
+            );
+          }
           await ledger.finalizePendingAssistantActionSteps(
             runId,
             status: 'skipped',
