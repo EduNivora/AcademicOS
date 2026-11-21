@@ -300,12 +300,39 @@ $userMessage''';
     final preflight = await _actionExecutor.preflightPlan(plan.actions);
     if (!preflight.succeeded) return preflight.message;
 
+    // Obtain every destructive-action approval before the first write.
+    // A declined confirmation must cancel the whole plan, not leave earlier
+    // create/update steps partially applied.
+    const destructiveActions = {
+      'delete_material',
+      'delete_task',
+      'delete_lecture',
+      'delete_exam',
+    };
+    final approvedDestructiveActions = <int>{};
+    for (var index = 0; index < plan.actions.length; index++) {
+      final call = plan.actions[index];
+      if (!destructiveActions.contains(call.name)) continue;
+      final preview = await _actionExecutor.execute(call);
+      if (!preview.requiresConfirmation) {
+        return preview.message;
+      }
+      final confirmed = await _showActionConfirmation(preview);
+      if (confirmed != true) {
+        return 'تم إلغاء الخطة قبل التنفيذ. لم تُنفذ أي خطوة.';
+      }
+      approvedDestructiveActions.add(index);
+    }
+
     final messages = <String>[];
     final lead = plan.reply.trim();
     if (lead.isNotEmpty) messages.add(lead);
 
     for (var index = 0; index < plan.actions.length; index++) {
-      final result = await _executeTool(plan.actions[index]);
+      final result = await _executeTool(
+        plan.actions[index],
+        confirmed: approvedDestructiveActions.contains(index),
+      );
       messages.add(result.message);
       if (!result.succeeded) {
         final remaining = plan.actions.length - index - 1;
@@ -333,11 +360,35 @@ $userMessage''';
     return result.message;
   }
 
+  Future<bool?> _showActionConfirmation(
+    AcademicAssistantToolResult result,
+  ) {
+    if (!mounted) return Future.value(null);
+    return showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('تأكيد العملية'),
+        content: Text(result.confirmationPrompt ?? result.message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('تأكيد الحذف'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<AcademicAssistantToolResult> _executeTool(
-    AcademicAssistantToolCall call,
-  ) async {
+    AcademicAssistantToolCall call, {
+    bool confirmed = false,
+  }) async {
     try {
-      var result = await _actionExecutor.execute(call);
+      var result = await _actionExecutor.execute(call, confirmed: confirmed);
       if (result.requiresConfirmation) {
         if (!mounted) {
           return const AcademicAssistantToolResult(
@@ -345,23 +396,7 @@ $userMessage''';
             succeeded: false,
           );
         }
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (dialogContext) => AlertDialog(
-            title: const Text('تأكيد العملية'),
-            content: Text(result.confirmationPrompt ?? result.message),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('إلغاء'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('تأكيد الحذف'),
-              ),
-            ],
-          ),
-        );
+        final confirmed = await _showActionConfirmation(result);
         if (confirmed != true) {
           return const AcademicAssistantToolResult(
             message: 'تم إلغاء العملية بناءً على اختيارك.',
