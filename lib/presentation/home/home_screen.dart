@@ -373,15 +373,21 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     }
   }
 
-  Color _getPriorityTextColor(TaskPriority priority) {
+  Color _getPriorityTextColor(TaskPriority priority, bool isDark) {
     switch (priority) {
       case TaskPriority.urgent:
       case TaskPriority.high:
-        return const Color(0xFFE11D48);
+        return isDark
+            ? const Color(0xFFFDA4AF)
+            : const Color(0xFFBE123C);
       case TaskPriority.medium:
-        return const Color(0xFFD97706);
+        return isDark
+            ? const Color(0xFFFCD34D)
+            : const Color(0xFF92400E);
       case TaskPriority.low:
-        return const Color(0xFF16A34A);
+        return isDark
+            ? const Color(0xFF86EFAC)
+            : const Color(0xFF166534);
     }
   }
 
@@ -1405,7 +1411,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
   }
 
   Widget _buildTaskItemRefCard(TaskEntity task, bool isDark) {
-    final priorityColor = _getPriorityTextColor(task.priority);
+    final priorityColor = _getPriorityTextColor(task.priority, isDark);
     final priorityBg = _getPriorityBgColor(task.priority, isDark);
     final priorityLabel = _getPriorityLabel(task.priority);
 
