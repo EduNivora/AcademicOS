@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/academic/academic_dashboard_service.dart';
 import '../../core/security/auth_secure_storage_service.dart';
 import '../../core/security/app_lock_service.dart';
@@ -1455,24 +1456,37 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                 // Checkbox circle
                 GestureDetector(
                   onTap: () => _toggleTaskCompletion(task),
-                  child: Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: task.isCompleted
-                            ? const Color(0xFF10B981)
-                            : const Color(0xFF94A3B8),
-                        width: 2,
+                  behavior: HitTestBehavior.opaque,
+                  child: SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: Center(
+                      child: Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: task.isCompleted
+                                ? const Color(0xFF047857)
+                                : (Theme.of(context).brightness == Brightness.dark
+                                    ? const Color(0xFF94A3B8)
+                                    : AppTheme.accessibleOutline),
+                            width: 2,
+                          ),
+                          color: task.isCompleted
+                              ? const Color(0xFF047857)
+                              : Colors.transparent,
+                        ),
+                        child: task.isCompleted
+                            ? const Icon(
+                                Icons.check,
+                                size: 16,
+                                color: Colors.white,
+                              )
+                            : null,
                       ),
-                      color: task.isCompleted
-                          ? const Color(0xFF10B981)
-                          : Colors.transparent,
                     ),
-                    child: task.isCompleted
-                        ? const Icon(Icons.check, size: 16, color: Colors.white)
-                        : null,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -2880,7 +2894,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
             Icon(
               Icons.chevron_left_rounded,
               size: 20,
-              color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
+              color: isDark ? Colors.white70 : AppTheme.accessibleOutline,
             ),
           ],
         ),
@@ -3014,10 +3028,12 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     required bool isDark,
     required VoidCallback onTap,
   }) {
-    const activeColor = Color(0xFF2563EB);
+    final activeColor = isDark
+        ? const Color(0xFF93C5FD)
+        : const Color(0xFF2563EB);
     final inactiveColor = isDark
         ? const Color(0xFF94A3B8)
-        : const Color(0xFF64748B);
+        : AppTheme.accessibleOutline;
 
     return InkWell(
       onTap: onTap,
