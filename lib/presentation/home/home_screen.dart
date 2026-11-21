@@ -1944,17 +1944,21 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                   children: [
                     Text(
                       widget.isArabic ? 'عرض الكل' : 'View all',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF2563EB),
+                        color: isDark
+                            ? const Color(0xFF93C5FD)
+                            : const Color(0xFF2563EB),
                       ),
                     ),
                     const SizedBox(width: 4),
                     const Icon(
                       Icons.arrow_back_rounded,
                       size: 16,
-                      color: Color(0xFF2563EB),
+                      color: isDark
+                          ? const Color(0xFF93C5FD)
+                          : const Color(0xFF2563EB),
                     ),
                   ],
                 ),
@@ -2168,7 +2172,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                     const Icon(
                       Icons.check_circle_outline_rounded,
                       size: 38,
-                      color: Color(0xFF10B981),
+                      color: isDark
+                          ? const Color(0xFF34D399)
+                          : const Color(0xFF047857),
                     ),
                     const SizedBox(height: 8),
                     Text(
