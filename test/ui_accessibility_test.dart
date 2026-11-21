@@ -1,3 +1,5 @@
+import 'package:academic_os/core/theme/app_theme.dart';
+import 'package:academic_os/core/widgets/edunivora_ui.dart';
 import 'package:academic_os/domain/entities/user_entity.dart';
 import 'package:academic_os/domain/repositories/auth_repository.dart';
 import 'package:academic_os/domain/usecases/auth_use_cases.dart';
@@ -43,6 +45,32 @@ class _AccessibilityAuthRepository implements AuthRepository {
     required String email,
     required String otp,
   }) async => true;
+  for (final dark in [false, true]) {
+    testWidgets('shared brand footer meets text contrast guidance (dark=$dark)', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.lightTheme(),
+          darkTheme: AppTheme.darkTheme(),
+          themeMode: dark ? ThemeMode.dark : ThemeMode.light,
+          home: const Scaffold(
+            body: SingleChildScrollView(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: EduBrandFooter(),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final semantics = tester.ensureSemantics();
+      await expectLater(tester, meetsGuideline(textContrastGuideline));
+      semantics.dispose();
+    });
+  }
+
 }
 
 AuthUseCases _authUseCases() {
