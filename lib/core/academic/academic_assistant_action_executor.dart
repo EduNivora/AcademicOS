@@ -37,6 +37,7 @@ class AcademicAssistantToolResult {
   final bool succeeded;
   final bool requiresConfirmation;
   final String? confirmationPrompt;
+  final int? affectedRecordId;
 
   const AcademicAssistantToolResult({
     required this.message,
@@ -44,6 +45,7 @@ class AcademicAssistantToolResult {
     this.succeeded = false,
     this.requiresConfirmation = false,
     this.confirmationPrompt,
+    this.affectedRecordId,
   });
 }
 
@@ -235,6 +237,113 @@ class AcademicAssistantActionExecutor {
         message: 'هذه العملية غير متاحة للمساعد حالياً.',
       ),
     };
+  }
+
+  /// Re-reads the affected record after a write before reporting success.
+  /// A successful SQL call alone is not treated as proof of persisted state.
+  Future<bool> verifyPostcondition(
+    AcademicAssistantToolCall call,
+    AcademicAssistantToolResult result,
+  ) async {
+    if (!result.succeeded || !result.changedData) return result.succeeded;
+    final id = result.affectedRecordId;
+    try {
+      switch (call.name) {
+        case 'create_material':
+        case 'update_material':
+          if (id == null) return false;
+          final courses = await courseUseCases.getCourses();
+          final course = courses.where((item) => item.id == id).firstOrNull;
+          if (course == null) return false;
+          final name = _string(call.arguments, 'name');
+          final instructor = _string(call.arguments, 'instructor');
+          final code = _string(call.arguments, 'code');
+          final credits = _integer(call.arguments['credits']);
+          return (name.isEmpty || _normalize(course.name) == _normalize(name)) &&
+              (instructor.isEmpty || course.instructor == instructor) &&
+              (code.isEmpty || course.code == code) &&
+              (credits == null || course.credits == credits);
+        case 'delete_material':
+          if (id == null) return false;
+          final courses = await courseUseCases.getCourses();
+          return !courses.any((item) => item.id == id);
+        case 'add_material_file':
+          if (id == null) return false;
+          final row = await database.getMaterialById(id);
+          final rawBytes = call.arguments['file_bytes'];
+          final expectedLength = rawBytes is List ? rawBytes.length : -1;
+          return row != null &&
+              row['title'] == _string(call.arguments, 'file_name') &&
+              row['file_bytes'] is List &&
+              (row['file_bytes'] as List).length == expectedLength &&
+              expectedLength > 0;
+        case 'create_task':
+        case 'complete_task':
+        case 'update_task':
+          if (id == null) return false;
+          final tasks = await taskUseCases.getTasks();
+          final task = tasks.where((item) => item.id == id).firstOrNull;
+          if (task == null) return false;
+          if (call.name == 'complete_task') return task.isCompleted;
+          final title = _string(call.arguments, 'title');
+          final description = _string(call.arguments, 'description');
+          return (title.isEmpty || task.title == title) &&
+              (description.isEmpty || task.description == description) &&
+              (call.arguments['reminder_enabled'] is! bool ||
+                  task.reminderEnabled == call.arguments['reminder_enabled']);
+        case 'delete_task':
+          if (id == null) return false;
+          final tasks = await taskUseCases.getTasks();
+          return !tasks.any((item) => item.id == id);
+        case 'add_lecture':
+        case 'update_lecture':
+          if (id == null) return false;
+          final schedules = await database.getSchedules();
+          final row = schedules.where((item) => item['id'] == id).firstOrNull;
+          if (row == null) return false;
+          final day = _string(call.arguments, 'day');
+          final start = _string(call.arguments, 'start_time');
+          final end = _string(call.arguments, 'end_time');
+          return (day.isEmpty || row['day_of_week'] == day) &&
+              (start.isEmpty || row['start_time'] == start) &&
+              (end.isEmpty || row['end_time'] == end);
+        case 'delete_lecture':
+          if (id == null) return false;
+          final schedules = await database.getSchedules();
+          return !schedules.any((item) => item['id'] == id);
+        case 'create_exam':
+        case 'update_exam':
+          if (id == null) return false;
+          final exam = await database.getExamById(id);
+          if (exam == null) return false;
+          final title = _string(call.arguments, 'title');
+          final date = _date(call.arguments['exam_date']);
+          return (title.isEmpty || exam.title == title) &&
+              (date == null || exam.examDate.isAtSameMomentAs(date));
+        case 'delete_exam':
+          if (id == null) return false;
+          return await database.getExamById(id) == null;
+        case 'update_profile':
+          final profile = await StudentProfile.load();
+          final args = call.arguments;
+          return (_string(args, 'full_name').isEmpty ||
+                  profile.fullName == _string(args, 'full_name')) &&
+              (_string(args, 'university').isEmpty ||
+                  profile.university == _string(args, 'university')) &&
+              (_string(args, 'major').isEmpty ||
+                  profile.major == _string(args, 'major')) &&
+              (_string(args, 'department').isEmpty ||
+                  profile.department == _string(args, 'department')) &&
+              (_string(args, 'semester').isEmpty ||
+                  profile.semester == _string(args, 'semester')) &&
+              (_string(args, 'academic_level').isEmpty ||
+                  profile.academicLevel == _string(args, 'academic_level'));
+        default:
+          return false;
+      }
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Performs a read-only validation pass over every action before the plan
@@ -694,6 +803,7 @@ class AcademicAssistantActionExecutor {
       message: 'تمت إضافة المادة «$name» بنجاح. رقمها الداخلي: $id.',
       succeeded: true,
       changedData: true,
+      affectedRecordId: id,
     );
   }
 
@@ -744,12 +854,13 @@ class AcademicAssistantActionExecutor {
       fileType: fileType,
       fileBytes: bytes,
     );
-    await database.insertMaterial(material.toMap());
+    final materialId = await database.insertMaterial(material.toMap());
     return AcademicAssistantToolResult(
       message:
           'تم حفظ «$fileName» داخل مادة «${course.name}» وربطه بمعرّف المادة.',
       succeeded: true,
       changedData: true,
+      affectedRecordId: materialId,
     );
   }
 
@@ -793,6 +904,7 @@ class AcademicAssistantActionExecutor {
       message: 'تم تحديث بيانات المادة «${updated.name}».',
       succeeded: true,
       changedData: true,
+      affectedRecordId: updated.id,
     );
   }
 
@@ -836,6 +948,7 @@ class AcademicAssistantActionExecutor {
           'تم حذف المادة «${course.name}» والبيانات التابعة لها بعد تأكيدك.',
       succeeded: true,
       changedData: true,
+      affectedRecordId: course.id,
     );
   }
 
@@ -907,6 +1020,7 @@ class AcademicAssistantActionExecutor {
       message: 'تم إنشاء المهمة «$title»$materialText وحفظها في النظام.',
       succeeded: true,
       changedData: true,
+      affectedRecordId: id,
     );
   }
 
@@ -932,6 +1046,7 @@ class AcademicAssistantActionExecutor {
       message: 'تم تسجيل إنجاز المهمة «${task.title}» مع وقت الإنجاز الفعلي.',
       succeeded: true,
       changedData: true,
+      affectedRecordId: task.id,
     );
   }
 
@@ -1003,6 +1118,7 @@ class AcademicAssistantActionExecutor {
       message: 'تم تحديث المهمة «${updated.title}».',
       succeeded: true,
       changedData: true,
+      affectedRecordId: updated.id,
     );
   }
 
@@ -1028,6 +1144,7 @@ class AcademicAssistantActionExecutor {
       message: 'تم حذف المهمة «${task.title}».',
       succeeded: true,
       changedData: true,
+      affectedRecordId: task.id,
     );
   }
 
@@ -1108,6 +1225,7 @@ class AcademicAssistantActionExecutor {
           'تمت إضافة محاضرة ${course.name} يوم $day من $startTime إلى $endTime وربطها بمعرّف المادة.',
       succeeded: true,
       changedData: true,
+      affectedRecordId: id,
     );
   }
 
@@ -1205,6 +1323,7 @@ class AcademicAssistantActionExecutor {
       message: 'تم تحديث محاضرة ${course.name} في الجدول الأسبوعي.',
       succeeded: true,
       changedData: true,
+      affectedRecordId: scheduleId,
     );
   }
 
@@ -1242,6 +1361,7 @@ class AcademicAssistantActionExecutor {
       message: 'تم حذف المحاضرة من الجدول وإلغاء تنبيهها.',
       succeeded: true,
       changedData: true,
+      affectedRecordId: scheduleId,
     );
   }
 
@@ -1273,6 +1393,7 @@ class AcademicAssistantActionExecutor {
           '${courseResult.course == null ? '' : ' وربطه بمادة ${courseResult.course!.name}'} (رقم $id).',
       succeeded: true,
       changedData: true,
+      affectedRecordId: id,
     );
   }
 
@@ -1312,6 +1433,7 @@ class AcademicAssistantActionExecutor {
       message: 'تم تحديث الاختبار «${updated.title}».',
       succeeded: true,
       changedData: true,
+      affectedRecordId: id,
     );
   }
 
@@ -1339,6 +1461,7 @@ class AcademicAssistantActionExecutor {
       message: 'تم حذف الاختبار «${exam.title}» بعد تأكيدك.',
       succeeded: true,
       changedData: true,
+      affectedRecordId: id,
     );
   }
 
