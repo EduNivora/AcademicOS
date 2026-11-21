@@ -12,8 +12,10 @@ CREATE TABLE IF NOT EXISTS public.ai_usage_windows (
   PRIMARY KEY (user_id, window_kind, window_start)
 );
 
+-- Supports pruning old windows for the account making a request.
+CREATE INDEX IF NOT EXISTS ai_usage_windows_account_expiry_idx
+  ON public.ai_usage_windows (user_id, window_start);
+
+-- Also supports a future scheduled global cleanup for inactive accounts.
 CREATE INDEX IF NOT EXISTS ai_usage_windows_expiry_idx
   ON public.ai_usage_windows (window_start);
-
--- Retention is performed by a separately scheduled maintenance task.
--- Do not attach a trigger or delete rows during request processing.
