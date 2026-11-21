@@ -2,11 +2,32 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createAiHandler } from "./app.mjs";
 const token = "valid";
-const identity = { sub: "user-123" };
-const make = ({ apiKey = "test-api-key-not-real", fetchImpl, verifyIdentity } = {}) =>
+const identity = { sub: "00000000-0000-4000-8000-000000000123" };
+const createPool = ({ minuteExceeded = false, dayExceeded = false, unavailable = false } = {}) => {
+  const calls = [];
+  const pool = {
+    calls,
+    async connect() {
+      if (unavailable) throw new Error("database unavailable");
+      return {
+        async query(sql) {
+          calls.push(sql);
+          if (sql === "BEGIN" || sql === "COMMIT" || sql === "ROLLBACK") return { rows: [] };
+          if (sql.includes("'minute'")) return { rows: minuteExceeded ? [] : [{ request_count: 1 }] };
+          if (sql.includes("'day'")) return { rows: dayExceeded ? [] : [{ request_count: 1 }] };
+          throw new Error("unexpected quota SQL");
+        },
+        release() {},
+      };
+    },
+  };
+  return pool;
+};
+const make = ({ apiKey = "test-api-key-not-real", fetchImpl, verifyIdentity, pool } = {}) =>
   createAiHandler({
     verifyIdentity: verifyIdentity ?? (async (value) => value === token ? identity : null),
     apiKey,
+    pool: pool ?? createPool(),
     allowedOrigins: ["https://app.example.test"],
     fetchImpl: fetchImpl ?? (async () => Response.json({
       steps: [{ type: "model_output", content: [{ type: "text", text: "جواب اختباري" }] }],
@@ -136,4 +157,62 @@ test("schedule image parsing rejects unsupported image types before Gemini", asy
 test("schedule image parsing requires authentication", async () => {
   const response = await make()(scheduleRequest({ bearer: null }));
   assert.equal(response.status, 401);
+});
+
+
+test("AI quota reserves minute and daily counters atomically before provider calls", async () => {
+  const pool = createPool();
+  let providerCalled = false;
+  const response = await make({
+    pool,
+    fetchImpl: async () => {
+      providerCalled = true;
+      return Response.json({ steps: [{ type: "model_output", content: [{ type: "text", text: "تمام" }] }] });
+    },
+  })(request("اشرح"));
+  assert.equal(response.status, 200);
+  assert.equal(providerCalled, true);
+  assert.equal(pool.calls[0], "BEGIN");
+  assert.ok(pool.calls.some((sql) => sql.includes("'minute'")));
+  assert.ok(pool.calls.some((sql) => sql.includes("'day'")));
+  assert.equal(pool.calls.at(-1), "COMMIT");
+});
+
+test("minute quota returns 429 and does not call Gemini", async () => {
+  const pool = createPool({ minuteExceeded: true });
+  let providerCalled = false;
+  const response = await make({
+    pool,
+    fetchImpl: async () => { providerCalled = true; return Response.json({}); },
+  })(request("اشرح"));
+  assert.equal(response.status, 429);
+  assert.equal((await response.json()).error.code, "ai_quota_exceeded");
+  assert.equal(response.headers.get("Retry-After"), "60");
+  assert.equal(providerCalled, false);
+  assert.equal(pool.calls.at(-1), "ROLLBACK");
+});
+
+test("daily quota rolls back minute reservation and does not call Gemini", async () => {
+  const pool = createPool({ dayExceeded: true });
+  let providerCalled = false;
+  const response = await make({
+    pool,
+    fetchImpl: async () => { providerCalled = true; return Response.json({}); },
+  })(request("اشرح"));
+  assert.equal(response.status, 429);
+  assert.equal((await response.json()).error.code, "ai_quota_exceeded");
+  assert.ok(Number(response.headers.get("Retry-After")) > 0);
+  assert.equal(providerCalled, false);
+  assert.equal(pool.calls.at(-1), "ROLLBACK");
+});
+
+test("quota store failure fails closed without calling Gemini", async () => {
+  let providerCalled = false;
+  const response = await make({
+    pool: createPool({ unavailable: true }),
+    fetchImpl: async () => { providerCalled = true; return Response.json({}); },
+  })(request("اشرح"));
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error.code, "ai_quota_unavailable");
+  assert.equal(providerCalled, false);
 });
