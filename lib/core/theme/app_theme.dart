@@ -5,6 +5,10 @@ class AppTheme {
 
   static const Color primary = Color(0xFF5B6CFF);
   static const Color primaryStrong = Color(0xFF3B82F6);
+  // WCAG AA text tones paired with the app's light and dark surfaces.
+  static const Color primaryTextLight = Color(0xFF3645C7);
+  static const Color primaryTextDark = Color(0xFFA5B4FC);
+  static const Color mutedTextLight = Color(0xFF475569);
   static const Color primarySoft = Color(0xFFE0E7FF);
   static const Color success = Color(0xFF10B981);
   static const Color warning = Color(0xFFF59E0B);
