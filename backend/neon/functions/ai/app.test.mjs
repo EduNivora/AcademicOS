@@ -7,6 +7,11 @@ const createPool = ({ minuteExceeded = false, dayExceeded = false, unavailable =
   const calls = [];
   const pool = {
     calls,
+    async query(sql) {
+      if (unavailable) throw new Error("database unavailable");
+      if (sql === "SELECT 1") return { rows: [{ "?column?": 1 }] };
+      throw new Error("unexpected pool query");
+    },
     async connect() {
       if (unavailable) throw new Error("database unavailable");
       return {
@@ -51,6 +56,7 @@ test("health route", async () => {
   const health = await response.json();
   assert.equal(health.service, "edunivora-ai");
   assert.equal(health.configured, true);
+  assert.equal(health.quotaStore, "ready");
 });
 test("authentication is required", async () => {
   assert.equal((await make()(request("سؤال", { bearer: null }))).status, 401);
@@ -215,4 +221,13 @@ test("quota store failure fails closed without calling Gemini", async () => {
   assert.equal(response.status, 503);
   assert.equal((await response.json()).error.code, "ai_quota_unavailable");
   assert.equal(providerCalled, false);
+});
+
+
+test("health fails when the quota database is unavailable", async () => {
+  const response = await make({ pool: createPool({ unavailable: true }) })(
+    new Request("https://unit.test/health"),
+  );
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error.code, "ai_quota_store_unavailable");
 });
