@@ -139,6 +139,30 @@ Widget _testApp({required bool dark, required Widget home}) {
 }
 
 void main() {
+
+  test('semantic theme text and action colors meet WCAG AA contrast', () {
+    double contrast(Color foreground, Color background) {
+      final foregroundLuminance = foreground.computeLuminance();
+      final backgroundLuminance = background.computeLuminance();
+      final lighter = foregroundLuminance > backgroundLuminance
+          ? foregroundLuminance
+          : backgroundLuminance;
+      final darker = foregroundLuminance > backgroundLuminance
+          ? backgroundLuminance
+          : foregroundLuminance;
+      return (lighter + 0.05) / (darker + 0.05);
+    }
+
+    const lightSurface = Color(0xFFF5F7FF);
+    const darkSurface = Color(0xFF020817);
+    expect(contrast(AppTheme.primaryAction, Colors.white), greaterThanOrEqualTo(4.5));
+    expect(contrast(Colors.white, AppTheme.primaryAction), greaterThanOrEqualTo(4.5));
+    expect(contrast(AppTheme.mutedTextLight, lightSurface), greaterThanOrEqualTo(4.5));
+    expect(contrast(AppTheme.primaryTextLight, lightSurface), greaterThanOrEqualTo(4.5));
+    expect(contrast(AppTheme.primaryTextDark, darkSurface), greaterThanOrEqualTo(4.5));
+    expect(contrast(AppTheme.textMuted, darkSurface), greaterThanOrEqualTo(4.5));
+  });
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   for (final dark in [false, true]) {
