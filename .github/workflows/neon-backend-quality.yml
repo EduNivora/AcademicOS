@@ -12,6 +12,7 @@ on:
       - main
       - chore/edunivora-phase0-execution
       - feat/neon-managed-auth-and-notices
+      - feat/ai-durable-account-quotas
     paths:
       - "backend/neon/**"
       - "neon.ts"
