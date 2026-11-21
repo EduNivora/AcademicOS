@@ -107,7 +107,7 @@ class AcademicAssistantActionPlanParser {
         return hasCourse() &&
             hasValue('file_name') &&
             {'pdf', 'doc', 'docx', 'ppt', 'pptx', 'txt'}
-                .contains(args['file_type']?.toString().toLowerCase()) &&
+                .contains(args['file_type']?.toString().toLowerCase().replaceFirst('.', '')) &&
             bytes is List &&
             bytes.isNotEmpty &&
             bytes.length <= 50 * 1024 * 1024 &&
@@ -124,18 +124,39 @@ class AcademicAssistantActionPlanParser {
         return hasTask();
       case 'update_task':
         return hasTask() &&
-            ['title', 'description', 'priority', 'end_date_time'].any(hasValue);
+            [
+              'title',
+              'description',
+              'priority',
+              'end_date_time',
+              'reminder_enabled',
+              'reminder_offset_minutes',
+            ].any(hasValue);
       case 'add_lecture':
         return hasCourse() &&
             hasValue('day') &&
             hasValue('start_time') &&
             hasValue('end_time');
       case 'update_lecture':
+        return hasSchedule() &&
+            [
+              'course_id',
+              'course_name',
+              'day',
+              'start_time',
+              'end_time',
+              'location',
+              'reminder_enabled',
+              'reminder_offset_minutes',
+            ].any(hasValue);
       case 'delete_lecture':
         return hasSchedule();
       case 'create_exam':
         return hasValue('title') && hasValue('exam_date');
       case 'update_exam':
+        return hasExam() &&
+            ['course_id', 'course_name', 'title', 'exam_date', 'location', 'notes']
+                .any(hasValue);
       case 'delete_exam':
         return hasExam();
       case 'generate_report':
