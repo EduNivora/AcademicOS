@@ -6,7 +6,7 @@ Server-side Gemini boundary used by the Flutter academic assistant.
 
 `https://br-late-bread-bajll3is-ai.compute.c-8.eu-central-1.aws.neon.tech`
 
-- `GET /health` — deployment health; returns a non-secret `configured` boolean and was verified HTTP 200.
+- `GET /health` — deployment health; returns a non-secret `configured` boolean and was verified HTTP 200 on 2026-11-21. Neon reports active deployment ID 3 (Node.js 24).
 - `POST /v1/chat` — requires a valid Neon Auth JWT and a configured Gemini key.
 - `POST /v1/schedule/parse` — accepts an authenticated base64 JPG/PNG/WebP timetable image (maximum 8 MiB) and returns validated weekly lecture rows.
 
@@ -29,7 +29,7 @@ The schedule parser accepts `{ "image": "<base64>", "mimeType": "image/jpeg" }`.
 
 - `NEON_AUTH_BASE_URL` — injected by Neon Auth.
 - `NEON_AUTH_JWKS_URL` — injected by Neon Auth.
-- `GEMINI_API_KEY` — **not configured yet**. Add it only as a server-side Neon Function environment variable.
+- `GEMINI_API_KEY` — configured as a server-side Neon Function environment variable. Neon reports the variable is present; `/health` returned `configured: true` on 2026-11-21. This confirms configuration only, not successful authenticated Gemini generation.
 - `APP_ORIGINS` — comma-separated exact origins required by Flutter Web. Native Android requests do not rely on browser CORS.
 
 Never place `GEMINI_API_KEY` in Flutter, GitHub source, SQL, or client-side build arguments.
@@ -54,7 +54,7 @@ and a privately configured Gemini API key. Do not treat a successful health chec
 
 ## Set the Gemini secret and activate generation
 
-The secret is deliberately not stored in this repository or in Flutter.
+The secret is deliberately not stored in this repository or in Flutter. The active Neon deployment reports the variable present; never expose its value in documentation, logs, or client responses.
 On the developer machine, from the repository root:
 
 1. Install the CLI once with `npm install -g neon@latest`. Run `neon link` from the repository root if this checkout is not already linked, then select project `edunivora` (`morning-lab-61449214`) and branch `br-late-bread-bajll3is`.
