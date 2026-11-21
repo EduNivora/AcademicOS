@@ -266,7 +266,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         EdunivoraIdentity.officialTagline,
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: colors.primary,
+                          // The seed primary is intentionally vibrant for
+                          // surfaces and icons, but falls below WCAG AA for
+                          // small text on light surfaces. Use an accessible
+                          // tonal pair for this compact tagline.
+                          color: isDark
+                              ? const Color(0xFFA5B4FC)
+                              : const Color(0xFF3645C7),
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.2,
                         ),
