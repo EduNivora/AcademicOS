@@ -224,6 +224,16 @@ void main() {
 
         expect(result.changedData, isTrue);
         expect(result.succeeded, isTrue);
+        expect(
+          await executor.verifyPostcondition(
+            const AcademicAssistantToolCall(
+              name: 'update_profile',
+              arguments: {'semester': 'الثاني', 'department': 'الأمن السيبراني'},
+            ),
+            result,
+          ),
+          isTrue,
+        );
         expect(profile.fullName, 'طالب');
         expect(profile.university, 'جامعة الاختبار');
         expect(profile.semester, 'الثاني');
@@ -248,6 +258,16 @@ void main() {
         );
 
         expect(first.changedData, isTrue);
+        expect(
+          await executor.verifyPostcondition(
+            const AcademicAssistantToolCall(
+              name: 'create_material',
+              arguments: {'name': 'أمن الشبكات'},
+            ),
+            first,
+          ),
+          isTrue,
+        );
         expect(courseRepository.courses, hasLength(1));
         expect(courseRepository.courses.single.code, startsWith('AUTO-'));
         expect(duplicate.changedData, isFalse);
@@ -286,6 +306,18 @@ void main() {
           taskRepository.tasks.single.startDateTime!.isBefore(before),
           isFalse,
         );
+        const createTaskCall = AcademicAssistantToolCall(
+          name: 'create_task',
+          arguments: {
+            'title': 'مراجعة المحاضرة الأولى',
+            'course_name': 'أمن الشبكات',
+          },
+        );
+        expect(await executor.verifyPostcondition(createTaskCall, result), isTrue);
+        taskRepository.tasks[0] = taskRepository.tasks.single.copyWith(
+          title: 'قيمة لم تُحفظ',
+        );
+        expect(await executor.verifyPostcondition(createTaskCall, result), isFalse);
       },
     );
 
@@ -365,6 +397,44 @@ void main() {
         expect(courseRepository.courses, hasLength(1));
       },
     );
+
+    test('verifies attachment bytes after a database write', () async {
+      final database = DatabaseHelper.instance;
+      await database.close();
+      int? materialId;
+      try {
+        courseRepository.courses.add(
+          const CourseEntity(
+            id: 55,
+            name: 'أمن الشبكات',
+            instructor: 'محاضر',
+            code: 'SEC-55',
+          ),
+        );
+        final call = AcademicAssistantToolCall(
+          name: 'add_material_file',
+          arguments: {
+            'course_name': 'أمن الشبكات',
+            'file_name': 'lecture.pdf',
+            'file_type': 'pdf',
+            'file_bytes': Uint8List.fromList([37, 80, 68, 70, 1, 2, 3]),
+          },
+        );
+        final result = await executor.execute(call);
+        materialId = result.affectedRecordId;
+
+        expect(result.succeeded, isTrue);
+        expect(materialId, isNotNull);
+        expect(await executor.verifyPostcondition(call, result), isTrue);
+
+        await database.deleteMaterial(materialId!);
+        expect(await executor.verifyPostcondition(call, result), isFalse);
+        materialId = null;
+      } finally {
+        if (materialId != null) await database.deleteMaterial(materialId);
+        await database.close();
+      }
+    });
 
     test('manages exams in the database and confirms deletion', () async {
       final database = DatabaseHelper.instance;
