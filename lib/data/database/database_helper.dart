@@ -351,6 +351,223 @@ class DatabaseHelper {
     await _createAssistantLedgerTables(db);
   }
 
+  Future<void> _createAssistantLedgerTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS assistant_action_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        source TEXT NOT NULL CHECK (source IN ('cloud_plan', 'local_command')),
+        status TEXT NOT NULL CHECK (status IN (
+          'preflighting', 'awaiting_confirmation', 'running',
+          'succeeded', 'failed', 'partial_failure', 'cancelled',
+          'rejected', 'interrupted'
+        )),
+        action_count INTEGER NOT NULL CHECK (action_count >= 0),
+        failure_step INTEGER,
+        failure_code TEXT,
+        created_at TEXT NOT NULL,
+        finished_at TEXT
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS assistant_action_steps (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        run_id INTEGER NOT NULL
+          REFERENCES assistant_action_runs(id) ON DELETE CASCADE,
+        step_index INTEGER NOT NULL CHECK (step_index >= 0),
+        action_name TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN (
+          'pending', 'running', 'succeeded', 'failed',
+          'skipped', 'cancelled', 'interrupted'
+        )),
+        changed_data INTEGER NOT NULL DEFAULT 0
+          CHECK (changed_data IN (0, 1)),
+        failure_code TEXT,
+        started_at TEXT,
+        finished_at TEXT,
+        UNIQUE (run_id, step_index)
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_assistant_action_runs_created '
+      'ON assistant_action_runs(created_at DESC)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_assistant_action_steps_run '
+      'ON assistant_action_steps(run_id, step_index)',
+    );
+  }
+
+  Future<int> createAssistantActionRun({
+    required String source,
+    required List<String> actionNames,
+  }) async {
+    if (!{'cloud_plan', 'local_command'}.contains(source)) {
+      throw ArgumentError.value(source, 'source', 'Unsupported assistant run source.');
+    }
+    if (actionNames.isEmpty || actionNames.length > 10 ||
+        actionNames.any((name) => name.trim().isEmpty)) {
+      throw ArgumentError('Assistant run must contain between 1 and 10 named actions.');
+    }
+    final db = await database;
+    final now = DateTime.now().toUtc().toIso8601String();
+    return db.transaction((txn) async {
+      final runId = await txn.insert('assistant_action_runs', {
+        'source': source,
+        'status': 'preflighting',
+        'action_count': actionNames.length,
+        'created_at': now,
+      });
+      for (var index = 0; index < actionNames.length; index++) {
+        await txn.insert('assistant_action_steps', {
+          'run_id': runId,
+          'step_index': index,
+          'action_name': actionNames[index],
+          'status': 'pending',
+        });
+      }
+      return runId;
+    });
+  }
+
+  Future<void> updateAssistantActionRun({
+    required int runId,
+    required String status,
+    int? failureStep,
+    String? failureCode,
+  }) async {
+    const validStatuses = {
+      'preflighting', 'awaiting_confirmation', 'running',
+      'succeeded', 'failed', 'partial_failure', 'cancelled',
+      'rejected', 'interrupted',
+    };
+    if (!validStatuses.contains(status)) {
+      throw ArgumentError.value(status, 'status', 'Unsupported assistant run status.');
+    }
+    final terminal = {
+      'succeeded', 'failed', 'partial_failure', 'cancelled',
+      'rejected', 'interrupted',
+    }.contains(status);
+    final db = await database;
+    final updated = await db.update(
+      'assistant_action_runs',
+      {
+        'status': status,
+        'failure_step': failureStep,
+        'failure_code': failureCode,
+        'finished_at': terminal ? DateTime.now().toUtc().toIso8601String() : null,
+      },
+      where: 'id = ?',
+      whereArgs: [runId],
+    );
+    if (updated != 1) {
+      throw StateError('Assistant execution ledger run $runId was not found.');
+    }
+  }
+
+  Future<void> updateAssistantActionStep({
+    required int runId,
+    required int stepIndex,
+    required String status,
+    bool changedData = false,
+    String? failureCode,
+  }) async {
+    const validStatuses = {
+      'pending', 'running', 'succeeded', 'failed',
+      'skipped', 'cancelled', 'interrupted',
+    };
+    if (!validStatuses.contains(status)) {
+      throw ArgumentError.value(status, 'status', 'Unsupported assistant step status.');
+    }
+    final now = DateTime.now().toUtc().toIso8601String();
+    final started = status == 'running';
+    final terminal = {
+      'succeeded', 'failed', 'skipped', 'cancelled', 'interrupted',
+    }.contains(status);
+    final db = await database;
+    final updated = await db.update(
+      'assistant_action_steps',
+      {
+        'status': status,
+        'changed_data': changedData ? 1 : 0,
+        'failure_code': failureCode,
+        if (started) 'started_at': now,
+        if (terminal) 'finished_at': now,
+      },
+      where: 'run_id = ? AND step_index = ?',
+      whereArgs: [runId, stepIndex],
+    );
+    if (updated != 1) {
+      throw StateError('Assistant execution ledger step $stepIndex was not found.');
+    }
+  }
+
+  Future<void> finalizePendingAssistantActionSteps(
+    int runId, {
+    required String status,
+    String? failureCode,
+  }) async {
+    if (!{'skipped', 'cancelled', 'interrupted'}.contains(status)) {
+      throw ArgumentError.value(status, 'status', 'Unsupported pending step status.');
+    }
+    final db = await database;
+    await db.update(
+      'assistant_action_steps',
+      {
+        'status': status,
+        'failure_code': failureCode,
+        'finished_at': DateTime.now().toUtc().toIso8601String(),
+      },
+      where: "run_id = ? AND status = 'pending'",
+      whereArgs: [runId],
+    );
+  }
+
+  Future<void> recoverInterruptedAssistantRuns() async {
+    final db = await database;
+    await db.transaction((txn) async {
+      final activeRuns = await txn.query(
+        'assistant_action_runs',
+        columns: ['id'],
+        where: "status IN ('preflighting', 'awaiting_confirmation', 'running')",
+      );
+      if (activeRuns.isEmpty) return;
+      final now = DateTime.now().toUtc().toIso8601String();
+      for (final row in activeRuns) {
+        final runId = row['id'] as int;
+        await txn.update(
+          'assistant_action_steps',
+          {
+            'status': 'interrupted',
+            'failure_code': 'app_restarted',
+            'finished_at': now,
+          },
+          where: "run_id = ? AND status = 'running'",
+          whereArgs: [runId],
+        );
+        await txn.update(
+          'assistant_action_steps',
+          {
+            'status': 'skipped',
+            'failure_code': 'app_restarted',
+            'finished_at': now,
+          },
+          where: "run_id = ? AND status = 'pending'",
+          whereArgs: [runId],
+        );
+        await txn.update(
+          'assistant_action_runs',
+          {
+            'status': 'interrupted',
+            'failure_code': 'app_restarted',
+            'finished_at': now,
+          },
+          where: 'id = ?',
+          whereArgs: [runId],
+        );
+      }
+    });
+  }
+
   Future<void> _onUpgradeDatabase(
     Database db,
     int oldVersion,
