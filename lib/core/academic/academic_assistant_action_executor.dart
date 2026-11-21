@@ -451,6 +451,14 @@ class AcademicAssistantActionExecutor {
               final start = _string(args, 'start_time');
               final end = _string(args, 'end_time');
               if (!validDays.contains(day)) throw StateError('يوم المحاضرة غير صحيح.');
+              if (args.containsKey('reminder_enabled') &&
+                  args['reminder_enabled'] is! bool) {
+                throw StateError('قيمة تفعيل تذكير المحاضرة يجب أن تكون true أو false.');
+              }
+              if (args.containsKey('reminder_offset_minutes') &&
+                  _integer(args['reminder_offset_minutes']) == null) {
+                throw StateError('مدة التنبيه يجب أن تكون عدداً صحيحاً بالدقائق.');
+              }
               final validation = ScheduleConflictValidator.validate(
                 day: day,
                 startTime: start,
@@ -1052,6 +1060,12 @@ class AcademicAssistantActionExecutor {
       );
     }
     final location = _string(args, 'location');
+    final reminderEnabled = args['reminder_enabled'] is bool
+        ? args['reminder_enabled'] as bool
+        : true;
+    final reminderOffset = (_integer(args['reminder_offset_minutes']) ?? 15)
+        .clamp(0, 1440)
+        .toInt();
     final id = await database.insertSchedule({
       'course_id': course.id,
       'course_name': course.name,
@@ -1059,17 +1073,17 @@ class AcademicAssistantActionExecutor {
       'start_time': startTime,
       'end_time': endTime,
       'location': location,
-      'reminder_enabled': 1,
-      'reminder_offset_minutes': 15,
+      'reminder_enabled': reminderEnabled ? 1 : 0,
+      'reminder_offset_minutes': reminderOffset,
     });
     await NotificationService.instance.scheduleLectureReminder(
       id: id,
       title: course.name,
       weekdayName: day,
       startTime: startTime,
-      reminderEnabled: true,
+      reminderEnabled: reminderEnabled,
       location: location,
-      reminderOffsetMinutes: 15,
+      reminderOffsetMinutes: reminderOffset,
     );
     return AcademicAssistantToolResult(
       message:
