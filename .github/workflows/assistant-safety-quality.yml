@@ -1,0 +1,57 @@
+name: Assistant safety quality
+
+on:
+  pull_request:
+    branches: [qa/uiux-release-candidate]
+    paths:
+      - 'lib/core/academic/academic_assistant_action_executor.dart'
+      - 'lib/presentation/ai_assistant/academic_ai_screen.dart'
+      - 'test/academic_assistant_action_executor_test.dart'
+      - 'lib/data/database/**'
+      - 'lib/domain/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.github/workflows/assistant-safety-quality.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: assistant-safety-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Dart static analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.8'
+          cache: true
+      - name: Resolve dependencies
+        run: flutter pub get
+      - name: Analyze
+        run: flutter analyze --no-pub --no-fatal-infos
+
+  flutter-tests:
+    name: Full Flutter test suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.8'
+          cache: true
+      - name: Resolve dependencies
+        run: flutter pub get
+      - name: Run all tests
+        run: flutter test --no-pub
