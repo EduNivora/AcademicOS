@@ -32,7 +32,7 @@ class EduSectionHeader extends StatelessWidget {
     final color = accentColor ?? theme.colorScheme.primary;
     final mutedColor = theme.brightness == Brightness.dark
         ? AppTheme.textMuted
-        : const Color(0xFF64748B);
+        : AppTheme.mutedTextLight;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -218,7 +218,7 @@ class EduErrorState extends StatelessWidget {
     final theme = Theme.of(context);
     final muted = theme.brightness == Brightness.dark
         ? AppTheme.textSecondary
-        : const Color(0xFF475569);
+        : AppTheme.mutedTextLight;
 
     return EduSurfaceCard(
       borderColor: AppTheme.danger.withValues(alpha: 0.4),
@@ -374,7 +374,7 @@ class EduBrandFooter extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final isArabic = isArabicLocale(context);
-    final muted = isDark ? AppTheme.textMuted : const Color(0xFF64748B);
+    final muted = isDark ? AppTheme.textMuted : AppTheme.mutedTextLight;
 
     return EduSurfaceCard(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
@@ -391,7 +391,7 @@ class EduBrandFooter extends StatelessWidget {
                     ? '${EdunivoraIdentity.appName} v${EdunivoraIdentity.versionDisplay}'
                     : EdunivoraIdentity.appName,
                 style: theme.textTheme.labelLarge?.copyWith(
-                  color: theme.colorScheme.primary,
+                  color: isDark ? AppTheme.primaryTextDark : AppTheme.primaryTextLight,
                   fontWeight: FontWeight.w800,
                 ),
               ),

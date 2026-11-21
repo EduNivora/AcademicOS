@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/academic/academic_assistant_service.dart';
+import '../../core/academic/academic_assistant_action_plan.dart';
 import '../../core/academic/academic_assistant_action_executor.dart';
 import '../../data/database/database_helper.dart';
 import '../../data/models/student_profile_model.dart';
@@ -63,6 +64,7 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
   bool _isCheckingSession = true;
   bool _hasCloudSession = false;
   bool _isGeminiReady = false;
+  late final Future<void> _ledgerRecovery;
 
   @override
   void initState() {
@@ -71,7 +73,16 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
       courseUseCases: widget.courseUseCases,
       taskUseCases: widget.taskUseCases,
     );
+    _ledgerRecovery = _recoverAssistantLedger();
     _refreshSessionState();
+  }
+
+  Future<void> _recoverAssistantLedger() async {
+    try {
+      await DatabaseHelper.instance.recoverInterruptedAssistantRuns();
+    } catch (error) {
+      debugPrint('Assistant execution ledger recovery failed: ${error.runtimeType}');
+    }
   }
 
   Future<void> _refreshSessionState() async {
@@ -142,22 +153,22 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
     if (courseName.isEmpty) return 'اكتب اسم المادة بوضوح.';
     final extension = (file.extension ?? file.name.split('.').last)
         .toLowerCase();
-    final result = await _actionExecutor.execute(
-      AcademicAssistantToolCall(
-        name: 'add_material_file',
-        arguments: {
-          'course_name': courseName,
-          'file_name': file.name,
-          'file_type': extension,
-          'file_bytes': file.bytes!,
-        },
-      ),
+    final call = AcademicAssistantToolCall(
+      name: 'add_material_file',
+      arguments: {
+        'course_name': courseName,
+        'file_name': file.name,
+        'file_type': extension,
+        'file_bytes': file.bytes!,
+      },
     );
-    if (result.changedData) {
-      setState(() => _pendingAttachment = null);
-      await widget.onDataChanged?.call();
-    }
-    return result.message;
+    return _executeTrackedActions(
+      [call],
+      source: 'attachment',
+      onSuccess: () async {
+        if (mounted) setState(() => _pendingAttachment = null);
+      },
+    );
   }
 
   void _showMessage(String message) {
@@ -210,7 +221,7 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
               message: _buildActionPlanningPrompt(trimmed),
               context: await _buildAcademicContext(),
             );
-            final plan = _parseActionPlan(planned);
+            final plan = const AcademicAssistantActionPlanParser().parse(planned);
             if (plan == null) {
               reply = await _remote.sendMessage(
                 accessToken: token,
@@ -290,100 +301,258 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
 $userMessage''';
   }
 
-  Map<String, dynamic>? _parseActionPlan(String response) {
-    try {
-      final cleaned = response
-          .replaceFirst(RegExp(r'^```(?:json)?\s*', caseSensitive: false), '')
-          .replaceFirst(RegExp(r'\s*```$'), '')
-          .trim();
-      final decoded = jsonDecode(cleaned);
-      if (decoded is! Map<String, dynamic> || decoded['actions'] is! List) {
-        return null;
-      }
-      final actions = (decoded['actions'] as List)
-          .whereType<Map>()
-          .map((item) => Map<String, dynamic>.from(item))
-          .where(
-            (item) => const {
-              'update_profile',
-              'create_material',
-              'update_material',
-              'delete_material',
-              'create_task',
-              'complete_task',
-              'update_task',
-              'delete_task',
-              'add_lecture',
-              'update_lecture',
-              'delete_lecture',
-              'create_exam',
-              'update_exam',
-              'delete_exam',
-              'generate_report',
-            }.contains(item['name']),
-          )
-          .take(10)
-          .toList();
-      return {'reply': decoded['reply']?.toString() ?? '', 'actions': actions};
-    } catch (_) {
-      return null;
-    }
+  Future<String> _executeActionPlan(AcademicAssistantActionPlan plan) {
+    return _executeTrackedActions(
+      plan.actions,
+      source: 'cloud_plan',
+      lead: plan.reply,
+    );
   }
 
-  Future<String> _executeActionPlan(Map<String, dynamic> plan) async {
-    final messages = <String>[];
-    final lead = plan['reply']?.toString().trim() ?? '';
-    if (lead.isNotEmpty) messages.add(lead);
-    final actions = plan['actions'] as List? ?? const [];
-    for (final raw in actions) {
-      if (raw is! Map) continue;
-      final call = AcademicAssistantToolCall.fromJson(
-        Map<String, dynamic>.from(raw),
-      );
-      messages.add(await _executeTool(call));
+  Future<String> _executeTrackedActions(
+    List<AcademicAssistantToolCall> calls, {
+    required String source,
+    String lead = '',
+    Future<void> Function()? onSuccess,
+  }) async {
+    if (calls.isEmpty) {
+      return lead.trim().isEmpty
+          ? 'لم ينتج المساعد إجراءً أو إجابة واضحة.'
+          : lead.trim();
     }
-    return messages.isEmpty
-        ? 'لم ينتج عن الطلب إجراء واضح. وضّح ما تريد تنفيذه.'
-        : messages.join('\n\n');
+
+    final ledger = DatabaseHelper.instance;
+    int? runId;
+    var currentStep = -1;
+    try {
+      await _ledgerRecovery;
+      runId = await ledger.createAssistantActionRun(
+        source: source,
+        actionNames: calls.map((call) => call.name).toList(growable: false),
+      );
+
+      final preflight = await _actionExecutor.preflightPlan(calls);
+      if (!preflight.succeeded) {
+        await ledger.finalizePendingAssistantActionSteps(
+          runId,
+          status: 'skipped',
+          failureCode: 'preflight_rejected',
+        );
+        await ledger.updateAssistantActionRun(
+          runId: runId,
+          status: 'rejected',
+          failureCode: 'preflight_rejected',
+        );
+        return preflight.message;
+      }
+
+      const destructiveActions = {
+        'delete_material',
+        'delete_task',
+        'delete_lecture',
+        'delete_exam',
+      };
+      await ledger.updateAssistantActionRun(
+        runId: runId,
+        status: 'awaiting_confirmation',
+      );
+      final approvedDestructiveActions = <int>{};
+      for (var index = 0; index < calls.length; index++) {
+        final call = calls[index];
+        if (!destructiveActions.contains(call.name)) continue;
+        final preview = await _actionExecutor.execute(call);
+        if (!preview.requiresConfirmation) {
+          await ledger.finalizePendingAssistantActionSteps(
+            runId,
+            status: 'skipped',
+            failureCode: 'confirmation_unavailable',
+          );
+          await ledger.updateAssistantActionRun(
+            runId: runId,
+            status: 'failed',
+            failureStep: index,
+            failureCode: 'confirmation_unavailable',
+          );
+          return preview.message;
+        }
+        final confirmed = await _showActionConfirmation(preview);
+        if (confirmed != true) {
+          await ledger.finalizePendingAssistantActionSteps(
+            runId,
+            status: 'cancelled',
+            failureCode: 'user_cancelled',
+          );
+          await ledger.updateAssistantActionRun(
+            runId: runId,
+            status: 'cancelled',
+            failureStep: index,
+            failureCode: 'user_cancelled',
+          );
+          return 'تم إلغاء الخطة قبل التنفيذ. لم تُنفذ أي خطوة.';
+        }
+        approvedDestructiveActions.add(index);
+      }
+
+      await ledger.updateAssistantActionRun(runId: runId, status: 'running');
+      final messages = <String>[];
+      if (lead.trim().isNotEmpty) messages.add(lead.trim());
+      var succeededCount = 0;
+
+      for (var index = 0; index < calls.length; index++) {
+        currentStep = index;
+        await ledger.updateAssistantActionStep(
+          runId: runId,
+          stepIndex: index,
+          status: 'running',
+        );
+        final result = await _executeTool(
+          calls[index],
+          confirmed: approvedDestructiveActions.contains(index),
+        );
+        messages.add(result.message);
+        await ledger.updateAssistantActionStep(
+          runId: runId,
+          stepIndex: index,
+          status: result.succeeded ? 'succeeded' : 'failed',
+          changedData: result.changedData,
+          failureCode: result.succeeded ? null : 'action_failed',
+        );
+        currentStep = -1;
+        if (result.succeeded) {
+          succeededCount++;
+          if (result.changedData) {
+            try {
+              await onSuccess?.call();
+            } catch (callbackError) {
+              debugPrint('Assistant success callback failed: ${callbackError.runtimeType}');
+            }
+          }
+          continue;
+        }
+
+        final remaining = calls.length - index - 1;
+        if (remaining > 0) {
+          await ledger.finalizePendingAssistantActionSteps(
+            runId,
+            status: 'skipped',
+            failureCode: 'previous_action_failed',
+          );
+          messages.add(
+            'أوقفت بقية الخطة لأن الإجراء ${index + 1} لم يكتمل بنجاح. '
+            'راجع النتيجة ثم اطلب متابعة الخطوات المتبقية.',
+          );
+        }
+        await ledger.updateAssistantActionRun(
+          runId: runId,
+          status: succeededCount > 0 ? 'partial_failure' : 'failed',
+          failureStep: index,
+          failureCode: 'action_failed',
+        );
+        return messages.join('\\n\\n');
+      }
+
+      await ledger.updateAssistantActionRun(runId: runId, status: 'succeeded');
+      return messages.isEmpty
+          ? 'لم ينتج عن الطلب إجراء واضح. وضّح ما تريد تنفيذه.'
+          : messages.join('\\n\\n');
+    } catch (error) {
+      if (runId != null) {
+        try {
+          if (currentStep >= 0) {
+            await ledger.updateAssistantActionStep(
+              runId: runId,
+              stepIndex: currentStep,
+              status: 'interrupted',
+              failureCode: 'execution_interrupted',
+            );
+          }
+          await ledger.finalizePendingAssistantActionSteps(
+            runId,
+            status: 'skipped',
+            failureCode: 'execution_interrupted',
+          );
+          await ledger.updateAssistantActionRun(
+            runId: runId,
+            status: 'interrupted',
+            failureCode: 'execution_interrupted',
+          );
+        } catch (ledgerError) {
+          debugPrint(
+            'Assistant ledger finalization failed: ${ledgerError.runtimeType}',
+          );
+        }
+      }
+      return 'توقفت الخطة بسبب خطأ أثناء التنفيذ أو تسجيل نتيجته. '
+          'افحص سجل التنفيذ قبل إعادة الطلب لتجنب تكرار أي خطوة.';
+    }
   }
 
   Future<String?> _runLocalCommand(String input) async {
     final call = const AcademicAssistantCommandParser().parse(input);
     if (call == null) return null;
-    return _executeTool(call);
+    return _executeTrackedActions([call], source: 'local_command');
   }
 
-  Future<String> _executeTool(AcademicAssistantToolCall call) async {
-    try {
-      var result = await _actionExecutor.execute(call);
-      if (result.requiresConfirmation) {
-        if (!mounted) return 'تعذر عرض تأكيد العملية.';
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (dialogContext) => AlertDialog(
-            title: const Text('تأكيد العملية'),
-            content: Text(result.confirmationPrompt ?? result.message),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('إلغاء'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('تأكيد الحذف'),
-              ),
-            ],
+  Future<bool?> _showActionConfirmation(
+    AcademicAssistantToolResult result,
+  ) {
+    if (!mounted) return Future.value(null);
+    return showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('تأكيد العملية'),
+        content: Text(result.confirmationPrompt ?? result.message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('إلغاء'),
           ),
-        );
-        if (confirmed != true) return 'تم إلغاء العملية بناءً على اختيارك.';
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('تأكيد الحذف'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<AcademicAssistantToolResult> _executeTool(
+    AcademicAssistantToolCall call, {
+    bool confirmed = false,
+  }) async {
+    try {
+      var result = await _actionExecutor.execute(call, confirmed: confirmed);
+      if (result.requiresConfirmation) {
+        if (!mounted) {
+          return const AcademicAssistantToolResult(
+            message: 'تعذر عرض تأكيد العملية.',
+            succeeded: false,
+          );
+        }
+        final confirmed = await _showActionConfirmation(result);
+        if (confirmed != true) {
+          return const AcademicAssistantToolResult(
+            message: 'تم إلغاء العملية بناءً على اختيارك.',
+            succeeded: false,
+          );
+        }
         result = await _actionExecutor.execute(call, confirmed: true);
       }
-      if (result.changedData) {
-        await widget.onDataChanged?.call();
+      if (result.succeeded && result.changedData) {
+        try {
+          await widget.onDataChanged?.call();
+        } catch (refreshError) {
+          // A UI refresh failure must not relabel an already committed
+          // academic write as a failed action in the execution ledger.
+          debugPrint('Assistant data refresh failed: ${refreshError.runtimeType}');
+        }
       }
-      return result.message;
+      return result;
     } catch (error) {
-      return 'لم يتم تنفيذ «${call.name}»: $error';
+      return AcademicAssistantToolResult(
+        message: 'لم يتم تنفيذ «${call.name}»: $error',
+        succeeded: false,
+      );
     }
   }
 
@@ -576,7 +745,7 @@ $userMessage''';
                     ),
                     decoration: BoxDecoration(
                       color: message.isUser
-                          ? Colors.blue.shade600
+                          ? Colors.blue.shade800
                           : (isDark
                                 ? Theme.of(
                                     context,
@@ -585,7 +754,7 @@ $userMessage''';
                       borderRadius: BorderRadius.circular(18),
                       border: Border.all(
                         color: message.isUser
-                            ? Colors.blue.shade500
+                            ? Colors.blue.shade700
                             : Colors.grey.shade300,
                       ),
                     ),
@@ -654,7 +823,11 @@ $userMessage''';
                       child: TextField(
                         controller: _messageController,
                         readOnly: _isSending,
+                        textInputAction: TextInputAction.send,
+                        minLines: 1,
+                        maxLines: 4,
                         decoration: InputDecoration(
+                          labelText: 'رسالتك للمساعد الذكي',
                           hintText: 'اكتب طلبك أو سؤالك...',
                           filled: true,
                           fillColor: Theme.of(
@@ -674,6 +847,7 @@ $userMessage''';
                     ),
                     const SizedBox(width: 8),
                     FloatingActionButton.small(
+                      tooltip: 'إرسال الرسالة',
                       onPressed: _isSending
                           ? null
                           : () => _sendPrompt(_messageController.text),
