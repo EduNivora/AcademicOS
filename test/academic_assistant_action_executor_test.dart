@@ -74,6 +74,7 @@ void main() {
         final profile = await StudentProfile.load();
 
         expect(result.changedData, isTrue);
+        expect(result.succeeded, isTrue);
         expect(profile.fullName, 'طالب');
         expect(profile.university, 'جامعة الاختبار');
         expect(profile.semester, 'الثاني');
