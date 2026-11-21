@@ -27,14 +27,21 @@ The schedule parser accepts `{ "image": "<base64>", "mimeType": "image/jpeg" }`.
 
 ## Runtime environment
 
+- `DATABASE_URL` — injected by Neon for the function branch; used only for quota counters.
 - `NEON_AUTH_BASE_URL` — injected by Neon Auth.
 - `NEON_AUTH_JWKS_URL` — injected by Neon Auth.
-- `GEMINI_API_KEY` — **not configured yet**. Add it only as a server-side Neon Function environment variable.
+- `GEMINI_API_KEY` — configured as a server-side Neon Function environment variable; never expose its value.
 - `APP_ORIGINS` — comma-separated exact origins required by Flutter Web. Native Android requests do not rely on browser CORS.
 
 Never place `GEMINI_API_KEY` in Flutter, GitHub source, SQL, or client-side build arguments.
 The key is sent to Google only in the `x-goog-api-key` request header from the server.
 The function validates Neon Auth JWT issuer, audience, expiration, not-before, and EdDSA signature before forwarding a request.
+
+## Per-account AI quotas
+
+The AI function reserves quota in PostgreSQL after authentication and request validation, before calling Gemini. Default limits are 5 requests per account per UTC minute and 50 requests per account per UTC day, shared by chat and timetable parsing. Reservation uses one database transaction and atomic `INSERT ... ON CONFLICT ... WHERE request_count < limit` updates; if either window is exhausted, the transaction rolls back and the provider is not called. The API returns HTTP 429 with `Retry-After`. If the quota database is unavailable, the API fails closed with HTTP 503. Only account ID, window kind, window start, and request count are stored; prompts, responses, academic context, IP addresses, and device identifiers are not stored.
+
+Schema: `migrations/0003_ai_usage_windows.sql`. Apply it only after reviewing and testing the migration on a Neon child branch.
 
 ## Limits and error handling
 
@@ -48,7 +55,7 @@ The function validates Neon Auth JWT issuer, audience, expiration, not-before, a
 ## Remaining release gates
 
 The Flutter client is wired to this endpoint and retains the local assistant for guest/local sessions.
-Before production-wide activation, add a durable per-account quota/rate limiter, configure Google AI usage limits,
+Before production-wide activation, verify the durable per-account quota migration and configure Google AI usage limits,
 set the production Flutter Web origin if web is shipped, and run end-to-end tests with a real Neon Auth session
 and a privately configured Gemini API key. Do not treat a successful health check as proof that Gemini generation works.
 
