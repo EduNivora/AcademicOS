@@ -1473,35 +1473,35 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                     onTap: () => _toggleTaskCompletion(task),
                     behavior: HitTestBehavior.opaque,
                     child: SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: Center(
-                      child: Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
+                      width: 48,
+                      height: 48,
+                      child: Center(
+                        child: Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: task.isCompleted
+                                  ? const Color(0xFF047857)
+                                  : (isDark
+                                        ? const Color(0xFF94A3B8)
+                                        : AppTheme.accessibleOutline),
+                              width: 2,
+                            ),
                             color: task.isCompleted
                                 ? const Color(0xFF047857)
-                                : (Theme.of(context).brightness == Brightness.dark
-                                    ? const Color(0xFF94A3B8)
-                                    : AppTheme.accessibleOutline),
-                            width: 2,
+                                : Colors.transparent,
                           ),
-                          color: task.isCompleted
-                              ? const Color(0xFF047857)
-                              : Colors.transparent,
+                          child: task.isCompleted
+                              ? const Icon(
+                                  Icons.check,
+                                  size: 16,
+                                  color: Colors.white,
+                                )
+                              : null,
                         ),
-                        child: task.isCompleted
-                            ? const Icon(
-                                Icons.check,
-                                size: 16,
-                                color: Colors.white,
-                              )
-                            : null,
                       ),
-                    ),
                     ),
                   ),
                 ),
