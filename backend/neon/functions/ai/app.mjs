@@ -79,7 +79,7 @@ export async function reserveAiQuota(pool, subject, {
     );
     const minute = await client.query(
       `INSERT INTO public.ai_usage_windows (user_id, window_kind, window_start, request_count)
-       VALUES ($1::uuid, 'minute', date_trunc('minute', NOW()), 1)
+       VALUES ($1::uuid, 'minute', date_trunc('minute', NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC', 1)
        ON CONFLICT (user_id, window_kind, window_start)
        DO UPDATE SET request_count = public.ai_usage_windows.request_count + 1
        WHERE public.ai_usage_windows.request_count < $2
