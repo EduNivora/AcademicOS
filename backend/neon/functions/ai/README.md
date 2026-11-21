@@ -6,7 +6,7 @@ Server-side Gemini boundary used by the Flutter academic assistant.
 
 `https://br-late-bread-bajll3is-ai.compute.c-8.eu-central-1.aws.neon.tech`
 
-- `GET /health` — deployment health; returns a non-secret `configured` boolean and was verified HTTP 200.
+- `GET /health` — checks the Neon quota database with `SELECT 1` and returns non-secret `configured` and `quotaStore` fields; returns HTTP 503 when the quota database is unavailable.
 - `POST /v1/chat` — requires a valid Neon Auth JWT and a configured Gemini key.
 - `POST /v1/schedule/parse` — accepts an authenticated base64 JPG/PNG/WebP timetable image (maximum 8 MiB) and returns validated weekly lecture rows.
 
