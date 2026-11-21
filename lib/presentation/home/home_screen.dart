@@ -1454,10 +1454,19 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
             child: Row(
               children: [
                 // Checkbox circle
-                GestureDetector(
-                  onTap: () => _toggleTaskCompletion(task),
-                  behavior: HitTestBehavior.opaque,
-                  child: SizedBox(
+                Semantics(
+                  label: widget.isArabic
+                      ? (task.isCompleted
+                          ? 'إلغاء إكمال المهمة: ${task.title}'
+                          : 'إكمال المهمة: ${task.title}')
+                      : (task.isCompleted
+                          ? 'Mark task incomplete: ${task.title}'
+                          : 'Mark task complete: ${task.title}'),
+                  checked: task.isCompleted,
+                  child: GestureDetector(
+                    onTap: () => _toggleTaskCompletion(task),
+                    behavior: HitTestBehavior.opaque,
+                    child: SizedBox(
                     width: 48,
                     height: 48,
                     child: Center(
@@ -1486,6 +1495,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                               )
                             : null,
                       ),
+                    ),
                     ),
                   ),
                 ),
