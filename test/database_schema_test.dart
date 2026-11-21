@@ -635,6 +635,14 @@ void main() {
             'idx_academic_terms_single_active',
           ]),
         );
+        final ledgerTables = await upgradedDb.rawQuery(
+          "SELECT name FROM sqlite_master WHERE type = 'table' "
+          "AND name IN ('assistant_action_runs', 'assistant_action_steps')",
+        );
+        expect(
+          ledgerTables.map((row) => row['name']),
+          containsAll(['assistant_action_runs', 'assistant_action_steps']),
+        );
         expect(
           (await helper.getCourseById(courseId))?.name,
           'Migration preservation',
