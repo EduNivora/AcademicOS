@@ -1,5 +1,5 @@
 -- 0003: Durable per-account AI request quotas.
--- Stores counters only; never store prompts, responses, academic context, or IP addresses.
+-- Stores counters only and never store prompts, responses, academic context, or IP addresses.
 
 CREATE TABLE IF NOT EXISTS public.ai_usage_windows (
   user_id UUID NOT NULL
