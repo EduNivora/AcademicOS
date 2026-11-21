@@ -73,6 +73,9 @@ void main() {
 
 
     test('rejects malformed and mismatched course and task identifiers', () async {
+      taskRepository.tasks.add(
+        const TaskEntity(id: 1, title: 'عنوان صحيح', description: ''),
+      );
       final malformedCourse = await executor.preflightPlan([
         const AcademicAssistantToolCall(
           name: 'create_task',
@@ -123,6 +126,14 @@ void main() {
 
 
     test('rejects invalid lecture reminder options during preflight', () async {
+      courseRepository.courses.add(
+        const CourseEntity(
+          id: 1,
+          name: 'الشبكات',
+          instructor: 'محاضر',
+          code: 'NET101',
+        ),
+      );
       final invalidToggle = await executor.preflightPlan([
         const AcademicAssistantToolCall(
           name: 'add_lecture',
