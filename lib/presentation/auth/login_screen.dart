@@ -258,6 +258,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         EdunivoraIdentity.appName,
                         textAlign: TextAlign.center,
                         style: theme.textTheme.headlineMedium?.copyWith(
+                          color: isDark
+                              ? AppTheme.primaryTextDark
+                              : AppTheme.primaryTextLight,
                           fontWeight: FontWeight.w800,
                           letterSpacing: -0.5,
                         ),
@@ -408,8 +411,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ],
                             const SizedBox(height: 22),
-                            SizedBox(
-                              height: 54,
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(minHeight: 54),
                               child: FilledButton(
                                 onPressed: _isLoading
                                     ? null
@@ -428,14 +431,16 @@ class _LoginScreenState extends State<LoginScreen> {
                                           color: Colors.white,
                                         ),
                                       )
-                                    : const Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
+                                    : const Wrap(
+                                        alignment: WrapAlignment.center,
+                                        crossAxisAlignment:
+                                            WrapCrossAlignment.center,
+                                        spacing: 9,
                                         children: [
                                           Icon(Icons.login_rounded, size: 20),
-                                          SizedBox(width: 9),
                                           Text(
                                             'تسجيل الدخول',
+                                            textAlign: TextAlign.center,
                                             style: TextStyle(
                                               fontWeight: FontWeight.w700,
                                               fontSize: 15,
@@ -469,8 +474,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       const SizedBox(height: 22),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 4,
                         children: [
                           Text(
                             'ليس لديك حساب؟',
