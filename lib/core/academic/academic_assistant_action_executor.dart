@@ -410,7 +410,7 @@ class AcademicAssistantActionExecutor {
                   .clamp(0, 1440)
                   .toInt();
               if (reminderEnabled &&
-                  !due!.subtract(Duration(minutes: reminderOffset)).isAfter(DateTime.now())) {
+                  !due.subtract(Duration(minutes: reminderOffset)).isAfter(DateTime.now())) {
                 throw StateError('موعد المهمة قريب جداً لإنشاء التنبيه المحدد.');
               }
               break;
