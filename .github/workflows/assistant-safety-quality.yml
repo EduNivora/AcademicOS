@@ -1,6 +1,8 @@
 name: Assistant safety quality
 
 on:
+  push:
+    branches: [feat/assistant-postcondition-verification]
   pull_request:
     branches: [qa/uiux-release-candidate]
     paths:
