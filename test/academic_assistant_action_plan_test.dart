@@ -122,6 +122,44 @@ void main() {
       expect(plan!.actions, hasLength(1));
     });
 
+
+    test('accepts dot-prefixed material file extensions', () {
+      final plan = parser.parse(encode([
+        action('add_material_file', {
+          'course_name': 'الشبكات',
+          'file_name': 'lecture.pdf',
+          'file_type': '.pdf',
+          'file_bytes': [37, 80, 68, 70],
+        }),
+      ]));
+      expect(plan, isNotNull);
+    });
+
+    test('accepts task reminder-only updates', () {
+      final plan = parser.parse(encode([
+        action('update_task', {
+          'task_id': 12,
+          'reminder_enabled': false,
+        }),
+      ]));
+      expect(plan, isNotNull);
+    });
+
+    test('rejects exam and lecture updates without any changed fields', () {
+      expect(
+        parser.parse(encode([
+          action('update_exam', {'exam_id': 3}),
+        ])),
+        isNull,
+      );
+      expect(
+        parser.parse(encode([
+          action('update_lecture', {'schedule_id': 8}),
+        ])),
+        isNull,
+      );
+    });
+
     test('rejects malformed JSON', () {
       expect(parser.parse('{not-json'), isNull);
     });
