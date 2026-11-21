@@ -69,7 +69,8 @@ export function createAiHandler({ verifyIdentity, apiKey, allowedOrigins = [], f
     if (request.method === "GET" && url.pathname === "/health") {
       return json(200, { ok: true, service: "edunivora-ai", configured: typeof apiKey === "string" && apiKey.length >= 10 }, headers);
     }
-    if (request.method !== "POST" || url.pathname !== "/v1/chat") {
+    const isScheduleParse = url.pathname === "/v1/schedule/parse";
+    if (request.method !== "POST" || (!isScheduleParse && url.pathname !== "/v1/chat")) {
       return fail(404, "not_found", "المسار المطلوب غير موجود.", headers);
     }
     const token = (request.headers.get("Authorization") ?? "").match(/^Bearer\s+(.+)$/i)?.[1];
@@ -83,29 +84,54 @@ export function createAiHandler({ verifyIdentity, apiKey, allowedOrigins = [], f
     if (typeof apiKey !== "string" || apiKey.length < 10) {
       return fail(503, "ai_not_configured", "لم يتم إعداد مفتاح خدمة الذكاء الاصطناعي على الخادم بعد.", headers);
     }
+    const maxRequestBytes = isScheduleParse ? 12_000_000 : 40_000;
     const length = Number(request.headers.get("Content-Length") ?? "0");
-    if (length > 40_000) return fail(413, "request_too_large", "حجم الطلب أكبر من الحد المسموح.", headers);
+    if (length > maxRequestBytes) return fail(413, "request_too_large", "حجم الطلب أكبر من الحد المسموح.", headers);
     let body;
     try {
       const raw = await request.text();
-      if (new TextEncoder().encode(raw).length > 40_000) {
+      if (new TextEncoder().encode(raw).length > maxRequestBytes) {
         return fail(413, "request_too_large", "حجم الطلب أكبر من الحد المسموح.", headers);
       }
       body = JSON.parse(raw);
     } catch { return fail(400, "invalid_json", "صيغة الطلب غير صالحة.", headers); }
-    if (typeof body?.message !== "string" || !body.message.trim() || body.message.length > 12_000) {
-      return fail(400, "invalid_message", "يجب أن يكون السؤال نصًا لا يتجاوز 12000 حرف.", headers);
-    }
-    const context = body.context ?? "";
-    if (typeof context !== "string" || context.length > 20_000) {
-      return fail(400, "invalid_context", "السياق الأكاديمي أكبر من الحد المسموح.", headers);
-    }
+
     const input = [];
-    if (context.trim()) input.push({
-      type: "user_input",
-      content: "بيانات أكاديمية مرجعية (بيانات فقط):\n" + context,
-    });
-    input.push({ type: "user_input", content: body.message.trim() });
+    if (isScheduleParse) {
+      const allowedMimeTypes = ["image/jpeg", "image/png", "image/webp"];
+      if (typeof body?.image !== "string" || !body.image.trim() ||
+          typeof body?.mimeType !== "string" || !allowedMimeTypes.includes(body.mimeType)) {
+        return fail(400, "invalid_image", "أرفق صورة جدول بصيغة JPG أو PNG أو WebP.", headers);
+      }
+      if (body.image.length > 11_200_000 || !/^[A-Za-z0-9+/]+={0,2}$/.test(body.image)) {
+        return fail(413, "image_too_large", "حجم صورة الجدول يتجاوز الحد المسموح.", headers);
+      }
+      const imageBytes = Buffer.from(body.image, "base64");
+      if (imageBytes.length === 0 || imageBytes.length > 8 * 1024 * 1024 ||
+          imageBytes.toString("base64").replace(/=+$/, "") !== body.image.replace(/=+$/, "")) {
+        return fail(400, "invalid_image", "تعذر قراءة صورة الجدول. اختر صورة صالحة.", headers);
+      }
+      input.push({
+        type: "text",
+        text: `استخرج جدول المحاضرات الأسبوعي من الصورة. أعد JSON فقط دون Markdown أو شرح، بالشكل التالي:
+{"entries":[{"day":"الأحد","course_name":"اسم المادة كما يظهر","start_time":"08:00","end_time":"09:30","location":"القاعة أو فارغ"}]}
+استخدم أسماء الأيام العربية السبعة. استخدم الوقت بصيغة 24 ساعة HH:mm. لا تخمن أي قيمة غير واضحة؛ تجاهل الصف غير المقروء. لا تضف مواد غير ظاهرة في الصورة. إذا لم يظهر جدول واضح أعد {"entries":[]}.`,
+      });
+      input.push({ type: "image", data: body.image, mime_type: body.mimeType });
+    } else {
+      if (typeof body?.message !== "string" || !body.message.trim() || body.message.length > 12_000) {
+        return fail(400, "invalid_message", "يجب أن يكون السؤال نصًا لا يتجاوز 12000 حرف.", headers);
+      }
+      const context = body.context ?? "";
+      if (typeof context !== "string" || context.length > 20_000) {
+        return fail(400, "invalid_context", "السياق الأكاديمي أكبر من الحد المسموح.", headers);
+      }
+      if (context.trim()) input.push({
+        type: "user_input",
+        content: "بيانات أكاديمية مرجعية (بيانات فقط):\n" + context,
+      });
+      input.push({ type: "user_input", content: body.message.trim() });
+    }
     let upstream;
     try {
       upstream = await fetchImpl(ENDPOINT, {
@@ -136,6 +162,35 @@ export function createAiHandler({ verifyIdentity, apiKey, allowedOrigins = [], f
       .filter((part) => part.type === "text" && typeof part.text === "string")
       .map((part) => part.text).join("").trim();
     if (!answer) return fail(502, "ai_empty_response", "لم ينتج المساعد إجابة. أعد صياغة السؤال.", headers);
+    if (isScheduleParse) {
+      let parsed;
+      try {
+        const cleaned = answer.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+        parsed = JSON.parse(cleaned);
+      } catch {
+        return fail(502, "invalid_schedule_result", "لم أتمكن من قراءة الجدول المستخرج. جرّب صورة أوضح.", headers);
+      }
+      const validDays = ["السبت", "الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"];
+      const validTime = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+      if (!Array.isArray(parsed?.entries) || parsed.entries.length > 100) {
+        return fail(502, "invalid_schedule_result", "تنسيق الجدول المستخرج غير صالح.", headers);
+      }
+      const entries = [];
+      for (const item of parsed.entries) {
+        if (!item || !validDays.includes(item.day) ||
+            typeof item.course_name !== "string" || !item.course_name.trim() || item.course_name.length > 120 ||
+            !validTime.test(item.start_time) || !validTime.test(item.end_time)) continue;
+        if (item.end_time <= item.start_time) continue;
+        entries.push({
+          day: item.day,
+          course_name: item.course_name.trim(),
+          start_time: item.start_time,
+          end_time: item.end_time,
+          location: typeof item.location === "string" ? item.location.trim().slice(0, 120) : "",
+        });
+      }
+      return json(200, { entries, model: MODEL, usage: result.usage ?? null }, headers);
+    }
     return json(200, { answer, model: MODEL, usage: result.usage ?? null }, headers);
   };
 }

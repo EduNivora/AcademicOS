@@ -135,8 +135,134 @@ void main() {
       );
 
       expect(report, contains('EduNivora'));
-      expect(report, contains('GPA Breakdown'));
-      expect(report, contains('Math'));
+      expect(report, contains('المهام المتبقية'));
+      expect(report, contains('عدد المواد المسجلة: 1'));
+      expect(report, isNot(contains('GPA')));
+    });
+
+    test('daily report includes only tasks completed on the selected day', () {
+      final service = AcademicReportService();
+      final generatedAt = DateTime(2026, 11, 20, 18);
+      final report = service.generatePeriodReport(
+        period: AcademicReportPeriod.daily,
+        generatedAt: generatedAt,
+        courses: const [],
+        tasks: [
+          TaskModel(
+            id: 1,
+            title: 'Completed today',
+            description: '',
+            isCompleted: true,
+            completedAt: DateTime(2026, 11, 20, 10),
+          ),
+          TaskModel(
+            id: 2,
+            title: 'Completed yesterday',
+            description: '',
+            isCompleted: true,
+            completedAt: DateTime(2026, 11, 19, 10),
+          ),
+          TaskModel(
+            id: 3,
+            title: 'Due today',
+            description: '',
+            dueDate: DateTime(2026, 11, 20, 21),
+            isCompleted: false,
+          ),
+        ],
+        exams: const [],
+        schedule: const [],
+      );
+
+      expect(report, contains('Completed today'));
+      expect(report, isNot(contains('Completed yesterday')));
+      expect(report, contains('Due today'));
+      expect(report, contains('لا يثبت الحضور'));
+      expect(report, isNot(contains('GPA')));
+    });
+
+    test('final report separates legacy completed tasks without timestamps', () {
+      final report = AcademicReportService().generatePeriodReport(
+        period: AcademicReportPeriod.finalReport,
+        generatedAt: DateTime(2026, 11, 20),
+        courses: const [],
+        tasks: const [
+          TaskModel(
+            id: 1,
+            title: 'Legacy completed',
+            description: '',
+            isCompleted: true,
+          ),
+        ],
+        exams: const [],
+        schedule: const [],
+      );
+
+      expect(report, contains('دون تاريخ إنجاز محفوظ'));
+      expect(report, isNot(contains('Legacy completed — 2026')));
+    });
+
+    test('weekly and monthly reports respect their local period boundaries', () {
+      final service = AcademicReportService();
+      final tasks = [
+        TaskModel(
+          id: 1,
+          title: 'Inside week',
+          description: '',
+          isCompleted: true,
+          completedAt: DateTime(2026, 11, 16, 9),
+        ),
+        TaskModel(
+          id: 2,
+          title: 'Outside week',
+          description: '',
+          isCompleted: true,
+          completedAt: DateTime(2026, 11, 15, 9),
+        ),
+        TaskModel(
+          id: 3,
+          title: 'Inside month',
+          description: '',
+          isCompleted: true,
+          completedAt: DateTime(2026, 11, 1, 9),
+        ),
+        TaskModel(
+          id: 4,
+          title: 'Outside month',
+          description: '',
+          isCompleted: true,
+          completedAt: DateTime(2026, 10, 31, 9),
+        ),
+      ];
+      final common = {
+        'courses': const <CourseModel>[],
+        'tasks': tasks,
+        'exams': const <ExamModel>[],
+        'schedule': const <Map<String, dynamic>>[],
+        'generatedAt': DateTime(2026, 11, 20, 18),
+      };
+
+      final weekly = service.generatePeriodReport(
+        period: AcademicReportPeriod.weekly,
+        courses: common['courses'] as List<CourseModel>,
+        tasks: common['tasks'] as List<TaskModel>,
+        exams: common['exams'] as List<ExamModel>,
+        schedule: common['schedule'] as List<Map<String, dynamic>>,
+        generatedAt: common['generatedAt'] as DateTime,
+      );
+      final monthly = service.generatePeriodReport(
+        period: AcademicReportPeriod.monthly,
+        courses: const [],
+        tasks: tasks,
+        exams: const [],
+        schedule: const [],
+        generatedAt: DateTime(2026, 11, 20, 18),
+      );
+
+      expect(weekly, contains('Inside week'));
+      expect(weekly, isNot(contains('Outside week')));
+      expect(monthly, contains('Inside month'));
+      expect(monthly, isNot(contains('Outside month')));
     });
   });
 }

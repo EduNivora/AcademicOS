@@ -179,6 +179,28 @@ void main() {
       expect(reminderDate, dueDate.subtract(const Duration(minutes: 30)));
     });
 
+    test('subtracts the selected offset from a one-off course lecture time', () {
+      final lectureDate = DateTime(2026, 1, 10, 9, 0);
+      final reminderDate = NotificationService.resolveCourseReminderDate(
+        reminderEnabled: true,
+        lectureDate: lectureDate,
+        reminderOffsetMinutes: 15,
+      );
+
+      expect(reminderDate, lectureDate.subtract(const Duration(minutes: 15)));
+    });
+
+    test('does not schedule a one-off course reminder when disabled', () {
+      expect(
+        NotificationService.resolveCourseReminderDate(
+          reminderEnabled: false,
+          lectureDate: DateTime(2026, 1, 10, 9, 0),
+          reminderOffsetMinutes: 15,
+        ),
+        isNull,
+      );
+    });
+
     test(
         'computes the next lecture reminder time from weekday and lecture time',
         () {

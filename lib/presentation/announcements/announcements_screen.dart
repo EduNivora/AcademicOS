@@ -8,8 +8,9 @@ import '../../domain/usecases/auth_use_cases.dart';
 
 class AnnouncementsScreen extends StatefulWidget {
   final AuthUseCases authUseCases;
+  final bool embedded;
 
-  const AnnouncementsScreen({super.key, required this.authUseCases});
+  const AnnouncementsScreen({super.key, required this.authUseCases, this.embedded = false});
 
   @override
   State<AnnouncementsScreen> createState() => _AnnouncementsScreenState();
@@ -67,16 +68,18 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
   Widget build(BuildContext context) {
     final isArabic = _isArabic;
     return Scaffold(
-      appBar: AppBar(
-        title: Text(isArabic ? 'التعميمات والإعلانات' : 'Announcements'),
-        actions: [
-          IconButton(
-            tooltip: isArabic ? 'تحديث' : 'Refresh',
-            onPressed: _refresh,
-            icon: const Icon(Icons.refresh_rounded),
-          ),
-        ],
-      ),
+      appBar: widget.embedded
+          ? null
+          : AppBar(
+              title: Text(isArabic ? 'التعميمات والإعلانات' : 'Announcements'),
+              actions: [
+                IconButton(
+                  tooltip: isArabic ? 'تحديث' : 'Refresh',
+                  onPressed: _refresh,
+                  icon: const Icon(Icons.refresh_rounded),
+                ),
+              ],
+            ),
       body: FutureBuilder<List<Announcement>>(
         future: _announcementsFuture,
         builder: (context, snapshot) {

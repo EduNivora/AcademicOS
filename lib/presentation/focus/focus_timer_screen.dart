@@ -190,6 +190,7 @@ class _FocusTimerScreenState extends State<FocusTimerScreen> {
       recurrence: TaskRecurrence.once,
       dueDate: DateTime.now(),
       isCompleted: true,
+      completedAt: DateTime.now(),
       courseId: selectedCourse.id,
       courseName: selectedCourse.name,
       notes: 'Focus Mode Session',

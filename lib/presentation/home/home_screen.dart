@@ -1,10 +1,7 @@
 // ignore_for_file: use_build_context_synchronously
 
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/academic/academic_dashboard_service.dart';
 import '../../core/security/auth_secure_storage_service.dart';
 import '../../core/security/app_lock_service.dart';
@@ -28,90 +25,17 @@ import '../course/add_edit_course_screen.dart';
 import '../course/course_detail_screen.dart';
 import '../course/course_list_screen.dart';
 import '../../core/notifications/notification_service.dart';
-import '../notifications/upcoming_notifications_screen.dart';
-import '../announcements/announcements_screen.dart';
+import '../notifications/communications_screen.dart';
+import '../about/contact_screen.dart';
 import '../admin/admin_announcements_screen.dart';
 import '../schedule/weekly_schedule_screen.dart';
 import '../focus/focus_timer_screen.dart';
 import '../reports/academic_reports_screen.dart';
-import '../terms/academic_terms_screen.dart';
 import '../study_plan/study_planner_screen.dart';
 import '../task/add_edit_task_screen.dart';
-import '../grades/grade_tools_hub_screen.dart';
 import '../../data/database/database_helper.dart';
 import '../../data/models/exam_model.dart';
-
-class StudentProfile {
-  static const String storageKey = 'academic_os_student_profile';
-
-  final String fullName;
-  final String university;
-  final String major;
-  final String academicLevel;
-  final String targetGpa;
-  final String avatar;
-
-  const StudentProfile({
-    required this.fullName,
-    required this.university,
-    required this.major,
-    required this.academicLevel,
-    required this.targetGpa,
-    required this.avatar,
-  });
-
-  factory StudentProfile.empty() => const StudentProfile(
-    fullName: '',
-    university: '',
-    major: '',
-    academicLevel: '',
-    targetGpa: '',
-    avatar: 'student',
-  );
-
-  Map<String, dynamic> toJson() => {
-    'fullName': fullName,
-    'university': university,
-    'major': major,
-    'academicLevel': academicLevel,
-    'targetGpa': targetGpa,
-    'avatar': avatar,
-  };
-
-  factory StudentProfile.fromJson(Map<String, dynamic> json) => StudentProfile(
-    fullName: json['fullName']?.toString() ?? '',
-    university: json['university']?.toString() ?? '',
-    major: json['major']?.toString() ?? '',
-    academicLevel: json['academicLevel']?.toString() ?? '',
-    targetGpa: json['targetGpa']?.toString() ?? '',
-    avatar: json['avatar']?.toString() ?? 'student',
-  );
-
-  static Future<StudentProfile> load() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(storageKey);
-    if (raw == null || raw.trim().isEmpty) {
-      return StudentProfile.empty();
-    }
-    try {
-      final decoded = jsonDecode(raw);
-      if (decoded is Map<String, dynamic>) {
-        return StudentProfile.fromJson(decoded);
-      }
-    } catch (_) {}
-    return StudentProfile.empty();
-  }
-
-  static Future<void> save(StudentProfile profile) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(storageKey, jsonEncode(profile.toJson()));
-  }
-
-  static Future<void> clear() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(storageKey);
-  }
-}
+import '../../data/models/student_profile_model.dart';
 
 enum TaskSortMode {
   none,
@@ -266,7 +190,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
   TaskSortMode _sortMode = TaskSortMode.none;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   List<Map<String, dynamic>> _todayLectures = [];
-  String _activeTermName = '';
   bool _showTaskControls = false;
 
   int get _completedTasksCount =>
@@ -367,7 +290,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
   Future<void> _loadScheduleAndTerm() async {
     try {
       final db = DatabaseHelper.instance;
-      final activeTerm = await db.getActiveAcademicTerm();
       final schedules = await db.getSchedules();
       final courses = await db.getCourses();
       final exams = await db.getExams();
@@ -403,9 +325,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
 
       if (!mounted) return;
       setState(() {
-        if (activeTerm != null) {
-          _activeTermName = activeTerm.name;
-        }
         _todayLectures = todaySchedules;
         _exams = exams;
       });
@@ -515,7 +434,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
   Future<void> _loadStudentProfile() async {
     final profile = await StudentProfile.load();
     if (!mounted) return;
-    setState(() => _studentProfile = profile);
+    setState(() {
+      _studentProfile = profile;
+    });
   }
 
   Future<void> _refreshAfterLocalDataClear() async {
@@ -672,13 +593,13 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
   }
 
   Future<void> _toggleTaskCompletion(TaskEntity task) async {
-    final updatedTask = task.copyWith(isCompleted: !task.isCompleted);
+    final willComplete = !task.isCompleted;
     try {
-      await widget.onToggleCompletion(updatedTask);
+      await widget.onToggleCompletion(task);
       await _loadTasks();
       if (!mounted) return;
       _showWarmSnackBar(
-        updatedTask.isCompleted
+        willComplete
             ? 'تم إكمال المهمة بنجاح.. الله يوفقك!'
             : 'تمت إعادة المهمة إلى قائمة الأعمال.. استمر!',
       );
@@ -691,6 +612,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     }
   }
 
+  // ignore: unused_element
   void _showAboutDialog(BuildContext context) {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
@@ -756,7 +678,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                   Text(
                     isAr
                         ? 'EduNivora هي بيئة تشغيل وإنتاجية أكاديمية متكاملة مصممة خصيصاً لطلاب الجامعات لتنظيم وإدارة مسيرتهم الدراسية بكفاءة واحترافية، وجمع كافة الأدوات الأكاديمية في منصة واحدة تعمل دون اتصال بالإنترنت مع خصوصية تامة.'
-                        : 'EduNivora is an all-in-one offline-first academic productivity platform crafted for university students to manage courses, tasks, schedules, grades, and focus sessions with full privacy.',
+                        : 'EduNivora is an all-in-one offline-first academic productivity platform crafted for university students to manage materials, tasks, schedules, reports, and focus sessions with full privacy.',
                     style: theme.textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 14),
@@ -769,8 +691,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                           Expanded(
                             child: Text(
                               isAr
-                                  ? 'إدارة المقررات: متابعة تفاصيل المواد، المحاضرين، والساعات المعتمدة.'
-                                  : 'Courses: track subjects, instructors, materials, and credits.',
+                                  ? 'إدارة المواد: متابعة التفاصيل والمحاضرين والساعات المعتمدة.'
+                                  : 'Materials: organize subjects, instructors, and credit hours.',
                             ),
                           ),
                         ],
@@ -797,19 +719,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                               isAr
                                   ? 'الجدول الدراسي: تتبع أوقات المحاضرات، القاعات والمعامل، والمحاضرات النشطة.'
                                   : 'Weekly Schedule: track lecture times, rooms, and active sessions.',
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Text('📊  ', style: TextStyle(fontSize: 18)),
-                          Expanded(
-                            child: Text(
-                              isAr
-                                  ? 'توزيع الدرجات والمعدل: رصد درجات النظري والعملي واحتساب المعدل الفعلي ومؤشرات التقدم.'
-                                  : 'Grades & GPA: track scores and calculate your GPA progress.',
                             ),
                           ),
                         ],
@@ -931,7 +840,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     if (task.courseId == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('هذه المهمة غير مرتبطة بمقرر.')),
+        const SnackBar(content: Text('هذه المهمة غير مرتبطة بمادة.')),
       );
       return;
     }
@@ -941,7 +850,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
       if (course == null) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('لم يتم العثور على المقرر المرتبط.')),
+          const SnackBar(content: Text('لم يتم العثور على المادة المرتبطة.')),
         );
         return;
       }
@@ -964,7 +873,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('تعذّر فتح تفاصيل المقرر.')));
+      ).showSnackBar(const SnackBar(content: Text('تعذّر فتح تفاصيل المادة.')));
     }
   }
 
@@ -979,7 +888,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     final riskText = dashboard.atRiskCourses.isEmpty
         ? (widget.isArabic
               ? 'لا توجد مواد في خطر حاليًا.'
-              : 'No courses currently at risk.')
+              : 'No materials currently need attention.')
         : (widget.isArabic
               ? 'مواد تحتاج عناية إضافية: ${dashboard.atRiskCourses.join(" • ")}'
               : 'Needs attention: ${dashboard.atRiskCourses.join(" • ")}');
@@ -1281,17 +1190,25 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
 
   Map<String, List<TaskEntity>> _groupTasksByCourse() {
     final groups = <String, List<TaskEntity>>{};
+    final materialsById = {
+      for (final material in _courses)
+        if (material.id != null) material.id!: material,
+    };
     for (final task in _filteredTasks()) {
+      final material = task.courseId == null
+          ? null
+          : materialsById[task.courseId];
       final groupName =
-          (task.courseName != null && task.courseName!.trim().isNotEmpty)
-          ? task.courseName!
-          : 'بدون كورس';
+          material?.name ??
+          (task.courseName != null && task.courseName!.trim().isNotEmpty
+              ? task.courseName!
+              : 'بدون مادة');
       groups.putIfAbsent(groupName, () => []).add(task);
     }
     final sortedKeys = groups.keys.toList()
       ..sort((a, b) {
-        if (a == 'بدون كورس') return 1;
-        if (b == 'بدون كورس') return -1;
+        if (a == 'بدون مادة') return 1;
+        if (b == 'بدون مادة') return -1;
         return a.compareTo(b);
       });
     return {for (final key in sortedKeys) key: groups[key]!};
@@ -1324,11 +1241,14 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
       text: _studentProfile.university,
     );
     final controllerMajor = TextEditingController(text: _studentProfile.major);
+    final controllerDepartment = TextEditingController(
+      text: _studentProfile.department,
+    );
+    final controllerSemester = TextEditingController(
+      text: _studentProfile.semester,
+    );
     final controllerLevel = TextEditingController(
       text: _studentProfile.academicLevel,
-    );
-    final controllerTarget = TextEditingController(
-      text: _studentProfile.targetGpa,
     );
     String selectedAvatar = _studentProfile.avatar;
 
@@ -1374,18 +1294,24 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                     ),
                     const SizedBox(height: 10),
                     TextField(
+                      controller: controllerDepartment,
+                      decoration: const InputDecoration(labelText: 'القسم'),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: controllerSemester,
+                      decoration: const InputDecoration(
+                        labelText: 'الفصل الدراسي',
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
                       controller: controllerLevel,
                       decoration: const InputDecoration(
                         labelText: 'المستوى الدراسي',
                       ),
                     ),
                     const SizedBox(height: 10),
-                    TextField(
-                      controller: controllerTarget,
-                      decoration: const InputDecoration(
-                        labelText: 'المعدل المستهدف',
-                      ),
-                    ),
                     const SizedBox(height: 14),
                     const Align(
                       alignment: Alignment.centerRight,
@@ -1445,18 +1371,35 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
       },
     );
 
-    if (result != true) return;
+    void disposeControllers() {
+      controllerName.dispose();
+      controllerUniversity.dispose();
+      controllerMajor.dispose();
+      controllerDepartment.dispose();
+      controllerSemester.dispose();
+      controllerLevel.dispose();
+    }
+
+    if (result != true) {
+      disposeControllers();
+      return;
+    }
     final profile = StudentProfile(
       fullName: controllerName.text.trim(),
       university: controllerUniversity.text.trim(),
       major: controllerMajor.text.trim(),
+      department: controllerDepartment.text.trim(),
+      semester: controllerSemester.text.trim(),
       academicLevel: controllerLevel.text.trim(),
-      targetGpa: controllerTarget.text.trim(),
+      targetGpa: _studentProfile.targetGpa,
       avatar: selectedAvatar,
     );
     await StudentProfile.save(profile);
+    disposeControllers();
     if (!mounted) return;
-    setState(() => _studentProfile = profile);
+    setState(() {
+      _studentProfile = profile;
+    });
     _showWarmSnackBar('تم تحديث الملف الأكاديمي بنجاح');
   }
 
@@ -1614,13 +1557,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     final userName = _studentProfile.fullName.isNotEmpty
         ? _studentProfile.fullName
         : (currentUser?.displayName ?? (currentUser?.username ?? 'Mohammed'));
-    final termText = _activeTermName.isNotEmpty
-        ? 'الفصل الدراسي: $_activeTermName'
-        : (_studentProfile.academicLevel.isNotEmpty
-              ? 'الفصل الدراسي: ${_studentProfile.academicLevel}'
-              : (widget.isArabic
-                    ? 'الفصل الدراسي: الثاني 1447 هـ'
-                    : 'Term: Second 1447 AH'));
+    final termText = _studentProfile.semester.trim().isNotEmpty
+        ? 'الفصل الدراسي: ${_studentProfile.semester}'
+        : '';
 
     return Container(
       padding: EdgeInsets.fromLTRB(16, topPadding + 8, 16, 26),
@@ -1656,9 +1595,10 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => UpcomingNotificationsScreen(
+                      builder: (_) => CommunicationsScreen(
                         taskUseCases: widget.taskUseCases,
                         courseUseCases: widget.courseUseCases,
+                        authUseCases: widget.authUseCases,
                       ),
                     ),
                   );
@@ -1677,28 +1617,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                         Icons.notifications_outlined,
                         color: Colors.white,
                         size: 22,
-                      ),
-                    ),
-                    Positioned(
-                      top: -2,
-                      right: -2,
-                      child: Container(
-                        width: 18,
-                        height: 18,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFEF4444),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Center(
-                          child: Text(
-                            '2',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
                       ),
                     ),
                   ],
@@ -1785,15 +1703,17 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      termText,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.85),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
+                    if (termText.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        termText,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.85),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -1859,8 +1779,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     final gpaDisplay = targetGpa > 0
         ? '${(_estimatedGpa * 25).clamp(0, 100).round()}%'
         : (_courses.isEmpty
-            ? '92%'
-            : '${(_estimatedGpa * 25).clamp(0, 100).round()}%');
+              ? '92%'
+              : '${(_estimatedGpa * 25).clamp(0, 100).round()}%');
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1882,7 +1802,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
               icon: Icons.menu_book_rounded,
               iconColor: const Color(0xFF2563EB),
               value: '${_courses.length}',
-              label: widget.isArabic ? 'مقرراتك' : 'Courses',
+              label: widget.isArabic ? 'موادك' : 'Materials',
               isDark: isDark,
             ),
           ),
@@ -2000,7 +1920,10 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const ScheduleScreen()),
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          ScheduleScreen(authUseCases: widget.authUseCases),
+                    ),
                   );
                 },
                 child: Row(
@@ -2292,7 +2215,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                   icon: Icons.memory_rounded,
                   iconColor: const Color(0xFF2563EB),
                   bgColor: const Color(0xFFEFF6FF),
-                  title: 'AI Copilot',
+                  title: 'المساعد الذكي',
                   isDark: isDark,
                   onTap: () {
                     Navigator.push(
@@ -2303,8 +2226,12 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                           tasks: widget.taskState.tasks,
                           exams: _exams,
                           authUseCases: widget.authUseCases,
+                          courseUseCases: widget.courseUseCases,
                           taskUseCases: widget.taskUseCases,
-                          onTasksChanged: widget.onRefresh,
+                          onDataChanged: () async {
+                            await _loadTasks();
+                            await _loadStudentProfile();
+                          },
                         ),
                       ),
                     ).then((_) => _loadScheduleAndTerm());
@@ -2317,7 +2244,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                   icon: Icons.school_rounded,
                   iconColor: const Color(0xFF1D4ED8),
                   bgColor: const Color(0xFFEFF6FF),
-                  title: widget.isArabic ? 'الكورسات' : 'Courses',
+                  title: widget.isArabic ? 'المواد' : 'Materials',
                   isDark: isDark,
                   onTap: () {
                     Navigator.push(
@@ -2335,27 +2262,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                 ),
               ),
               const SizedBox(width: 10),
-              Expanded(
-                child: _buildQuickAccessRefCard(
-                  icon: Icons.bar_chart_rounded,
-                  iconColor: const Color(0xFF10B981),
-                  bgColor: const Color(0xFFECFDF5),
-                  title: widget.isArabic
-                      ? 'توزيع الدرجات والمعدل'
-                      : 'Grades & GPA',
-                  isDark: isDark,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => GradeToolsHubScreen(
-                          courseUseCases: widget.courseUseCases,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
               const SizedBox(width: 10),
               Expanded(
                 child: _buildQuickAccessRefCard(
@@ -2632,20 +2538,21 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                     }
                   },
                 ),
-                
-                
-                
-                
+
                 _buildRefDrawerTile(
                   icon: Icons.campaign_outlined,
-                  title: widget.isArabic ? 'التعميمات' : 'Announcements',
+                  title: widget.isArabic
+                      ? 'التعميمات والإشعارات'
+                      : 'Announcements & Notifications',
                   isDark: isDark,
                   onTap: () {
                     Navigator.pop(context);
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => AnnouncementsScreen(
+                        builder: (_) => CommunicationsScreen(
+                          taskUseCases: widget.taskUseCases,
+                          courseUseCases: widget.courseUseCases,
                           authUseCases: widget.authUseCases,
                         ),
                       ),
@@ -2662,20 +2569,24 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                   isDark: isDark,
                 ),
                 _buildRefDrawerTile(
-                  icon: Icons.calendar_month_outlined,
-                  title: widget.isArabic ? 'الفصول الدراسية' : 'Academic Terms',
+                  icon: Icons.psychology_outlined,
+                  title: widget.isArabic ? 'مخطط المذاكرة' : 'Study Planner',
                   isDark: isDark,
                   onTap: () {
                     Navigator.pop(context);
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const AcademicTermsScreen(),
+                        builder: (_) => StudyPlannerScreen(
+                          courseUseCases: widget.courseUseCases,
+                          taskUseCases: widget.taskUseCases,
+                          onTasksChanged: widget.onRefresh,
+                        ),
                       ),
                     );
                   },
                 ),
-                
+
                 _buildRefDrawerTile(
                   icon: Icons.timer_outlined,
                   title: widget.isArabic ? 'وضع التركيز' : 'Focus Mode',
@@ -2690,7 +2601,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                     );
                   },
                 ),
-                
+
                 const SizedBox(height: 12),
                 // Section 3: الحساب
                 _buildRefDrawerCategoryHeader(
@@ -2709,46 +2620,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                     _showProfileEditor();
                   },
                 ),
-                
-                _buildRefDrawerTile(
-                  icon: Icons.logout_rounded,
-                  title: widget.isArabic ? 'تسجيل الخروج' : 'Logout',
-                  isDark: isDark,
-                  onTap: () async {
-                    Navigator.pop(context);
-                    try {
-                      await widget.authUseCases.logout.call();
-                    } catch (error, stackTrace) {
-                      debugPrint(
-                        'HomeScreen.logout error: $error\n$stackTrace',
-                      );
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'تعذّر تسجيل الخروج لأن التخزين الآمن غير متاح.',
-                          ),
-                        ),
-                      );
-                      return;
-                    }
-                    if (!mounted) return;
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(
-                        builder: (_) => AuthGateScreen(
-                          authUseCases: widget.authUseCases,
-                          taskUseCases: widget.taskUseCases,
-                          courseUseCases: widget.courseUseCases,
-                          isDarkMode: widget.isDarkMode,
-                          isArabic: widget.isArabic,
-                          onThemeChanged: widget.onThemeChanged,
-                          onLanguageChanged: widget.onLanguageChanged,
-                        ),
-                      ),
-                      (route) => false,
-                    );
-                  },
-                ),
+
                 const SizedBox(height: 12),
                 // Section 4: التفضيلات والنظام
                 _buildRefDrawerCategoryHeader(
@@ -2877,7 +2749,71 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                     );
                   },
                 ),
-                
+                _buildRefDrawerTile(
+                  icon: Icons.contact_support_outlined,
+                  title: widget.isArabic ? 'التواصل' : 'Contact',
+                  isDark: isDark,
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ContactScreen()),
+                    );
+                  },
+                ),
+                _buildRefDrawerTile(
+                  icon: Icons.help_outline_rounded,
+                  title: widget.isArabic ? 'مركز المساعدة' : 'Help Center',
+                  isDark: isDark,
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const HelpCenterScreen(),
+                      ),
+                    );
+                  },
+                ),
+                _buildRefDrawerTile(
+                  icon: Icons.logout_rounded,
+                  title: widget.isArabic ? 'تسجيل الخروج' : 'Logout',
+                  isDark: isDark,
+                  onTap: () async {
+                    Navigator.pop(context);
+                    try {
+                      await widget.authUseCases.logout.call();
+                    } catch (error, stackTrace) {
+                      debugPrint(
+                        'HomeScreen.logout error: $error\n$stackTrace',
+                      );
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'تعذّر تسجيل الخروج لأن التخزين الآمن غير متاح.',
+                          ),
+                        ),
+                      );
+                      return;
+                    }
+                    if (!mounted) return;
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(
+                        builder: (_) => AuthGateScreen(
+                          authUseCases: widget.authUseCases,
+                          taskUseCases: widget.taskUseCases,
+                          courseUseCases: widget.courseUseCases,
+                          isDarkMode: widget.isDarkMode,
+                          isArabic: widget.isArabic,
+                          onThemeChanged: widget.onThemeChanged,
+                          onLanguageChanged: widget.onLanguageChanged,
+                        ),
+                      ),
+                      (route) => false,
+                    );
+                  },
+                ),
                 const SizedBox(height: 20),
               ],
             ),
@@ -3020,7 +2956,10 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                   onTap: () async {
                     await Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const ScheduleScreen()),
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            ScheduleScreen(authUseCases: widget.authUseCases),
+                      ),
                     );
                     _loadScheduleAndTerm();
                   },

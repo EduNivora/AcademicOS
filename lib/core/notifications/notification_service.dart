@@ -51,14 +51,22 @@ class NotificationService {
       const courseChannel = AndroidNotificationChannel(
         'academic_os_courses',
         'EduNivora — تذكيرات المحاضرات',
-        description: 'تذكيرات المحاضرات والمقررات الدراسية في EduNivora',
+        description: 'تذكيرات المحاضرات والمواد الدراسية في EduNivora',
         importance: Importance.high,
         playSound: true,
         enableVibration: true,
       );
+      const reportChannel = AndroidNotificationChannel(
+        'academic_os_reports',
+        'EduNivora — التقارير الأكاديمية',
+        description: 'إشعارات تجهيز التقارير الأكاديمية',
+        importance: Importance.defaultImportance,
+        playSound: true,
+      );
 
       await androidPlugin?.createNotificationChannel(taskChannel);
       await androidPlugin?.createNotificationChannel(courseChannel);
+      await androidPlugin?.createNotificationChannel(reportChannel);
     } catch (error, stackTrace) {
       debugPrint('NotificationService.initialize error: $error\n$stackTrace');
     }
@@ -138,6 +146,19 @@ class NotificationService {
     }
   }
 
+  static DateTime? resolveCourseReminderDate({
+    required bool reminderEnabled,
+    required DateTime? lectureDate,
+    required int reminderOffsetMinutes,
+  }) {
+    return resolveReminderDate(
+      reminderEnabled: reminderEnabled,
+      dueDate: lectureDate,
+      reminderDate: null,
+      reminderOffsetMinutes: reminderOffsetMinutes,
+    );
+  }
+
   static DateTime? resolveLectureReminderDate({
     required DateTime now,
     required String weekdayName,
@@ -169,6 +190,35 @@ class NotificationService {
     return reminder.isBefore(now)
         ? reminder.add(const Duration(days: 7))
         : reminder;
+  }
+
+  Future<void> showReportReadyNotification({
+    required int id,
+    required String title,
+    required String body,
+  }) async {
+    if (kIsWeb) return;
+    try {
+      await _plugin.show(
+        id,
+        title,
+        body,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'academic_os_reports',
+            'Academic reports',
+            channelDescription: 'Notifications when academic reports are ready',
+            importance: Importance.defaultImportance,
+            priority: Priority.defaultPriority,
+            playSound: true,
+          ),
+        ),
+      );
+    } catch (error, stackTrace) {
+      debugPrint(
+        'NotificationService.showReportReadyNotification error: $error\n$stackTrace',
+      );
+    }
   }
 
   Future<void> scheduleTaskReminder(TaskEntity task) async {
@@ -223,10 +273,9 @@ class NotificationService {
       return;
     }
 
-    final scheduledAt = resolveReminderDate(
+    final scheduledAt = resolveCourseReminderDate(
       reminderEnabled: course.lectureReminderEnabled,
-      dueDate: course.lectureDate,
-      reminderDate: course.lectureDate,
+      lectureDate: course.lectureDate,
       reminderOffsetMinutes: course.lectureReminderOffsetMinutes,
     );
 
@@ -351,12 +400,79 @@ class NotificationService {
     }
   }
 
+  Future<void> syncLectureReminders({
+    required List<Map<String, dynamic>> schedules,
+    required List<CourseEntity> courses,
+  }) async {
+    if (kIsWeb) return;
+
+    final coursesById = {
+      for (final course in courses)
+        if (course.id != null) course.id!: course,
+    };
+    final activeScheduleIds = <int>{};
+
+    for (final schedule in schedules) {
+      final rawId = schedule['id'];
+      final scheduleId = rawId is int
+          ? rawId
+          : int.tryParse(rawId?.toString() ?? '');
+      if (scheduleId == null) continue;
+      activeScheduleIds.add(scheduleId);
+
+      final enabled =
+          schedule['reminder_enabled'] == 1 ||
+          schedule['reminder_enabled'] == true;
+      final rawCourseId = schedule['course_id'];
+      final courseId = rawCourseId is int
+          ? rawCourseId
+          : int.tryParse(rawCourseId?.toString() ?? '');
+      final course = courseId == null ? null : coursesById[courseId];
+      if (!enabled || course == null) {
+        await cancelLectureReminder(scheduleId);
+        continue;
+      }
+
+      final offsetValue = schedule['reminder_offset_minutes'];
+      final offset = offsetValue is int
+          ? offsetValue
+          : int.tryParse(offsetValue?.toString() ?? '') ?? 15;
+      await scheduleLectureReminder(
+        id: scheduleId,
+        title: course.name,
+        weekdayName: schedule['day_of_week']?.toString() ?? '',
+        startTime: schedule['start_time']?.toString() ?? '',
+        reminderEnabled: true,
+        location: schedule['location']?.toString(),
+        reminderOffsetMinutes: offset,
+      );
+    }
+
+    try {
+      final pending = await _plugin.pendingNotificationRequests();
+      for (final request in pending) {
+        if (request.id >= 30000 && request.id < 40000) {
+          final scheduleId = request.id - 30000;
+          if (!activeScheduleIds.contains(scheduleId)) {
+            await _plugin.cancel(request.id);
+          }
+        }
+      }
+    } catch (error, stackTrace) {
+      debugPrint(
+        'NotificationService.syncLectureReminders cleanup error: $error\n$stackTrace',
+      );
+    }
+  }
+
   Future<bool> cancelAllNotifications() async {
     try {
       await _plugin.cancelAll();
       return true;
     } catch (error, stackTrace) {
-      debugPrint('NotificationService.cancelAllNotifications error: $error\\n$stackTrace');
+      debugPrint(
+        'NotificationService.cancelAllNotifications error: $error\n$stackTrace',
+      );
       return false;
     }
   }
@@ -378,13 +494,10 @@ class NotificationService {
       }
     }
 
+    // Legacy course-level lecture reminders are intentionally disabled.
+    // Lecture reminders now come only from the weekly schedule records.
     for (final course in courses) {
-      if (course.id == null) {
-        continue;
-      }
-      if (course.lectureReminderEnabled) {
-        await scheduleCourseReminder(course);
-      } else {
+      if (course.id != null) {
         await cancelCourseReminder(course.id!);
       }
     }

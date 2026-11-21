@@ -7,11 +7,13 @@ import '../../domain/usecases/task_use_cases.dart';
 class UpcomingNotificationsScreen extends StatefulWidget {
   final TaskUseCases taskUseCases;
   final CourseUseCases courseUseCases;
+  final bool embedded;
 
   const UpcomingNotificationsScreen({
     super.key,
     required this.taskUseCases,
     required this.courseUseCases,
+    this.embedded = false,
   });
 
   @override
@@ -115,7 +117,7 @@ class _UpcomingNotificationsScreenState
         (course) => _ReminderItem(
           type: 'course',
           title: course.name,
-          subtitle: course.notes ?? 'محاضرة مقررة',
+          subtitle: course.notes ?? 'محاضرة مجدولة',
           date: course.lectureDate!,
           badge: 'محاضرة',
         ),
@@ -123,7 +125,9 @@ class _UpcomingNotificationsScreenState
     ]..sort((a, b) => a.date.compareTo(b.date));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('الإشعارات القادمة'), centerTitle: true),
+      appBar: widget.embedded
+          ? null
+          : AppBar(title: const Text('الإشعارات القادمة'), centerTitle: true),
       body: SafeArea(
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())

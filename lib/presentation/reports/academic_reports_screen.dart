@@ -1,11 +1,11 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/academic/academic_report_service.dart';
+import '../../core/notifications/notification_service.dart';
 import '../../data/database/database_helper.dart';
 
 /// Release 1 academic reporting; backup export and restore are deliberately
@@ -24,6 +24,7 @@ class _AcademicReportsScreenState extends State<AcademicReportsScreen> {
 
   bool _isBusy = false;
   String _reportText = '';
+  AcademicReportPeriod _selectedPeriod = AcademicReportPeriod.daily;
 
   @override
   void dispose() {
@@ -40,7 +41,8 @@ class _AcademicReportsScreenState extends State<AcademicReportsScreen> {
       final exams = await _databaseHelper.getExams();
       final schedule = await _databaseHelper.getSchedules();
 
-      final report = _reportService.generateAcademicReport(
+      final report = _reportService.generatePeriodReport(
+        period: _selectedPeriod,
         courses: courses,
         tasks: tasks,
         exams: exams,
@@ -52,8 +54,14 @@ class _AcademicReportsScreenState extends State<AcademicReportsScreen> {
         _reportText = report;
         _reportController.text = report;
       });
+      await NotificationService.instance.showReportReadyNotification(
+        id: 41000 + _selectedPeriod.index,
+        title: 'تم تجهيز التقرير ${_selectedPeriod.arabicLabel}',
+        body: 'تقريرك الأكاديمي جاهز للمراجعة داخل AcademicOS.',
+      );
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم تجهيز التقرير الأكاديمي بنجاح.')),
+        const SnackBar(content: Text('تم تجهيز التقرير وإرسال إشعار به.')),
       );
     } catch (error, stackTrace) {
       debugPrint('Academic report generation failed: $error\\n$stackTrace');
@@ -107,22 +115,46 @@ class _AcademicReportsScreenState extends State<AcademicReportsScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           const Text(
-            'ملخص أكاديمي مبني على بياناتك المحلية',
+            'تقارير أكاديمية مبنية على إنجازاتك المسجلة فعلياً',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 8),
           Text(
-            'يُنشأ التقرير من المقررات والمهام والاختبارات والجدول المحفوظ على هذا الجهاز. لا تُرفع سجلاتك الأكاديمية إلى خادم.',
+            'اختر الفترة المطلوبة. لا يُحتسب إنجاز إلا إذا سُجلت المهمة كمكتملة، والجدول يعرض المحاضرات المخططة ولا يدّعي الحضور. تُحفظ بيانات التقرير محلياً.',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 16),
+          DropdownButtonFormField<AcademicReportPeriod>(
+            initialValue: _selectedPeriod,
+            decoration: const InputDecoration(labelText: 'نوع التقرير'),
+            items: AcademicReportPeriod.values
+                .map(
+                  (period) => DropdownMenuItem(
+                    value: period,
+                    child: Text('التقرير ${period.arabicLabel}'),
+                  ),
+                )
+                .toList(),
+            onChanged: _isBusy
+                ? null
+                : (value) {
+                    if (value != null) {
+                      setState(() {
+                        _selectedPeriod = value;
+                        _reportText = '';
+                        _reportController.clear();
+                      });
+                    }
+                  },
+          ),
+          const SizedBox(height: 12),
           TextField(
             controller: _reportController,
             readOnly: true,
             minLines: 12,
             maxLines: 20,
             decoration: InputDecoration(
-              hintText: 'اضغط «إنشاء التقرير» لعرض ملخصك الأكاديمي.',
+              hintText: 'اختر نوع التقرير ثم اضغط «إنشاء التقرير». ',
               filled: true,
               fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
               border: OutlineInputBorder(
@@ -141,7 +173,7 @@ class _AcademicReportsScreenState extends State<AcademicReportsScreen> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.assessment_outlined),
-            label: const Text('إنشاء التقرير'),
+            label: Text('إنشاء التقرير ${_selectedPeriod.arabicLabel}'),
           ),
           const SizedBox(height: 8),
           OutlinedButton.icon(

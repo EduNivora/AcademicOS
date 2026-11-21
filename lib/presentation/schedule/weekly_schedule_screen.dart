@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 
 import '../../core/academic/schedule_conflict_validator.dart';
 import '../../core/notifications/notification_service.dart';
 import '../../data/database/database_helper.dart';
+import '../../data/datasources/academic_ai_remote_data_source.dart';
+import '../../domain/usecases/auth_use_cases.dart';
 import '../../data/models/course_model.dart';
 
 class ScheduleScreen extends StatefulWidget {
-  const ScheduleScreen({super.key});
+  final AuthUseCases authUseCases;
+
+  const ScheduleScreen({super.key, required this.authUseCases});
 
   @override
   State<ScheduleScreen> createState() => _ScheduleScreenState();
@@ -24,9 +29,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   ];
 
   final DatabaseHelper _databaseHelper = DatabaseHelper.instance;
+  final AcademicAiRemoteDataSource _aiRemote = AcademicAiRemoteDataSource();
   final List<Map<String, dynamic>> _lectures = [];
   final List<CourseModel> _courses = [];
   bool _isLoading = true;
+  bool _isImportingSchedule = false;
 
   String _selectedDay = 'السبت';
 
@@ -91,6 +98,217 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     }
   }
 
+  Future<void> _importScheduleImage() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      withData: true,
+      allowMultiple: false,
+    );
+    if (result == null || !mounted) return;
+
+    final file = result.files.single;
+    final extension = (file.extension ?? '').toLowerCase();
+    final mimeType = switch (extension) {
+      'jpg' || 'jpeg' => 'image/jpeg',
+      'png' => 'image/png',
+      'webp' => 'image/webp',
+      _ => null,
+    };
+    final bytes = file.bytes;
+    if (mimeType == null || bytes == null || bytes.isEmpty ||
+        bytes.length > 8 * 1024 * 1024) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('اختر صورة JPG أو PNG أو WebP لا يتجاوز حجمها 8 ميجابايت.'),
+        ),
+      );
+      return;
+    }
+
+    final consent = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('تحليل صورة الجدول'),
+        content: const Text(
+          'سيتم إرسال صورة الجدول إلى خدمة Gemini لاستخراج أسماء المواد والأيام والأوقات. لن تُحفظ الصورة في سجل المحادثة. هل تريد المتابعة؟',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('متابعة'),
+          ),
+        ],
+      ),
+    );
+    if (consent != true || !mounted) return;
+
+    setState(() => _isImportingSchedule = true);
+    try {
+      final accessToken = await widget.authUseCases.getCloudAccessToken.call();
+      if (accessToken == null || accessToken.trim().isEmpty) {
+        throw const AcademicAiRemoteException(
+          401,
+          'unauthorized',
+          'استيراد الجدول من الصورة يحتاج إلى تسجيل الدخول بحساب سحابي. يمكنك إدخال الجدول يدوياً دون ذلك.',
+        );
+      }
+
+      final extracted = await _aiRemote.parseScheduleImage(
+        accessToken: accessToken,
+        imageBytes: bytes,
+        mimeType: mimeType,
+      );
+      if (extracted.isEmpty) {
+        throw const AcademicAiRemoteException(
+          422,
+          'empty_schedule',
+          'لم أتعرف على محاضرات واضحة في الصورة. جرّب صورة أوضح أو أدخل الجدول يدوياً.',
+        );
+      }
+
+      String normalize(String value) => value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+      final matchedEntries = <Map<String, dynamic>>[];
+      final unmatchedNames = <String>{};
+      for (final entry in extracted) {
+        final courseName = entry['course_name']?.toString() ?? '';
+        final course = _courses.where((item) => normalize(item.name) == normalize(courseName)).firstOrNull;
+        if (course?.id == null) {
+          unmatchedNames.add(courseName);
+          continue;
+        }
+        matchedEntries.add({
+          'day_of_week': entry['day'],
+          'course_id': course!.id,
+          'course_name': course.name,
+          'start_time': entry['start_time'],
+          'end_time': entry['end_time'],
+          'location': entry['location']?.toString() ?? '',
+        });
+      }
+
+      if (unmatchedNames.isNotEmpty) {
+        throw AcademicAiRemoteException(
+          422,
+          'unmatched_subjects',
+          'هذه المواد غير موجودة في قائمة المواد: ${unmatchedNames.join('، ')}. أضفها أولاً ثم أعد استيراد الجدول.',
+        );
+      }
+      if (matchedEntries.isEmpty) {
+        throw const AcademicAiRemoteException(
+          422,
+          'empty_schedule',
+          'لم يتم استخراج محاضرات مرتبطة بموادك.',
+        );
+      }
+
+      if (!mounted) return;
+      final approved = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text('مراجعة الجدول المستخرج (${matchedEntries.length})'),
+          content: SizedBox(
+            width: 480,
+            height: 360,
+            child: ListView.separated(
+              itemCount: matchedEntries.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final entry = matchedEntries[index];
+                return ListTile(
+                  dense: true,
+                  title: Text('${entry['course_name']} — ${entry['day_of_week']}'),
+                  subtitle: Text('${entry['start_time']} - ${entry['end_time']}  •  ${entry['location']}'),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('مراجعة لاحقاً'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('اعتماد الجدول'),
+            ),
+          ],
+        ),
+      );
+      if (approved != true || !mounted) return;
+
+      final existingSchedules = await _databaseHelper.getSchedules();
+      final toSave = <Map<String, dynamic>>[];
+      for (final entry in matchedEntries) {
+        final isDuplicate = existingSchedules.any((row) =>
+            row['course_id'] == entry['course_id'] &&
+            row['day_of_week'] == entry['day_of_week'] &&
+            row['start_time'] == entry['start_time'] &&
+            row['end_time'] == entry['end_time']);
+        if (isDuplicate) continue;
+
+        final validation = ScheduleConflictValidator.validate(
+          day: entry['day_of_week'] as String,
+          startTime: entry['start_time'] as String,
+          endTime: entry['end_time'] as String,
+          existingSchedules: [...existingSchedules, ...toSave],
+        );
+        if (!validation.isValid) {
+          throw const AcademicAiRemoteException(
+            409,
+            'schedule_conflict',
+            'الجدول المستخرج يحتوي على أوقات متعارضة مع جدولك الحالي. لم يتم حفظ أي محاضرة جديدة.',
+          );
+        }
+        toSave.add({
+          ...entry,
+          'reminder_enabled': 1,
+          'reminder_offset_minutes': 15,
+        });
+      }
+
+      if (toSave.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('كل المحاضرات المستخرجة موجودة مسبقاً في جدولك.')),
+        );
+        return;
+      }
+
+      final savedIds = await _databaseHelper.insertSchedules(toSave);
+      for (var index = 0; index < toSave.length; index++) {
+        final entry = toSave[index];
+        await NotificationService.instance.scheduleLectureReminder(
+          id: savedIds[index],
+          title: entry['course_name'] as String,
+          weekdayName: entry['day_of_week'] as String,
+          startTime: entry['start_time'] as String,
+          reminderEnabled: true,
+          location: entry['location'] as String,
+          reminderOffsetMinutes: 15,
+        );
+      }
+      await _loadLectures();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تم استيراد ${toSave.length} محاضرة وربطها بموادك.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      final message = error is AcademicAiRemoteException
+          ? error.message
+          : 'تعذر استيراد الجدول. حاول مرة أخرى أو أدخله يدوياً.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } finally {
+      if (mounted) setState(() => _isImportingSchedule = false);
+    }
+  }
+
   Future<void> _showLectureDialog({Map<String, dynamic>? lecture}) async {
     final locationController = TextEditingController(
       text: lecture != null ? lecture['location']?.toString() ?? '' : '',
@@ -138,25 +356,32 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                         },
                       ),
                       const SizedBox(height: 12),
-                      if (_courses.isNotEmpty)
-                        DropdownButtonFormField<int?>(
+                      if (_courses.isEmpty)
+                        const Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: Text('أضف مادة أولاً حتى تربط بها المحاضرة.'),
+                        )
+                      else
+                        DropdownButtonFormField<int>(
                           value: selectedCourseId,
                           decoration: const InputDecoration(
-                              labelText: 'المقرر المرتبط'),
-                          items: [
-                            const DropdownMenuItem<int?>(
-                              value: null,
-                              child: Text('محاضرة عامة'),
-                            ),
-                            ..._courses.map(
-                              (course) => DropdownMenuItem<int?>(
-                                value: course.id,
-                                child: Text(course.name),
-                              ),
-                            ),
-                          ],
-                          onChanged: (value) =>
-                              setStateDialog(() => selectedCourseId = value),
+                            labelText: 'المادة المرتبطة',
+                          ),
+                          items: _courses
+                              .where((course) => course.id != null)
+                              .map(
+                                (course) => DropdownMenuItem<int>(
+                                  value: course.id!,
+                                  child: Text(course.name),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) => setStateDialog(
+                            () => selectedCourseId = value,
+                          ),
+                          validator: (value) => value == null
+                              ? 'اختر المادة المرتبطة بالمحاضرة.'
+                              : null,
                         ),
                       const SizedBox(height: 12),
                       Row(
@@ -222,6 +447,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     );
 
     if (result != true) return;
+    if (selectedCourseId == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('يجب إضافة مادة واختيارها قبل حفظ المحاضرة.')),
+      );
+      return;
+    }
 
     final scheduleEntry = {
       'day_of_week': selectedDay,
@@ -394,7 +626,22 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final selectedLectures = _dayLectures(_selectedDay);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('الجدول الدراسي')),
+      appBar: AppBar(
+        title: const Text('الجدول الدراسي'),
+        actions: [
+          IconButton(
+            tooltip: 'استيراد الجدول من صورة',
+            onPressed: _isImportingSchedule ? null : _importScheduleImage,
+            icon: _isImportingSchedule
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.image_search_outlined),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(

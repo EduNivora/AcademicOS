@@ -120,7 +120,12 @@ class TaskListNotifier extends Notifier<TaskListState> {
   }
 
   Future<void> toggleCompletion(TaskEntity task) async {
-    final updatedTask = task.copyWith(isCompleted: !task.isCompleted);
+    final willComplete = !task.isCompleted;
+    final updatedTask = task.copyWith(
+      isCompleted: willComplete,
+      completedAt: willComplete ? DateTime.now() : null,
+      clearCompletedAt: !willComplete,
+    );
     try {
       await _repository.updateTask(updatedTask);
       await loadTasks();

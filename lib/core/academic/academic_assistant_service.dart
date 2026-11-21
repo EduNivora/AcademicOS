@@ -50,17 +50,10 @@ class AcademicAssistantService {
         .where((exam) => exam.examDate.isAfter(DateTime.now()))
         .firstOrNull;
 
-    final averageText = dashboard.averageCourseScore == 0
-        ? 'لا توجد درجات حالياً'
-        : dashboard.averageCourseScore.toStringAsFixed(1);
-
     String response;
     switch (parsedIntent.intent) {
       case AcademicIntent.calculateGpa:
-        response =
-            'متوسط المواد الحالي هو $averageText، بينما لديك ${dashboard.totalCourses} مادة و${dashboard.totalTasks} مهمة إجمالية.'
-            ' ${dashboard.atRiskCourses.isEmpty ? 'لا توجد مواد في خطر حاليًا.' : 'المواد الأكثر احتياجًا: ${dashboard.atRiskCourses.join('، ')}.'}'
-            ' ${dashboard.studyHealthScore >= 75 ? 'حالتك الأكاديمية جيدة.' : 'تحتاج إلى تركيز أكبر في الخطة التالية.'}';
+        response = 'وظائف توزيع الدرجات وحساب المعدل مؤجلة إلى تحديث مستقبلي من AcademicOS.';
         break;
       case AcademicIntent.queryExams:
         if (upcomingExam == null) {

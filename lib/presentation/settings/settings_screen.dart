@@ -71,9 +71,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         content: Text(
           isAr
-              ? 'سيتم حذف الفصول الدراسية والمقررات والمهام والاختبارات والجدول والمرفقات من هذا الجهاز. '
+              ? 'سيتم حذف المواد والمهام والاختبارات والجدول والمرفقات من هذا الجهاز. '
                     'لا يمكن التراجع عن هذا الإجراء.'
-              : 'Academic terms, courses, tasks, exams, schedules, and attachments stored on this device will be permanently removed. This action cannot be undone.',
+              : 'Subjects, tasks, exams, schedules, and attachments stored on this device will be permanently removed. This action cannot be undone.',
         ),
         actions: [
           TextButton(

@@ -1,25 +1,28 @@
 import 'dart:convert';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/academic/academic_assistant_service.dart';
+import '../../core/academic/academic_assistant_action_executor.dart';
+import '../../data/database/database_helper.dart';
+import '../../data/models/student_profile_model.dart';
 import '../../data/datasources/academic_ai_remote_data_source.dart';
 import '../../data/models/exam_model.dart';
 import '../../domain/entities/course_entity.dart';
 import '../../domain/entities/task_entity.dart';
-import '../../core/academic/schedule_conflict_validator.dart';
-import '../../core/notifications/notification_service.dart';
-import '../../data/database/database_helper.dart';
-import '../../domain/usecases/task_use_cases.dart';
 import '../../domain/usecases/auth_use_cases.dart';
+import '../../domain/usecases/course_use_cases.dart';
+import '../../domain/usecases/task_use_cases.dart';
 
 class AcademicAiScreen extends StatefulWidget {
   final List<CourseEntity> courses;
   final List<TaskEntity> tasks;
   final List<ExamModel> exams;
   final AuthUseCases? authUseCases;
-  final TaskUseCases? taskUseCases;
-  final Future<void> Function()? onTasksChanged;
+  final CourseUseCases courseUseCases;
+  final TaskUseCases taskUseCases;
+  final Future<void> Function()? onDataChanged;
 
   const AcademicAiScreen({
     super.key,
@@ -27,8 +30,9 @@ class AcademicAiScreen extends StatefulWidget {
     this.tasks = const [],
     this.exams = const [],
     this.authUseCases,
-    this.taskUseCases,
-    this.onTasksChanged,
+    required this.courseUseCases,
+    required this.taskUseCases,
+    this.onDataChanged,
   });
 
   @override
@@ -38,21 +42,24 @@ class AcademicAiScreen extends StatefulWidget {
 class _AcademicAiScreenState extends State<AcademicAiScreen> {
   final TextEditingController _messageController = TextEditingController();
   final AcademicAiRemoteDataSource _remote = AcademicAiRemoteDataSource();
+  late final AcademicAssistantActionExecutor _actionExecutor;
   final List<_ChatMessage> _messages = [
     const _ChatMessage(
-      text: 'مرحباً، أنا المساعد الأكاديمي في EduNivora. أستطيع مساعدتك في فهم المواد وتنظيم المهام والاستعداد للاختبارات.',
+      text:
+          'مرحباً، أنا المساعد الذكي في EduNivora. أستطيع مساعدتك في فهم المواد وتنظيم المهام والاستعداد للاختبارات.',
       isUser: false,
     ),
   ];
 
   final List<String> _suggestedPrompts = [
     'كم باقي على أول اختبار وماذا أحتاج للمذاكرة؟',
-    'احسب متوسط درجاتي الحالية',
+    'أنشئ لي مهمة لمراجعة مادة الشبكات غداً',
     'وزع لي خطة مذاكرة لمادة التشفير خلال 3 أيام',
     'ما أهم مهمة يجب أن أبدأ بها اليوم؟',
   ];
 
   bool _isSending = false;
+  PlatformFile? _pendingAttachment;
   bool _isCheckingSession = true;
   bool _hasCloudSession = false;
   bool _isGeminiReady = false;
@@ -60,6 +67,10 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
   @override
   void initState() {
     super.initState();
+    _actionExecutor = AcademicAssistantActionExecutor(
+      courseUseCases: widget.courseUseCases,
+      taskUseCases: widget.taskUseCases,
+    );
     _refreshSessionState();
   }
 
@@ -90,6 +101,71 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
     super.dispose();
   }
 
+  Future<void> _pickAttachment() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'txt'],
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty || !mounted) return;
+      final file = result.files.single;
+      if (file.bytes == null || file.bytes!.isEmpty) {
+        _showMessage('تعذر قراءة الملف. جرّب اختيار الملف مرة أخرى.');
+        return;
+      }
+      if (file.size > 50 * 1024 * 1024) {
+        _showMessage('حجم الملف يتجاوز الحد المسموح وهو 50 MB.');
+        return;
+      }
+      setState(() => _pendingAttachment = file);
+    } catch (error) {
+      if (mounted) _showMessage('تعذر إرفاق الملف: $error');
+    }
+  }
+
+  Future<String> _savePendingAttachment(String instruction) async {
+    final file = _pendingAttachment;
+    if (file == null) return 'لا يوجد ملف مرفق.';
+    if (!RegExp(r'(أضف|اضف|أرفق|ارفق|احفظ|حفظ)').hasMatch(instruction)) {
+      return 'الملف «${file.name}» مرفق. اكتب مثلاً: أضف الملف إلى مادة أمن الشبكات.';
+    }
+    final match = RegExp(r'مادة\s+(.+)$').firstMatch(instruction);
+    if (match == null) {
+      return 'حدد المادة التي تريد ربط الملف بها، مثلاً: أضف الملف إلى مادة أمن الشبكات.';
+    }
+    final courseName = match
+        .group(1)!
+        .replaceFirst(RegExp(r'\s+(?:غداً|غدا|اليوم|في|من)\b.*$'), '')
+        .replaceAll(RegExp(r'[،,.]+$'), '')
+        .trim();
+    if (courseName.isEmpty) return 'اكتب اسم المادة بوضوح.';
+    final extension = (file.extension ?? file.name.split('.').last)
+        .toLowerCase();
+    final result = await _actionExecutor.execute(
+      AcademicAssistantToolCall(
+        name: 'add_material_file',
+        arguments: {
+          'course_name': courseName,
+          'file_name': file.name,
+          'file_type': extension,
+          'file_bytes': file.bytes!,
+        },
+      ),
+    );
+    if (result.changedData) {
+      setState(() => _pendingAttachment = null);
+      await widget.onDataChanged?.call();
+    }
+    return result.message;
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Future<void> _sendPrompt(String text) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty || _isSending) return;
@@ -100,39 +176,57 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
     });
     _messageController.clear();
 
-    final actionReply = await _tryHandleAction(trimmed);
-    if (actionReply != null) {
-      if (!mounted) return;
-      setState(() {
-        _messages.add(_ChatMessage(text: actionReply, isUser: false));
-        _isSending = false;
-      });
-      return;
-    }
-
     String reply;
     try {
-      final token = await widget.authUseCases?.getCloudAccessToken.call();
-      if (token == null || token.isEmpty) {
-        if (mounted) setState(() {
-          _hasCloudSession = false;
-          _isGeminiReady = false;
-        });
-        reply = _buildLocalAssistantReply(trimmed);
+      if (_pendingAttachment != null) {
+        reply = await _savePendingAttachment(trimmed);
       } else {
-        final configured = await _remote.isConfigured();
-        if (mounted) setState(() {
-          _hasCloudSession = true;
-          _isGeminiReady = configured;
-        });
-        if (!configured) {
-          reply = 'حسابك متصل، لكن مفتاح Gemini لم يُضف إلى الخادم بعد. هذه إجابة محلية مؤقتة:\\n\\n${_buildLocalAssistantReply(trimmed)}';
+        final token = await widget.authUseCases?.getCloudAccessToken.call();
+        if (token == null || token.isEmpty) {
+          if (mounted) {
+            setState(() {
+              _hasCloudSession = false;
+              _isGeminiReady = false;
+            });
+          }
+          reply =
+              await _runLocalCommand(trimmed) ??
+              _buildLocalAssistantReply(trimmed);
         } else {
-          reply = await _remote.sendMessage(
-            accessToken: token,
-            message: trimmed,
-            context: _buildAcademicContext(),
-          );
+          final configured = await _remote.isConfigured();
+          if (mounted) {
+            setState(() {
+              _hasCloudSession = true;
+              _isGeminiReady = configured;
+            });
+          }
+          if (!configured) {
+            reply =
+                await _runLocalCommand(trimmed) ??
+                'خدمة Gemini غير مهيأة على الخادم حالياً. يمكنني تنفيذ الأوامر المحلية المدعومة الآن:\n\n${_buildLocalAssistantReply(trimmed)}';
+          } else if (_looksLikeActionRequest(trimmed)) {
+            final planned = await _remote.sendMessage(
+              accessToken: token,
+              message: _buildActionPlanningPrompt(trimmed),
+              context: await _buildAcademicContext(),
+            );
+            final plan = _parseActionPlan(planned);
+            if (plan == null) {
+              reply = await _remote.sendMessage(
+                accessToken: token,
+                message: trimmed,
+                context: await _buildAcademicContext(),
+              );
+            } else {
+              reply = await _executeActionPlan(plan);
+            }
+          } else {
+            reply = await _remote.sendMessage(
+              accessToken: token,
+              message: trimmed,
+              context: await _buildAcademicContext(),
+            );
+          }
         }
       }
     } on AcademicAiRemoteException catch (error) {
@@ -145,9 +239,10 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
       }
       if (error.code == 'ai_not_configured' && mounted) {
         setState(() => _isGeminiReady = false);
+        reply = await _runLocalCommand(trimmed) ?? error.message;
       }
-    } catch (_) {
-      reply = 'تعذر الاتصال بالمساعد السحابي حاليًا. تحقق من اتصال الإنترنت ثم حاول مجددًا.';
+    } catch (error) {
+      reply = 'تعذر تنفيذ الطلب: $error';
     }
 
     if (!mounted) return;
@@ -157,294 +252,139 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
     });
   }
 
+  bool _looksLikeActionRequest(String value) => RegExp(
+    r'(أضف|اضف|أنشئ|انشئ|احذف|حذف|عدّل|عدل|حدّث|حدث|أكمل|اكمل|ضع|أدرج|تقرير)',
+  ).hasMatch(value);
 
-  bool _isTaskCreationCommand(String input) {
-    final value = input.trim().toLowerCase();
-    if (RegExp(r'^(كيف|ما هي طريقة|طريقة|كيف أقدر|كيف اقدر)').hasMatch(value)) return false;
-    return RegExp(r'(أضف|اضف|أنشئ|انشئ|إضافة|اضافة|إنشاء|انشاء|أريد|اريد|أبغى|ابغى|أحتاج|احتاج|سجل|سجّل|اعمل|سوّي|create|add).*(مهمة|واجب|تذكير|task)|(?:مهمة|واجب|تذكير).*(أضف|اضف|أنشئ|انشئ|إضافة|اضافة|إنشاء|انشاء|create|add)').hasMatch(value);
+  String _buildActionPlanningPrompt(String userMessage) {
+    return '''أنت محرك تنفيذ داخل AcademicOS. حلل طلب المستخدم ثم أعد JSON صالحاً فقط دون Markdown بالشكل:
+{"reply":"توضيح مختصر","actions":[{"name":"create_material","arguments":{"name":"اسم المادة"}}]}
+
+الأدوات المسموحة فقط:
+- update_profile: full_name, university, major, department, semester, academic_level
+- create_material: name, instructor, code
+- update_material: course_id أو course_name, name, instructor, code, credits
+- delete_material: course_id أو course_name
+- create_task: title, description, course_name, end_date_time بصيغة ISO-8601, priority (low|medium|high|urgent), type (homework|project|exam|review|attendance|academicActivity|other), reminder_enabled, reminder_offset_minutes
+- complete_task: task_id أو task_title
+- update_task: task_id أو task_title مع title أو description أو priority أو end_date_time
+- delete_task: task_id أو task_title
+- add_lecture: course_id أو course_name, day (اسم يوم عربي), start_time, end_time بصيغة HH:mm, location
+- update_lecture: schedule_id, course_id أو course_name, day, start_time, end_time, location, reminder_enabled, reminder_offset_minutes
+- delete_lecture: schedule_id
+- create_exam: title, exam_date بصيغة ISO-8601, course_id أو course_name, location, notes
+- update_exam: exam_id, title, exam_date بصيغة ISO-8601, course_id أو course_name, location, notes
+- delete_exam: exam_id
+- generate_report: period (daily|weekly|monthly|final)
+
+قواعد إلزامية:
+1. لا تخترع معرفات أو مواد غير موجودة في السياق.
+2. استخدم course_id عند توفره، وإلا استخدم الاسم المطابق تماماً.
+3. لا تنشئ مهمة أو محاضرة إذا كانت المعلومات الأساسية ناقصة؛ اترك actions فارغة واطلب توضيحاً في reply.
+4. لا تنفذ الحذف بنفسك؛ أرسل إجراء الحذف المطلوب فقط، وسيطلب التطبيق تأكيد المستخدم قبل حذف أي سجل.
+5. لا تدّعِ نجاح أي عملية؛ التطبيق سينفذ الأدوات ويتحقق من الحفظ.
+6. يمكن إنشاء عدة مهام في actions عند طلب خطة، لكن لا تتجاوز 10 إجراءات.
+7. لا تنشئ أي إجراء متعلق بتوزيع الدرجات أو المعدل؛ هذه الوظائف مؤجلة.
+
+طلب المستخدم:
+$userMessage''';
   }
 
-  bool _isScheduleCreationCommand(String input) {
-    final value = input.trim().toLowerCase();
-    if (RegExp(r'^(كيف|ما هي طريقة|طريقة|كيف أقدر|كيف اقدر)').hasMatch(value)) return false;
-    return RegExp(r'(أضف|اضف|أنشئ|انشئ|إضافة|اضافة|أريد|اريد|أبغى|ابغى|أحتاج|احتاج|جدول|جدولة|سجل|سجّل|add|schedule).*(محاضرة|حصة|موعد|lecture)|(?:محاضرة|حصة|موعد).*(أضف|اضف|أنشئ|انشئ|جدول|جدولة|add|schedule)').hasMatch(value);
-  }
-
-  String _suggestedTaskTitle(String input) {
-    return input.replaceFirst(
-      RegExp(r'^\s*(?:(?:من فضلك|أريد|اريد|أبغى|ابغى|أحتاج|احتاج)\s*)?(?:(?:أن\s*)?(?:أضف|اضف|أضيف|اضيف|أنشئ|انشئ|إضافة|اضافة|إنشاء|انشاء|سجل|سجّل|اعمل|create|add)\s*)?(?:لي\s*)?(?:مهمة|واجب|تذكير|task)?\s*(?:بعنوان|باسم|اسمها|عنوانها|:|-)?\s*', caseSensitive: false),
-      '',
-    ).trim();
-  }
-
-  Future<String?> _tryHandleAction(String input) async {
-    if (_isTaskCreationCommand(input)) {
-      if (widget.taskUseCases == null) {
-        return 'خدمة المهام غير موصولة بالمساعد، لذلك لم يتم حفظ شيء.';
-      }
-      return _createTaskFromAssistant(input);
-    }
-    if (_isScheduleCreationCommand(input)) return _createScheduleFromAssistant(input);
-    return null;
-  }
-
-  Future<String> _createTaskFromAssistant(String input) async {
-    final titleController = TextEditingController(text: _suggestedTaskTitle(input));
-    DateTime? dueDate;
-    int? selectedCourseId;
-    var priority = input.contains('عاجل') ? TaskPriority.urgent : TaskPriority.medium;
-    var reminderEnabled = false;
-    final matchingCourses = widget.courses.where((course) => input.toLowerCase().contains(course.name.toLowerCase()));
-    if (matchingCourses.isNotEmpty) selectedCourseId = matchingCourses.first.id;
-    if (input.contains('غدا') || input.contains('غداً')) {
-      final now = DateTime.now();
-      dueDate = DateTime(now.year, now.month, now.day + 1, 23, 59);
-    }
-
+  Map<String, dynamic>? _parseActionPlan(String response) {
     try {
-      final task = await showDialog<TaskEntity>(
-        context: context,
-        builder: (dialogContext) => StatefulBuilder(
-          builder: (context, setDialogState) => AlertDialog(
-            title: const Text('إنشاء مهمة من المساعد'),
-            content: SingleChildScrollView(
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                TextField(
-                  controller: titleController,
-                  autofocus: true,
-                  onChanged: (_) => setDialogState(() {}),
-                  decoration: const InputDecoration(labelText: 'عنوان المهمة', hintText: 'مثال: حل واجب الخوارزميات'),
-                ),
-                const SizedBox(height: 12),
-                if (widget.courses.isNotEmpty)
-                  DropdownButtonFormField<int?>(
-                    value: selectedCourseId,
-                    decoration: const InputDecoration(labelText: 'المادة'),
-                    items: [
-                      const DropdownMenuItem<int?>(value: null, child: Text('بدون مادة')),
-                      ...widget.courses.where((course) => course.id != null).map((course) =>
-                        DropdownMenuItem<int?>(value: course.id, child: Text(course.name))),
-                    ],
-                    onChanged: (value) => setDialogState(() => selectedCourseId = value),
-                  ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<TaskPriority>(
-                  value: priority,
-                  decoration: const InputDecoration(labelText: 'الأولوية'),
-                  items: TaskPriority.values.map((value) => DropdownMenuItem(value: value, child: Text(value.label))).toList(),
-                  onChanged: (value) { if (value != null) setDialogState(() => priority = value); },
-                ),
-                const SizedBox(height: 12),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(dueDate == null
-                    ? 'موعد التسليم: غير محدد'
-                    : 'موعد التسليم: ' + dueDate!.day.toString() + '/' + dueDate!.month.toString() + '/' + dueDate!.year.toString()),
-                  trailing: const Icon(Icons.calendar_month),
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: dueDate ?? DateTime.now().add(const Duration(days: 1)),
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 3650)),
-                    );
-                    if (picked != null) setDialogState(() => dueDate = DateTime(picked.year, picked.month, picked.day, 23, 59));
-                  },
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('تذكير قبل موعد التسليم'),
-                  value: reminderEnabled,
-                  onChanged: (value) => setDialogState(() => reminderEnabled = value),
-                ),
-              ]),
-            ),
+      final cleaned = response
+          .replaceFirst(RegExp(r'^```(?:json)?\s*', caseSensitive: false), '')
+          .replaceFirst(RegExp(r'\s*```$'), '')
+          .trim();
+      final decoded = jsonDecode(cleaned);
+      if (decoded is! Map<String, dynamic> || decoded['actions'] is! List) {
+        return null;
+      }
+      final actions = (decoded['actions'] as List)
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .where(
+            (item) => const {
+              'update_profile',
+              'create_material',
+              'update_material',
+              'delete_material',
+              'create_task',
+              'complete_task',
+              'update_task',
+              'delete_task',
+              'add_lecture',
+              'update_lecture',
+              'delete_lecture',
+              'create_exam',
+              'update_exam',
+              'delete_exam',
+              'generate_report',
+            }.contains(item['name']),
+          )
+          .take(10)
+          .toList();
+      return {'reply': decoded['reply']?.toString() ?? '', 'actions': actions};
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<String> _executeActionPlan(Map<String, dynamic> plan) async {
+    final messages = <String>[];
+    final lead = plan['reply']?.toString().trim() ?? '';
+    if (lead.isNotEmpty) messages.add(lead);
+    final actions = plan['actions'] as List? ?? const [];
+    for (final raw in actions) {
+      if (raw is! Map) continue;
+      final call = AcademicAssistantToolCall.fromJson(
+        Map<String, dynamic>.from(raw),
+      );
+      messages.add(await _executeTool(call));
+    }
+    return messages.isEmpty
+        ? 'لم ينتج عن الطلب إجراء واضح. وضّح ما تريد تنفيذه.'
+        : messages.join('\n\n');
+  }
+
+  Future<String?> _runLocalCommand(String input) async {
+    final call = const AcademicAssistantCommandParser().parse(input);
+    if (call == null) return null;
+    return _executeTool(call);
+  }
+
+  Future<String> _executeTool(AcademicAssistantToolCall call) async {
+    try {
+      var result = await _actionExecutor.execute(call);
+      if (result.requiresConfirmation) {
+        if (!mounted) return 'تعذر عرض تأكيد العملية.';
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('تأكيد العملية'),
+            content: Text(result.confirmationPrompt ?? result.message),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('إلغاء'),
+              ),
               FilledButton(
-                onPressed: titleController.text.trim().isEmpty ? null : () {
-                  CourseEntity? course;
-                  for (final candidate in widget.courses) {
-                    if (candidate.id == selectedCourseId) { course = candidate; break; }
-                  }
-                  Navigator.pop(dialogContext, TaskEntity(
-                    title: titleController.text.trim(),
-                    description: '',
-                    type: input.contains('واجب') ? TaskType.homework : TaskType.other,
-                    priority: priority,
-                    dueDate: dueDate,
-                    courseId: selectedCourseId,
-                    courseName: course?.name,
-                    reminderEnabled: reminderEnabled && dueDate != null,
-                    reminderOffsetMinutes: 30,
-                  ));
-                },
-                child: const Text('حفظ المهمة'),
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('تأكيد الحذف'),
               ),
             ],
           ),
-        ),
-      );
-      if (task == null) return 'تم إلغاء إنشاء المهمة؛ لم يتم حفظ أي شيء.';
-      final id = await widget.taskUseCases!.addTask(task);
-      final savedTask = task.copyWith(id: id);
-      if (savedTask.reminderEnabled) await NotificationService.instance.scheduleTaskReminder(savedTask);
-      await widget.onTasksChanged?.call();
-      var message = 'تم إنشاء المهمة "' + savedTask.title + '" وحفظها في قائمتك';
-      if (savedTask.courseName != null) message += ' لمادة ' + savedTask.courseName!;
-      if (savedTask.dueDate != null) message += ' بتاريخ ' + savedTask.dueDate!.day.toString() + '/' + savedTask.dueDate!.month.toString() + '/' + savedTask.dueDate!.year.toString();
-      return message + '.';
-    } catch (error) {
-      return 'تعذر حفظ المهمة: ' + error.toString() + '. لم أؤكد نجاح العملية.';
-    } finally {
-      titleController.dispose();
-    }
-  }
-
-  Future<String> _createScheduleFromAssistant(String input) async {
-    const days = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];
-    final aliases = <String, String>{
-      'السبت': 'السبت', 'الأحد': 'الأحد', 'الاحد': 'الأحد',
-      'الاثنين': 'الاثنين', 'الإثنين': 'الاثنين', 'الثلاثاء': 'الثلاثاء',
-      'الأربعاء': 'الأربعاء', 'الخميس': 'الخميس', 'الجمعة': 'الجمعة',
-    };
-    var selectedDay = days[(DateTime.now().weekday + 1) % 7];
-    for (final entry in aliases.entries) {
-      if (input.contains(entry.key)) { selectedDay = entry.value; break; }
-    }
-    int? selectedCourseId;
-    for (final course in widget.courses) {
-      if (input.toLowerCase().contains(course.name.toLowerCase())) { selectedCourseId = course.id; break; }
-    }
-    final timeMatch = RegExp(r'([01]?\d|2[0-3]):([0-5]\d)').firstMatch(input);
-    var start = timeMatch == null ? '08:00' : timeMatch.group(1)!.padLeft(2, '0') + ':' + timeMatch.group(2)!;
-    var end = '09:00';
-    if (timeMatch != null) {
-      final total = int.parse(timeMatch.group(1)!) * 60 + int.parse(timeMatch.group(2)!) + 60;
-      end = (total ~/ 60).toString().padLeft(2, '0') + ':' + (total % 60).toString().padLeft(2, '0');
-    }
-    final locationController = TextEditingController();
-    var reminderEnabled = true;
-    try {
-      final confirmed = await showDialog<Map<String, dynamic>>(
-        context: context,
-        builder: (dialogContext) => StatefulBuilder(
-          builder: (context, setDialogState) => AlertDialog(
-            title: const Text('إضافة محاضرة إلى الجدول'),
-            content: SingleChildScrollView(
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                DropdownButtonFormField<String>(
-                  value: selectedDay,
-                  decoration: const InputDecoration(labelText: 'اليوم'),
-                  items: days.map((day) => DropdownMenuItem(value: day, child: Text(day))).toList(),
-                  onChanged: (value) { if (value != null) setDialogState(() => selectedDay = value); },
-                ),
-                if (widget.courses.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<int?>(
-                    value: selectedCourseId,
-                    decoration: const InputDecoration(labelText: 'المادة'),
-                    items: [
-                      const DropdownMenuItem<int?>(value: null, child: Text('محاضرة عامة')),
-                      ...widget.courses.where((course) => course.id != null).map((course) =>
-                        DropdownMenuItem<int?>(value: course.id, child: Text(course.name))),
-                    ],
-                    onChanged: (value) => setDialogState(() => selectedCourseId = value),
-                  ),
-                ],
-                const SizedBox(height: 12),
-                Row(children: [
-                  Expanded(child: OutlinedButton(
-                    onPressed: () async { final value = await _pickAssistantTime(start); if (value != null) setDialogState(() => start = value); },
-                    child: Text('البداية ' + start),
-                  )),
-                  const SizedBox(width: 8),
-                  Expanded(child: OutlinedButton(
-                    onPressed: () async { final value = await _pickAssistantTime(end); if (value != null) setDialogState(() => end = value); },
-                    child: Text('النهاية ' + end),
-                  )),
-                ]),
-                const SizedBox(height: 12),
-                TextField(controller: locationController, decoration: const InputDecoration(labelText: 'الموقع (اختياري)')),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('تذكير قبل المحاضرة'),
-                  value: reminderEnabled,
-                  onChanged: (value) => setDialogState(() => reminderEnabled = value),
-                ),
-              ]),
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
-              FilledButton(onPressed: () => Navigator.pop(dialogContext, {
-                'day': selectedDay, 'courseId': selectedCourseId,
-                'start': start, 'end': end, 'location': locationController.text.trim(),
-                'reminder': reminderEnabled,
-              }), child: const Text('حفظ المحاضرة')),
-            ],
-          ),
-        ),
-      );
-      if (confirmed == null) return 'تم إلغاء إضافة المحاضرة؛ لم يتم حفظ أي شيء.';
-      final existing = await DatabaseHelper.instance.getSchedules();
-      final validation = ScheduleConflictValidator.validate(
-        day: confirmed['day'] as String,
-        startTime: confirmed['start'] as String,
-        endTime: confirmed['end'] as String,
-        existingSchedules: existing,
-      );
-      if (!validation.isValid) {
-        switch (validation.issue) {
-          case ScheduleValidationIssue.invalidTimeFormat: return 'لم أحفظ المحاضرة: صيغة الوقت غير صحيحة.';
-          case ScheduleValidationIssue.invalidTimeRange: return 'لم أحفظ المحاضرة: وقت النهاية يجب أن يكون بعد البداية.';
-          case ScheduleValidationIssue.invalidStoredEntry: return 'لم أحفظ المحاضرة: يوجد موعد محفوظ غير صالح، صححه أولاً.';
-          case ScheduleValidationIssue.overlap: return 'لم أحفظ المحاضرة: الوقت يتعارض مع محاضرة أخرى في اليوم نفسه.';
-          case null: return 'لم أحفظ المحاضرة: تعذر التحقق من التعارض.';
-        }
-      }
-      final location = (confirmed['location'] as String).isEmpty ? 'غير محدد' : confirmed['location'] as String;
-      final schedule = <String, dynamic>{
-        'day_of_week': confirmed['day'],
-        'course_id': confirmed['courseId'],
-        'start_time': confirmed['start'],
-        'end_time': confirmed['end'],
-        'location': location,
-        'reminder_enabled': confirmed['reminder'] == true ? 1 : 0,
-        'reminder_offset_minutes': 15,
-      };
-      final id = await DatabaseHelper.instance.insertSchedule(schedule);
-      CourseEntity? selectedCourse;
-      for (final course in widget.courses) {
-        if (course.id == confirmed['courseId']) { selectedCourse = course; break; }
-      }
-      if (confirmed['reminder'] == true) {
-        await NotificationService.instance.scheduleLectureReminder(
-          id: id, title: selectedCourse?.name ?? 'محاضرة',
-          weekdayName: confirmed['day'] as String,
-          startTime: confirmed['start'] as String,
-          reminderEnabled: true, location: location, reminderOffsetMinutes: 15,
         );
+        if (confirmed != true) return 'تم إلغاء العملية بناءً على اختيارك.';
+        result = await _actionExecutor.execute(call, confirmed: true);
       }
-      return 'تمت إضافة ' + (selectedCourse?.name ?? 'المحاضرة') + ' إلى جدول ' +
-          (confirmed['day'] as String) + ' من ' + (confirmed['start'] as String) +
-          ' إلى ' + (confirmed['end'] as String) + '.';
+      if (result.changedData) {
+        await widget.onDataChanged?.call();
+      }
+      return result.message;
     } catch (error) {
-      return 'تعذر حفظ المحاضرة: ' + error.toString() + '. لم أؤكد نجاح العملية.';
-    } finally {
-      locationController.dispose();
+      return 'لم يتم تنفيذ «${call.name}»: $error';
     }
-  }
-
-  Future<String?> _pickAssistantTime(String initialValue) async {
-    final parts = initialValue.split(':');
-    final hour = int.tryParse(parts.first) ?? 8;
-    final minute = int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0;
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay(hour: hour, minute: minute),
-    );
-    if (picked == null) return null;
-    return picked.hour.toString().padLeft(2, '0') + ':' + picked.minute.toString().padLeft(2, '0');
   }
 
   String _buildLocalAssistantReply(String input) {
@@ -460,30 +400,69 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
     return result.response;
   }
 
-  String _buildAcademicContext() {
+  Future<String> _buildAcademicContext() async {
+    final courses = await widget.courseUseCases.getCourses();
+    final tasks = await widget.taskUseCases.getTasks();
+    final schedules = await DatabaseHelper.instance.getSchedules();
+    final exams = await DatabaseHelper.instance.getExams();
+    final materials = await DatabaseHelper.instance.getAllMaterials();
+    final profile = await StudentProfile.load();
     final context = {
+      'academicProfile': {
+        'fullName': profile.fullName,
+        'university': profile.university,
+        'major': profile.major,
+        'department': profile.department,
+        'semester': profile.semester,
+        'academicLevel': profile.academicLevel,
+      },
       'currentDate': DateTime.now().toIso8601String(),
-      'courses': widget.courses.take(40).map((course) => {
-        'name': course.name,
-        'code': course.code,
-        'credits': course.credits,
-        'midGrade': course.midGrade,
-        'practicalGrade': course.practicalGrade,
-        'finalGrade': course.finalGrade,
+      'courses': courses
+          .take(60)
+          .map(
+            (course) => {
+              'id': course.id,
+              'name': course.name,
+              'code': course.code,
+              'credits': course.credits,
+            },
+          )
+          .toList(),
+      'tasks': tasks
+          .take(60)
+          .map(
+            (task) => {
+              'id': task.id,
+              'title': task.title,
+              'type': task.type.name,
+              'priority': task.priority.name,
+              'dueDate': task.dueDate?.toIso8601String(),
+              'endDateTime': task.endDateTime?.toIso8601String(),
+              'completedAt': task.completedAt?.toIso8601String(),
+              'completed': task.isCompleted,
+              'courseId': task.courseId,
+              'courseName': task.courseName,
+            },
+          )
+          .toList(),
+      'weeklySchedule': schedules.take(100).toList(),
+      'materials': materials.take(100).map((item) => {
+        'id': item['id'],
+        'courseId': item['course_id'],
+        'title': item['title'],
+        'fileType': item['file_type'],
       }).toList(),
-      'tasks': widget.tasks.take(40).map((task) => {
-        'title': task.title,
-        'type': task.type.name,
-        'priority': task.priority.name,
-        'dueDate': task.dueDate?.toIso8601String(),
-        'completed': task.isCompleted,
-        'courseName': task.courseName,
-      }).toList(),
-      'exams': widget.exams.take(30).map((exam) => {
-        'title': exam.title,
-        'courseName': exam.courseName,
-        'examDate': exam.examDate.toIso8601String(),
-      }).toList(),
+      'exams': exams
+          .take(30)
+          .map(
+            (exam) => {
+              'id': exam.id,
+              'title': exam.title,
+              'courseName': exam.courseName,
+              'examDate': exam.examDate.toIso8601String(),
+            },
+          )
+          .toList(),
     };
     return jsonEncode(context);
   }
@@ -494,22 +473,24 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
     final statusColor = _isGeminiReady
         ? Colors.green
         : _hasCloudSession
-            ? Colors.orange
-            : Colors.blueGrey;
+        ? Colors.orange
+        : Colors.blueGrey;
     final statusText = _isCheckingSession
         ? 'جارٍ التحقق من الاتصال...'
         : _isGeminiReady
-            ? 'Gemini 3.8 Flash جاهز'
-            : _hasCloudSession
-                ? 'الحساب متصل — خدمة Gemini بانتظار المفتاح'
-                : 'المساعد المحلي يعمل';
+        ? 'Gemini 3.8 Flash جاهز'
+        : _hasCloudSession
+        ? 'الحساب متصل — خدمة Gemini بانتظار المفتاح'
+        : 'المساعد المحلي يعمل';
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('المساعد الأكاديمي الذكي'),
+        title: const Text('المساعد الذكي'),
         actions: [
           TextButton.icon(
-            onPressed: _isSending ? null : () => setState(() => _messages.clear()),
+            onPressed: _isSending
+                ? null
+                : () => setState(() => _messages.clear()),
             icon: const Icon(Icons.refresh_rounded),
             label: const Text('إعادة'),
           ),
@@ -530,13 +511,19 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
                 Container(
                   width: 10,
                   height: 10,
-                  decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle),
+                  decoration: BoxDecoration(
+                    color: statusColor,
+                    shape: BoxShape.circle,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     statusText,
-                    style: TextStyle(fontWeight: FontWeight.bold, color: statusColor),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: statusColor,
+                    ),
                   ),
                 ),
               ],
@@ -578,24 +565,36 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
               itemBuilder: (context, index) {
                 final message = _messages[index];
                 return Align(
-                  alignment: message.isUser ? Alignment.centerRight : Alignment.centerLeft,
+                  alignment: message.isUser
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft,
                   child: Container(
                     margin: const EdgeInsets.only(bottom: 10),
                     padding: const EdgeInsets.all(12),
-                    constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.82),
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.of(context).size.width * 0.82,
+                    ),
                     decoration: BoxDecoration(
                       color: message.isUser
                           ? Colors.blue.shade600
-                          : (isDark ? Theme.of(context).colorScheme.surfaceContainerHighest : Colors.white),
+                          : (isDark
+                                ? Theme.of(
+                                    context,
+                                  ).colorScheme.surfaceContainerHighest
+                                : Colors.white),
                       borderRadius: BorderRadius.circular(18),
                       border: Border.all(
-                        color: message.isUser ? Colors.blue.shade500 : Colors.grey.shade300,
+                        color: message.isUser
+                            ? Colors.blue.shade500
+                            : Colors.grey.shade300,
                       ),
                     ),
                     child: Text(
                       message.text,
                       style: TextStyle(
-                        color: message.isUser ? Colors.white : Theme.of(context).colorScheme.onSurface,
+                        color: message.isUser
+                            ? Colors.white
+                            : Theme.of(context).colorScheme.onSurface,
                         height: 1.5,
                       ),
                     ),
@@ -621,29 +620,66 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
                 ),
               ],
             ),
-            child: Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _messageController,
-                    readOnly: _isSending,
-                    decoration: InputDecoration(
-                      hintText: 'اكتب طلبك أو سؤالك...',
-                      filled: true,
-                      fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
+                if (_pendingAttachment != null)
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: InputChip(
+                        avatar: const Icon(Icons.attach_file_rounded, size: 18),
+                        label: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 220),
+                          child: Text(
+                            _pendingAttachment!.name,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        onDeleted: _isSending
+                            ? null
+                            : () => setState(() => _pendingAttachment = null),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     ),
-                    onSubmitted: _sendPrompt,
                   ),
-                ),
-                const SizedBox(width: 8),
-                FloatingActionButton.small(
-                  onPressed: _isSending ? null : () => _sendPrompt(_messageController.text),
-                  child: const Icon(Icons.send_rounded),
+                Row(
+                  children: [
+                    IconButton(
+                      tooltip: 'إرفاق ملف بالمادة',
+                      onPressed: _isSending ? null : _pickAttachment,
+                      icon: const Icon(Icons.attach_file_rounded),
+                    ),
+                    Expanded(
+                      child: TextField(
+                        controller: _messageController,
+                        readOnly: _isSending,
+                        decoration: InputDecoration(
+                          hintText: 'اكتب طلبك أو سؤالك...',
+                          filled: true,
+                          fillColor: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                        ),
+                        onSubmitted: _sendPrompt,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FloatingActionButton.small(
+                      onPressed: _isSending
+                          ? null
+                          : () => _sendPrompt(_messageController.text),
+                      child: const Icon(Icons.send_rounded),
+                    ),
+                  ],
                 ),
               ],
             ),

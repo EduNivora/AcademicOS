@@ -90,3 +90,50 @@ test("health reports an unset Gemini key without exposing the key", async () => 
   assert.equal(health.configured, false);
   assert.equal(JSON.stringify(health).includes("test-api-key"), false);
 });
+
+const scheduleRequest = ({ image = "dGVzdA==", mimeType = "image/png", bearer = token } = {}) =>
+  new Request("https://unit.test/v1/schedule/parse", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(bearer ? { Authorization: "Bearer " + bearer } : {}),
+    },
+    body: JSON.stringify({ image, mimeType }),
+  });
+
+test("schedule image parsing forwards a multimodal image and validates extracted rows", async () => {
+  let payload;
+  const handler = make({ fetchImpl: async (_url, options) => {
+    payload = JSON.parse(options.body);
+    return Response.json({
+      steps: [{ type: "model_output", content: [{
+        type: "text",
+        text: JSON.stringify({ entries: [{
+          day: "الأحد", course_name: "أمن الشبكات", start_time: "08:00", end_time: "09:30", location: "قاعة 2",
+        }] }),
+      }] }],
+    });
+  }});
+  const response = await handler(scheduleRequest());
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).entries, [{
+    day: "الأحد", course_name: "أمن الشبكات", start_time: "08:00", end_time: "09:30", location: "قاعة 2",
+  }]);
+  assert.equal(payload.input[1].type, "image");
+  assert.equal(payload.input[1].mime_type, "image/png");
+  assert.equal(payload.input[1].data, "dGVzdA==");
+  assert.equal(payload.store, false);
+});
+
+test("schedule image parsing rejects unsupported image types before Gemini", async () => {
+  let called = false;
+  const handler = make({ fetchImpl: async () => { called = true; return Response.json({}); } });
+  const response = await handler(scheduleRequest({ mimeType: "application/pdf" }));
+  assert.equal(response.status, 400);
+  assert.equal(called, false);
+});
+
+test("schedule image parsing requires authentication", async () => {
+  const response = await make()(scheduleRequest({ bearer: null }));
+  assert.equal(response.status, 401);
+});

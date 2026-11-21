@@ -12,6 +12,7 @@ class TaskModel extends TaskEntity {
     super.startDateTime,
     super.endDateTime,
     super.isCompleted,
+    super.completedAt,
     super.courseId,
     super.courseName,
     super.notes,
@@ -58,6 +59,7 @@ class TaskModel extends TaskEntity {
       startDateTime: startDateTime,
       endDateTime: endDateTime,
       isCompleted: map['is_completed'] == 1 || map['is_completed'] == true,
+      completedAt: parseOptionalDate('completed_at'),
       courseId: map['course_id'] is int
           ? map['course_id'] as int
           : int.tryParse(map['course_id']?.toString() ?? ''),
@@ -84,6 +86,7 @@ class TaskModel extends TaskEntity {
       'start_date_time': startDateTime?.toIso8601String(),
       'end_date_time': endDateTime?.toIso8601String(),
       'is_completed': isCompleted ? 1 : 0,
+      'completed_at': completedAt?.toIso8601String(),
       'course_id': courseId,
       'course_name': courseName,
       'notes': notes,

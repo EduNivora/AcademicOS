@@ -15,8 +15,9 @@ class CourseLocalDataSourceImpl implements CourseLocalDataSource {
   CourseLocalDataSourceImpl(this.databaseHelper);
 
   @override
-  Future<int> deleteCourse(int id) {
-    return databaseHelper.deleteCourse(id);
+  Future<int> deleteCourse(int id) async {
+    final result = await databaseHelper.deleteCourseCascade(id);
+    return result.deletedCourses;
   }
 
   @override

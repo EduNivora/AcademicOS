@@ -47,14 +47,34 @@ class _CourseListScreenState extends State<CourseListScreen> {
     List<Map<String, Object?>> materialRows;
     try {
       final db = await DatabaseHelper.instance.database;
-      taskRows = await db.query('tasks', where: 'course_id = ?', whereArgs: [courseId]);
-      examRows = await db.query('exams', where: 'course_id = ?', whereArgs: [courseId]);
-      scheduleRows = await db.query('schedule', where: 'course_id = ?', whereArgs: [courseId]);
-      materialRows = await db.query('course_materials', where: 'course_id = ?', whereArgs: [courseId]);
+      taskRows = await db.query(
+        'tasks',
+        where: 'course_id = ?',
+        whereArgs: [courseId],
+      );
+      examRows = await db.query(
+        'exams',
+        where: 'course_id = ?',
+        whereArgs: [courseId],
+      );
+      scheduleRows = await db.query(
+        'schedule',
+        where: 'course_id = ?',
+        whereArgs: [courseId],
+      );
+      materialRows = await db.query(
+        'course_materials',
+        where: 'course_id = ?',
+        whereArgs: [courseId],
+      );
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر فحص ارتباطات المقرر قبل الحذف: ' + error.toString())),
+        SnackBar(
+          content: Text(
+            'تعذر فحص ارتباطات المادة قبل الحذف: ' + error.toString(),
+          ),
+        ),
       );
       return;
     }
@@ -62,13 +82,19 @@ class _CourseListScreenState extends State<CourseListScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('حذف المقرر؟'),
+        title: const Text('حذف المادة؟'),
         content: Text(
-          'سيتم حذف «' + course.name + '» وكل ما يرتبط به نهائياً: ' +
-          taskRows.length.toString() + ' مهام، ' +
-          examRows.length.toString() + ' اختبارات، ' +
-          scheduleRows.length.toString() + ' محاضرات، و' +
-          materialRows.length.toString() + ' مرفقات. لا يمكن التراجع عن ذلك.',
+          'سيتم حذف «' +
+              course.name +
+              '» وكل ما يرتبط به نهائياً: ' +
+              taskRows.length.toString() +
+              ' مهام، ' +
+              examRows.length.toString() +
+              ' اختبارات، ' +
+              scheduleRows.length.toString() +
+              ' محاضرات، و' +
+              materialRows.length.toString() +
+              ' مرفقات. لا يمكن التراجع عن ذلك.',
         ),
         actions: [
           TextButton(
@@ -76,9 +102,12 @@ class _CourseListScreenState extends State<CourseListScreen> {
             child: const Text('إلغاء'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('حذف المقرر وكل ارتباطاته'),
+            child: const Text('حذف المادة وكل ارتباطاتها'),
           ),
         ],
       ),
@@ -87,29 +116,34 @@ class _CourseListScreenState extends State<CourseListScreen> {
 
     try {
       final deleted = await widget.courseUseCases.deleteCourse(courseId);
-      if (deleted <= 0) throw StateError('لم يتم العثور على المقرر لحذفه.');
+      if (deleted <= 0) throw StateError('لم يتم العثور على المادة لحذفها.');
+      await NotificationService.instance.cancelCourseReminder(courseId);
 
       for (final row in taskRows) {
         final id = row['id'];
-        if (id is int && (row['reminder_enabled'] == 1 || row['reminder_enabled'] == true)) {
+        if (id is int &&
+            (row['reminder_enabled'] == 1 || row['reminder_enabled'] == true)) {
           await NotificationService.instance.cancelTaskReminder(id);
         }
       }
       for (final row in scheduleRows) {
         final id = row['id'];
-        if (id is int && (row['reminder_enabled'] == 1 || row['reminder_enabled'] == true)) {
+        if (id is int &&
+            (row['reminder_enabled'] == 1 || row['reminder_enabled'] == true)) {
           await NotificationService.instance.cancelLectureReminder(id);
         }
       }
       await _loadCourses();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تم حذف المقرر «' + course.name + '» وارتباطاته.')),
+        SnackBar(
+          content: Text('تم حذف المادة «' + course.name + '» وارتباطاته.'),
+        ),
       );
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر حذف المقرر: ' + error.toString())),
+        SnackBar(content: Text('تعذر حذف المادة: ' + error.toString())),
       );
     }
   }
@@ -136,11 +170,14 @@ class _CourseListScreenState extends State<CourseListScreen> {
   @override
   Widget build(BuildContext context) {
     final filtered = _courses
-        .where((course) => course.name.toLowerCase().contains(_searchQuery.toLowerCase()))
+        .where(
+          (course) =>
+              course.name.toLowerCase().contains(_searchQuery.toLowerCase()),
+        )
         .toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('المقررات الدراسية')),
+      appBar: AppBar(title: const Text('المواد')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(
@@ -158,20 +195,29 @@ class _CourseListScreenState extends State<CourseListScreen> {
                 ),
                 Expanded(
                   child: filtered.isEmpty
-                      ? const Center(child: Text('لا توجد مقررات دراسية مضافة'))
+                      ? const Center(child: Text('لا توجد مواد مضافة'))
                       : ListView.separated(
                           itemCount: filtered.length,
                           separatorBuilder: (_, __) => const Divider(),
                           itemBuilder: (_, index) {
                             final course = filtered[index];
                             return Card(
-                              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
                               child: ListTile(
                                 title: Text(course.name),
-                                subtitle: Text('${course.code} • ${course.instructor}'),
+                                subtitle: Text(
+                                  '${course.code} • ${course.instructor}',
+                                ),
                                 trailing: IconButton(
-                                  icon: const Icon(Icons.delete, color: Colors.red),
-                                  onPressed: () => _confirmAndDeleteCourse(course),
+                                  icon: const Icon(
+                                    Icons.delete,
+                                    color: Colors.red,
+                                  ),
+                                  onPressed: () =>
+                                      _confirmAndDeleteCourse(course),
                                 ),
                                 onTap: () {
                                   Navigator.push(
@@ -197,7 +243,8 @@ class _CourseListScreenState extends State<CourseListScreen> {
           final result = await Navigator.push<bool>(
             context,
             MaterialPageRoute(
-              builder: (_) => AddEditCourseScreen(useCases: widget.courseUseCases),
+              builder: (_) =>
+                  AddEditCourseScreen(useCases: widget.courseUseCases),
             ),
           );
           if (result == true) {
