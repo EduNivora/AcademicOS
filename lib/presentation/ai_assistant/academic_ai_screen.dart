@@ -292,6 +292,11 @@ $userMessage''';
   }
 
   Future<String> _executeActionPlan(AcademicAssistantActionPlan plan) async {
+    if (plan.actions.isEmpty) {
+      return plan.reply.trim().isEmpty
+          ? 'لم ينتج المساعد إجراءً أو إجابة واضحة.'
+          : plan.reply.trim();
+    }
     final preflight = await _actionExecutor.preflightPlan(plan.actions);
     if (!preflight.succeeded) return preflight.message;
 
