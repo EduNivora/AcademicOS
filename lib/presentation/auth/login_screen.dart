@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/config/edunivora_identity.dart';
 import '../../core/widgets/edunivora_ui.dart';
+import '../../core/theme/app_theme.dart';
 import '../../domain/usecases/auth_use_cases.dart';
 import 'register_screen.dart';
 import 'email_verification_screen.dart';
@@ -271,8 +272,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           // small text on light surfaces. Use an accessible
                           // tonal pair for this compact tagline.
                           color: isDark
-                              ? const Color(0xFFA5B4FC)
-                              : const Color(0xFF3645C7),
+                              ? AppTheme.primaryTextDark
+                              : AppTheme.primaryTextLight,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.2,
                         ),
