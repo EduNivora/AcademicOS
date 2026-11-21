@@ -76,6 +76,44 @@ void main() {
       );
     });
 
+    test('accepts supported material attachment actions with bounded bytes', () {
+      final plan = parser.parse(encode([
+        action('add_material_file', {
+          'course_name': 'الشبكات',
+          'file_name': 'lecture.pdf',
+          'file_type': 'pdf',
+          'file_bytes': [37, 80, 68, 70],
+        }),
+      ]));
+      expect(plan, isNotNull);
+      expect(plan!.actions.single.name, 'add_material_file');
+    });
+
+    test('rejects material attachments with invalid bytes or file type', () {
+      expect(
+        parser.parse(encode([
+          action('add_material_file', {
+            'course_name': 'الشبكات',
+            'file_name': 'lecture.exe',
+            'file_type': 'exe',
+            'file_bytes': [1, 2, 3],
+          }),
+        ])),
+        isNull,
+      );
+      expect(
+        parser.parse(encode([
+          action('add_material_file', {
+            'course_name': 'الشبكات',
+            'file_name': 'lecture.pdf',
+            'file_type': 'pdf',
+            'file_bytes': [256],
+          }),
+        ])),
+        isNull,
+      );
+    });
+
     test('accepts profile updates with at least one supplied field', () {
       final plan = parser.parse(encode([
         action('update_profile', {'university': 'جامعة صنعاء'}),
