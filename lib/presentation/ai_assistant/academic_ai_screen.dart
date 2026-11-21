@@ -292,6 +292,9 @@ $userMessage''';
   }
 
   Future<String> _executeActionPlan(AcademicAssistantActionPlan plan) async {
+    final preflight = await _actionExecutor.preflightPlan(plan.actions);
+    if (!preflight.succeeded) return preflight.message;
+
     final messages = <String>[];
     final lead = plan.reply.trim();
     if (lead.isNotEmpty) messages.add(lead);
@@ -319,6 +322,8 @@ $userMessage''';
   Future<String?> _runLocalCommand(String input) async {
     final call = const AcademicAssistantCommandParser().parse(input);
     if (call == null) return null;
+    final preflight = await _actionExecutor.preflightPlan([call]);
+    if (!preflight.succeeded) return preflight.message;
     final result = await _executeTool(call);
     return result.message;
   }
