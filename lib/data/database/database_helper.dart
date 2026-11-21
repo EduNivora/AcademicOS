@@ -54,7 +54,7 @@ class DatabaseHelper {
   static bool _nativeFactoryInitialized = false;
 
   static const String _databaseName = 'academic_os.db';
-  static const int _databaseVersion = 13;
+  static const int _databaseVersion = 14;
   static const String _materialsTable = 'course_materials';
   static const String _taskTable = 'tasks';
   static const String _courseTable = 'courses';
@@ -348,6 +348,7 @@ class DatabaseHelper {
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_academic_terms_single_active '
       'ON academic_terms(is_active) WHERE is_active = 1',
     );
+    await _createAssistantLedgerTables(db);
   }
 
   Future<void> _onUpgradeDatabase(
@@ -521,6 +522,9 @@ class DatabaseHelper {
     await _ensureColumn(db, _courseTable, 'practical_grade', 'REAL DEFAULT 0');
     await _ensureColumn(db, _courseTable, 'final_grade', 'REAL DEFAULT 0');
     await _ensureColumn(db, _courseTable, 'credit_hours', 'INTEGER DEFAULT 3');
+    if (oldVersion < 14) {
+      await _createAssistantLedgerTables(db);
+    }
   }
 
   /// Replaces all student academic records as one atomic database operation.
