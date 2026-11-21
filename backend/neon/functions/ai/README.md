@@ -25,6 +25,8 @@ The response contains `answer`, `model`, and usage metadata when available.
 
 The schedule parser accepts `{ "image": "<base64>", "mimeType": "image/jpeg" }`. It sends the image and an extraction instruction to Gemini with `store: false`, validates the returned day names and 24-hour time ranges, and returns an `entries` array. The client must match every extracted subject name to an existing material ID and let the student review the proposed rows before saving.
 
+Neon reported active deployment ID 3 (Node.js 24) on 2026-11-21. That live deployment is the pre-quota version; PR #47 does not deploy it. The new database-backed quota implementation must not be deployed until migration 0003 has been reviewed and applied to the intended branch.
+
 ## Runtime environment
 
 - `DATABASE_URL` — injected by Neon for the function branch; used only for quota counters.
