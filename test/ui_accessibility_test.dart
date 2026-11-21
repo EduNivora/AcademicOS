@@ -75,18 +75,8 @@ Widget _testApp({required bool dark, required Widget home}) {
       GlobalWidgetsLocalizations.delegate,
       GlobalCupertinoLocalizations.delegate,
     ],
-    theme: ThemeData(
-      useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF5B6CFF)),
-    ),
-    darkTheme: ThemeData(
-      useMaterial3: true,
-      brightness: Brightness.dark,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF5B6CFF),
-        brightness: Brightness.dark,
-      ),
-    ),
+    theme: AppTheme.lightTheme(),
+    darkTheme: AppTheme.darkTheme(),
     themeMode: dark ? ThemeMode.dark : ThemeMode.light,
     home: Directionality(textDirection: TextDirection.rtl, child: home),
   );
