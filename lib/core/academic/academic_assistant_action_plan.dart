@@ -20,6 +20,7 @@ class AcademicAssistantActionPlanParser {
   static const Set<String> allowedActions = {
     'update_profile',
     'create_material',
+    'add_material_file',
     'update_material',
     'delete_material',
     'create_task',
@@ -101,6 +102,16 @@ class AcademicAssistantActionPlanParser {
         ].any(hasValue);
       case 'create_material':
         return hasValue('name');
+      case 'add_material_file':
+        final bytes = args['file_bytes'];
+        return hasCourse() &&
+            hasValue('file_name') &&
+            {'pdf', 'doc', 'docx', 'ppt', 'pptx', 'txt'}
+                .contains(args['file_type']?.toString().toLowerCase()) &&
+            bytes is List &&
+            bytes.isNotEmpty &&
+            bytes.length <= 50 * 1024 * 1024 &&
+            bytes.every((byte) => byte is int && byte >= 0 && byte <= 255);
       case 'update_material':
         return hasCourse() &&
             ['name', 'instructor', 'code', 'credits'].any(hasValue);
