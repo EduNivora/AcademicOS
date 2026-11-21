@@ -719,9 +719,17 @@ $userMessage''';
               itemBuilder: (context, index) {
                 final prompt = _suggestedPrompts[index];
                 return ActionChip(
-                  label: Text(prompt, style: const TextStyle(fontSize: 12)),
+                  label: Text(
+                    prompt,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? Colors.white : const Color(0xFF1E1B4B),
+                    ),
+                  ),
                   onPressed: _isSending ? null : () => _sendPrompt(prompt),
-                  backgroundColor: Colors.indigo.shade50,
+                  backgroundColor: isDark
+                      ? const Color(0xFF312E81)
+                      : const Color(0xFFE0E7FF),
                 );
               },
             ),
