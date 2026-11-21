@@ -71,6 +71,27 @@ void main() {
       expect(courseRepository.courses, isEmpty);
     });
 
+
+    test('rejects malformed and mismatched course and task identifiers', () async {
+      final malformedCourse = await executor.preflightPlan([
+        const AcademicAssistantToolCall(
+          name: 'create_task',
+          arguments: {'title': 'مراجعة', 'course_id': 'invalid'},
+        ),
+      ]);
+      expect(malformedCourse.succeeded, isFalse);
+      expect(malformedCourse.message, contains('معرّف المادة'));
+
+      final mismatchedTask = await executor.preflightPlan([
+        const AcademicAssistantToolCall(
+          name: 'complete_task',
+          arguments: {'task_id': 1, 'task_title': 'عنوان غير مطابق'},
+        ),
+      ]);
+      expect(mismatchedTask.succeeded, isFalse);
+      expect(mismatchedTask.message, contains('معرّف المهمة'));
+    });
+
     test('allows later actions to reference a course created earlier in the same plan', () async {
       final result = await executor.preflightPlan([
         const AcademicAssistantToolCall(
