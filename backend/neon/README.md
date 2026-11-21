@@ -23,6 +23,7 @@ Apply in numeric order after provisioning Neon Auth:
 
 1. `migrations/0001_initial.sql`
 2. `migrations/0002_neon_auth_and_delivery.sql`
+3. `migrations/0003_ai_usage_windows.sql` — required before deploying the AI function version that enforces per-account quotas.
 
 The migrations are idempotent for the existing empty EduNivora project. They
 must be tested on a Neon child branch before being applied to any database that
@@ -101,12 +102,12 @@ The Notices API is deployed to the Neon project's default branch.
 
 - Function slug: `notices`
 - Runtime: Node.js 24
-- Last confirmed live deployment: deployment ID 7 (Node.js 24)
+- Active deployment verified 2026-11-21: deployment ID 8 (Node.js 24)
 - Invocation URL: `https://br-late-bread-bajll3is-notices.compute.c-8.eu-central-1.aws.neon.tech`
 - Health check: `GET /health` returned HTTP 200 and confirmed a database query.
 - Public feed: `GET /v1/announcements` returned HTTP 200 with an empty feed.
 - Admin guard: unauthenticated `GET /v1/admin/announcements` returned HTTP 401.
-- The current source branch adds authenticated `GET /v1/me`, receipt/profile improvements, and the corrected JWT issuer/audience validation. The latest source bundle is built and stored as a GitHub Actions artifact, but these newer source changes have **not yet been deployed** to the live Function. The active deployment remains version 7; the recorded smoke check returned 404 for `GET /v1/me`, while `/health` and the public feed returned 200 and the unauthenticated admin route returned 401. Do not consider the admin console operational until a verified deployment exposes `/v1/me` and accepts a real Neon JWT.
+- The active deployment is version 8. On 2026-11-21, the public health endpoint returned HTTP 200 and an unauthenticated request to `GET /v1/me` returned HTTP 401. This proves the protected route is present and rejects requests without credentials; it does **not** prove that a valid Neon JWT is accepted. Real-account JWT acceptance, registered receipts, admin publishing, Flutter integration, and production Web CORS remain explicit acceptance gates. Do not consider the admin console operational until these authenticated flows pass.
 
 The bundle workflow builds the Node.js 24 entrypoint, packages its runtime
 dependencies, and uploads the ZIP plus bundled entrypoint as a GitHub Actions

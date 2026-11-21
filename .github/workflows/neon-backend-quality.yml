@@ -12,6 +12,7 @@ on:
       - main
       - chore/edunivora-phase0-execution
       - feat/neon-managed-auth-and-notices
+      - feat/ai-durable-account-quotas
     paths:
       - "backend/neon/**"
       - "neon.ts"
@@ -35,3 +36,5 @@ jobs:
         run: npm run check
       - name: Run backend tests
         run: npm test
+      - name: Build AI Neon Function bundle
+        run: npm run build:ai
