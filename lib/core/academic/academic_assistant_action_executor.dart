@@ -398,11 +398,20 @@ class AcademicAssistantActionExecutor {
               if (_string(args, 'title').isEmpty) throw StateError('عنوان المهمة مطلوب.');
               final course = resolveCourse(args, allowPlanned: true);
               if (course?.id != null) usedCourseIds.add(course!.id!);
-              if (args['end_date_time'] != null) {
-                final due = _date(args['end_date_time']);
-                if (due == null || !due.isAfter(DateTime.now())) {
-                  throw StateError('وقت انتهاء المهمة غير صالح أو ليس في المستقبل.');
-                }
+              final due = args['end_date_time'] == null
+                  ? null
+                  : _date(args['end_date_time']);
+              if (args['end_date_time'] != null &&
+                  (due == null || !due.isAfter(DateTime.now()))) {
+                throw StateError('وقت انتهاء المهمة غير صالح أو ليس في المستقبل.');
+              }
+              final reminderEnabled = due != null && args['reminder_enabled'] != false;
+              final reminderOffset = (_integer(args['reminder_offset_minutes']) ?? 15)
+                  .clamp(0, 1440)
+                  .toInt();
+              if (reminderEnabled &&
+                  !due!.subtract(Duration(minutes: reminderOffset)).isAfter(DateTime.now())) {
+                throw StateError('موعد المهمة قريب جداً لإنشاء التنبيه المحدد.');
               }
               break;
 
@@ -412,10 +421,25 @@ class AcademicAssistantActionExecutor {
               final task = resolveTask(args);
               touch('task:${task.id}');
               if (task.courseId != null) usedCourseIds.add(task.courseId!);
-              if (call.name == 'update_task' && args['end_date_time'] != null) {
-                final due = _date(args['end_date_time']);
-                if (due == null || !due.isAfter(task.startDateTime ?? DateTime.now())) {
+              if (call.name == 'update_task') {
+                final due = args['end_date_time'] == null
+                    ? task.endDateTime
+                    : _date(args['end_date_time']);
+                if (args['end_date_time'] != null &&
+                    (due == null || !due.isAfter(task.startDateTime ?? DateTime.now()))) {
                   throw StateError('وقت انتهاء المهمة الجديدة غير صالح.');
+                }
+                final reminderEnabled = args['reminder_enabled'] is bool
+                    ? args['reminder_enabled'] as bool
+                    : task.reminderEnabled;
+                final reminderOffset = (_integer(args['reminder_offset_minutes']) ??
+                        task.reminderOffsetMinutes)
+                    .clamp(0, 1440)
+                    .toInt();
+                if (reminderEnabled &&
+                    (due == null ||
+                        !due.subtract(Duration(minutes: reminderOffset)).isAfter(DateTime.now()))) {
+                  throw StateError('موعد التنبيه الجديد غير صالح أو أصبح في الماضي.');
                 }
               }
               break;
