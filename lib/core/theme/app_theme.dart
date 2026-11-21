@@ -5,11 +5,12 @@ class AppTheme {
 
   static const Color primary = Color(0xFF5B6CFF);
   static const Color primaryStrong = Color(0xFF3B82F6);
-  static const Color primaryAction = Color(0xFF4655D6);
+  static const Color primaryAction = Color(0xFF4E5FD8);
   // WCAG AA text tones paired with the app's light and dark surfaces.
-  static const Color primaryTextLight = Color(0xFF4655D6);
+  static const Color primaryTextLight = Color(0xFF4E5FD8);
   static const Color primaryTextDark = Color(0xFFA5B4FC);
   static const Color mutedTextLight = Color(0xFF475569);
+  static const Color accessibleOutline = Color(0xFF64748B);
   static const Color primarySoft = Color(0xFFE0E7FF);
   static const Color success = Color(0xFF10B981);
   static const Color warning = Color(0xFFF59E0B);
@@ -81,7 +82,7 @@ class AppTheme {
         prefixIconColor: primary,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+          borderSide: const BorderSide(color: accessibleOutline),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
@@ -108,7 +109,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(radiusMd),
           ),
-          side: const BorderSide(color: Color(0xFFCBD5E1)),
+          side: const BorderSide(color: accessibleOutline),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -200,7 +201,7 @@ class AppTheme {
         prefixIconColor: Colors.white70,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Color(0xFF334155)),
+          borderSide: const BorderSide(color: accessibleOutline),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
@@ -213,6 +214,8 @@ class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
+          backgroundColor: primaryAction,
+          foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(radiusMd),
@@ -225,7 +228,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(radiusMd),
           ),
-          side: const BorderSide(color: border),
+          side: const BorderSide(color: accessibleOutline),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
