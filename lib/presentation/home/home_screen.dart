@@ -1969,7 +1969,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                       ),
                     ),
                     const SizedBox(width: 4),
-                    const Icon(
+                    Icon(
                       Icons.arrow_back_rounded,
                       size: 16,
                       color: isDark
@@ -2185,7 +2185,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
               child: Center(
                 child: Column(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.check_circle_outline_rounded,
                       size: 38,
                       color: isDark
