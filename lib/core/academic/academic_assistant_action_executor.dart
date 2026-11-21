@@ -283,6 +283,9 @@ class AcademicAssistantActionExecutor {
       }) {
         final id = _integer(args['course_id']);
         final name = _string(args, 'course_name');
+        if (args.containsKey('course_id') && id == null) {
+          throw StateError('معرّف المادة يجب أن يكون عدداً صحيحاً موجباً.');
+        }
         if (id == null && name.isEmpty) {
           if (required) throw StateError('حدد المادة المرتبطة بهذه العملية.');
           return null;
@@ -290,6 +293,9 @@ class AcademicAssistantActionExecutor {
         if (id != null) {
           final match = courses.where((item) => item.id == id).firstOrNull;
           if (match == null) throw StateError('لم أجد المادة المطلوبة بالمعرّف $id.');
+          if (name.isNotEmpty && _normalize(match.name) != _normalize(name)) {
+            throw StateError('معرّف المادة $id لا يطابق الاسم «$name».');
+          }
           return match;
         }
         final matches = courses
@@ -306,9 +312,15 @@ class AcademicAssistantActionExecutor {
       TaskEntity resolveTask(Map<String, dynamic> args) {
         final id = _integer(args['task_id']);
         final title = _string(args, 'task_title');
+        if (args.containsKey('task_id') && id == null) {
+          throw StateError('معرّف المهمة يجب أن يكون عدداً صحيحاً موجباً.');
+        }
         if (id != null) {
           final match = tasks.where((item) => item.id == id).firstOrNull;
           if (match == null) throw StateError('لم أجد المهمة المطلوبة بالمعرّف $id.');
+          if (title.isNotEmpty && _normalize(match.title) != _normalize(title)) {
+            throw StateError('معرّف المهمة $id لا يطابق العنوان «$title».');
+          }
           return match;
         }
         if (title.isEmpty) throw StateError('حدد عنوان المهمة أو معرّفها.');
@@ -492,6 +504,12 @@ class AcademicAssistantActionExecutor {
                 break;
               }
               final course = resolveCourse(args, allowPlanned: true);
+              final existingCourse = rawCourseId == null
+                  ? null
+                  : courses.where((item) => item.id == rawCourseId).firstOrNull;
+              if (course == null && existingCourse == null) {
+                throw StateError('المادة المرتبطة بالمحاضرة $id غير موجودة؛ حدد مادة صحيحة لتصحيح الربط.');
+              }
               if (course?.id != null) usedCourseIds.add(course!.id!);
               final day = _string(args, 'day').isEmpty
                   ? existing['day_of_week']?.toString() ?? ''
