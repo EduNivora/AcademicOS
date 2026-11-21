@@ -64,6 +64,7 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
   bool _isCheckingSession = true;
   bool _hasCloudSession = false;
   bool _isGeminiReady = false;
+  late final Future<void> _ledgerRecovery;
 
   @override
   void initState() {
@@ -72,7 +73,16 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
       courseUseCases: widget.courseUseCases,
       taskUseCases: widget.taskUseCases,
     );
+    _ledgerRecovery = _recoverAssistantLedger();
     _refreshSessionState();
+  }
+
+  Future<void> _recoverAssistantLedger() async {
+    try {
+      await DatabaseHelper.instance.recoverInterruptedAssistantRuns();
+    } catch (error) {
+      debugPrint('Assistant execution ledger recovery failed: ${error.runtimeType}');
+    }
   }
 
   Future<void> _refreshSessionState() async {
@@ -143,22 +153,22 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
     if (courseName.isEmpty) return 'اكتب اسم المادة بوضوح.';
     final extension = (file.extension ?? file.name.split('.').last)
         .toLowerCase();
-    final result = await _actionExecutor.execute(
-      AcademicAssistantToolCall(
-        name: 'add_material_file',
-        arguments: {
-          'course_name': courseName,
-          'file_name': file.name,
-          'file_type': extension,
-          'file_bytes': file.bytes!,
-        },
-      ),
+    final call = AcademicAssistantToolCall(
+      name: 'add_material_file',
+      arguments: {
+        'course_name': courseName,
+        'file_name': file.name,
+        'file_type': extension,
+        'file_bytes': file.bytes!,
+      },
     );
-    if (result.changedData) {
-      setState(() => _pendingAttachment = null);
-      await widget.onDataChanged?.call();
-    }
-    return result.message;
+    return _executeTrackedActions(
+      [call],
+      source: 'attachment',
+      onSuccess: () async {
+        if (mounted) setState(() => _pendingAttachment = null);
+      },
+    );
   }
 
   void _showMessage(String message) {
@@ -291,73 +301,196 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
 $userMessage''';
   }
 
-  Future<String> _executeActionPlan(AcademicAssistantActionPlan plan) async {
-    if (plan.actions.isEmpty) {
-      return plan.reply.trim().isEmpty
+  Future<String> _executeActionPlan(AcademicAssistantActionPlan plan) {
+    return _executeTrackedActions(
+      plan.actions,
+      source: 'cloud_plan',
+      lead: plan.reply,
+    );
+  }
+
+  Future<String> _executeTrackedActions(
+    List<AcademicAssistantToolCall> calls, {
+    required String source,
+    String lead = '',
+    Future<void> Function()? onSuccess,
+  }) async {
+    if (calls.isEmpty) {
+      return lead.trim().isEmpty
           ? 'لم ينتج المساعد إجراءً أو إجابة واضحة.'
-          : plan.reply.trim();
-    }
-    final preflight = await _actionExecutor.preflightPlan(plan.actions);
-    if (!preflight.succeeded) return preflight.message;
-
-    // Obtain every destructive-action approval before the first write.
-    // A declined confirmation must cancel the whole plan, not leave earlier
-    // create/update steps partially applied.
-    const destructiveActions = {
-      'delete_material',
-      'delete_task',
-      'delete_lecture',
-      'delete_exam',
-    };
-    final approvedDestructiveActions = <int>{};
-    for (var index = 0; index < plan.actions.length; index++) {
-      final call = plan.actions[index];
-      if (!destructiveActions.contains(call.name)) continue;
-      final preview = await _actionExecutor.execute(call);
-      if (!preview.requiresConfirmation) {
-        return preview.message;
-      }
-      final confirmed = await _showActionConfirmation(preview);
-      if (confirmed != true) {
-        return 'تم إلغاء الخطة قبل التنفيذ. لم تُنفذ أي خطوة.';
-      }
-      approvedDestructiveActions.add(index);
+          : lead.trim();
     }
 
-    final messages = <String>[];
-    final lead = plan.reply.trim();
-    if (lead.isNotEmpty) messages.add(lead);
-
-    for (var index = 0; index < plan.actions.length; index++) {
-      final result = await _executeTool(
-        plan.actions[index],
-        confirmed: approvedDestructiveActions.contains(index),
+    final ledger = DatabaseHelper.instance;
+    int? runId;
+    var currentStep = -1;
+    try {
+      await _ledgerRecovery;
+      runId = await ledger.createAssistantActionRun(
+        source: source,
+        actionNames: calls.map((call) => call.name).toList(growable: false),
       );
-      messages.add(result.message);
-      if (!result.succeeded) {
-        final remaining = plan.actions.length - index - 1;
+
+      final preflight = await _actionExecutor.preflightPlan(calls);
+      if (!preflight.succeeded) {
+        await ledger.finalizePendingAssistantActionSteps(
+          runId,
+          status: 'skipped',
+          failureCode: 'preflight_rejected',
+        );
+        await ledger.updateAssistantActionRun(
+          runId: runId,
+          status: 'rejected',
+          failureCode: 'preflight_rejected',
+        );
+        return preflight.message;
+      }
+
+      const destructiveActions = {
+        'delete_material',
+        'delete_task',
+        'delete_lecture',
+        'delete_exam',
+      };
+      await ledger.updateAssistantActionRun(
+        runId: runId,
+        status: 'awaiting_confirmation',
+      );
+      final approvedDestructiveActions = <int>{};
+      for (var index = 0; index < calls.length; index++) {
+        final call = calls[index];
+        if (!destructiveActions.contains(call.name)) continue;
+        final preview = await _actionExecutor.execute(call);
+        if (!preview.requiresConfirmation) {
+          await ledger.finalizePendingAssistantActionSteps(
+            runId,
+            status: 'skipped',
+            failureCode: 'confirmation_unavailable',
+          );
+          await ledger.updateAssistantActionRun(
+            runId: runId,
+            status: 'failed',
+            failureStep: index,
+            failureCode: 'confirmation_unavailable',
+          );
+          return preview.message;
+        }
+        final confirmed = await _showActionConfirmation(preview);
+        if (confirmed != true) {
+          await ledger.finalizePendingAssistantActionSteps(
+            runId,
+            status: 'cancelled',
+            failureCode: 'user_cancelled',
+          );
+          await ledger.updateAssistantActionRun(
+            runId: runId,
+            status: 'cancelled',
+            failureStep: index,
+            failureCode: 'user_cancelled',
+          );
+          return 'تم إلغاء الخطة قبل التنفيذ. لم تُنفذ أي خطوة.';
+        }
+        approvedDestructiveActions.add(index);
+      }
+
+      await ledger.updateAssistantActionRun(runId: runId, status: 'running');
+      final messages = <String>[];
+      if (lead.trim().isNotEmpty) messages.add(lead.trim());
+      var succeededCount = 0;
+
+      for (var index = 0; index < calls.length; index++) {
+        currentStep = index;
+        await ledger.updateAssistantActionStep(
+          runId: runId,
+          stepIndex: index,
+          status: 'running',
+        );
+        final result = await _executeTool(
+          calls[index],
+          confirmed: approvedDestructiveActions.contains(index),
+        );
+        messages.add(result.message);
+        await ledger.updateAssistantActionStep(
+          runId: runId,
+          stepIndex: index,
+          status: result.succeeded ? 'succeeded' : 'failed',
+          changedData: result.changedData,
+          failureCode: result.succeeded ? null : 'action_failed',
+        );
+        currentStep = -1;
+        if (result.succeeded) {
+          succeededCount++;
+          if (result.changedData) {
+            try {
+              await onSuccess?.call();
+            } catch (callbackError) {
+              debugPrint('Assistant success callback failed: ${callbackError.runtimeType}');
+            }
+          }
+          continue;
+        }
+
+        final remaining = calls.length - index - 1;
         if (remaining > 0) {
+          await ledger.finalizePendingAssistantActionSteps(
+            runId,
+            status: 'skipped',
+            failureCode: 'previous_action_failed',
+          );
           messages.add(
             'أوقفت بقية الخطة لأن الإجراء ${index + 1} لم يكتمل بنجاح. '
             'راجع النتيجة ثم اطلب متابعة الخطوات المتبقية.',
           );
         }
-        break;
+        await ledger.updateAssistantActionRun(
+          runId: runId,
+          status: succeededCount > 0 ? 'partial_failure' : 'failed',
+          failureStep: index,
+          failureCode: 'action_failed',
+        );
+        return messages.join('\\n\\n');
       }
-    }
 
-    return messages.isEmpty
-        ? 'لم ينتج عن الطلب إجراء واضح. وضّح ما تريد تنفيذه.'
-        : messages.join('\\n\\n');
+      await ledger.updateAssistantActionRun(runId: runId, status: 'succeeded');
+      return messages.isEmpty
+          ? 'لم ينتج عن الطلب إجراء واضح. وضّح ما تريد تنفيذه.'
+          : messages.join('\\n\\n');
+    } catch (error) {
+      if (runId != null) {
+        try {
+          if (currentStep >= 0) {
+            await ledger.updateAssistantActionStep(
+              runId: runId,
+              stepIndex: currentStep,
+              status: 'interrupted',
+              failureCode: 'execution_interrupted',
+            );
+          }
+          await ledger.finalizePendingAssistantActionSteps(
+            runId,
+            status: 'skipped',
+            failureCode: 'execution_interrupted',
+          );
+          await ledger.updateAssistantActionRun(
+            runId: runId,
+            status: 'interrupted',
+            failureCode: 'execution_interrupted',
+          );
+        } catch (ledgerError) {
+          debugPrint(
+            'Assistant ledger finalization failed: ${ledgerError.runtimeType}',
+          );
+        }
+      }
+      return 'توقفت الخطة بسبب خطأ أثناء التنفيذ أو تسجيل نتيجته. '
+          'افحص سجل التنفيذ قبل إعادة الطلب لتجنب تكرار أي خطوة.';
+    }
   }
 
   Future<String?> _runLocalCommand(String input) async {
     final call = const AcademicAssistantCommandParser().parse(input);
     if (call == null) return null;
-    final preflight = await _actionExecutor.preflightPlan([call]);
-    if (!preflight.succeeded) return preflight.message;
-    final result = await _executeTool(call);
-    return result.message;
+    return _executeTrackedActions([call], source: 'local_command');
   }
 
   Future<bool?> _showActionConfirmation(
@@ -406,7 +539,13 @@ $userMessage''';
         result = await _actionExecutor.execute(call, confirmed: true);
       }
       if (result.succeeded && result.changedData) {
-        await widget.onDataChanged?.call();
+        try {
+          await widget.onDataChanged?.call();
+        } catch (refreshError) {
+          // A UI refresh failure must not relabel an already committed
+          // academic write as a failed action in the execution ledger.
+          debugPrint('Assistant data refresh failed: ${refreshError.runtimeType}');
+        }
       }
       return result;
     } catch (error) {
