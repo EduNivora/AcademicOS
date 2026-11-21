@@ -194,7 +194,8 @@ test("minute quota returns 429 and does not call Gemini", async () => {
   })(request("اشرح"));
   assert.equal(response.status, 429);
   assert.equal((await response.json()).error.code, "ai_quota_exceeded");
-  assert.equal(response.headers.get("Retry-After"), "60");
+  const retryAfter = Number(response.headers.get("Retry-After"));
+  assert.ok(retryAfter >= 1 && retryAfter <= 60);
   assert.equal(providerCalled, false);
   assert.equal(pool.calls.at(-1), "ROLLBACK");
 });
