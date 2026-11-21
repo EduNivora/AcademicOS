@@ -151,7 +151,8 @@ export function createAiHandler({ verifyIdentity, apiKey, pool, allowedOrigins =
     let identity;
     try { identity = await verifyIdentity(token); }
     catch { return fail(401, "invalid_token", "جلسة الدخول غير صالحة أو منتهية.", headers); }
-    if (!identity?.sub || typeof identity.sub !== "string") {
+    if (!identity?.sub || typeof identity.sub !== "string" ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(identity.sub)) {
       return fail(401, "invalid_token", "جلسة الدخول غير صالحة أو منتهية.", headers);
     }
     if (typeof apiKey !== "string" || apiKey.length < 10) {
