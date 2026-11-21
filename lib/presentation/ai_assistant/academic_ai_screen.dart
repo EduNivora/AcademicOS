@@ -153,22 +153,22 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
     if (courseName.isEmpty) return 'اكتب اسم المادة بوضوح.';
     final extension = (file.extension ?? file.name.split('.').last)
         .toLowerCase();
-    final result = await _actionExecutor.execute(
-      AcademicAssistantToolCall(
-        name: 'add_material_file',
-        arguments: {
-          'course_name': courseName,
-          'file_name': file.name,
-          'file_type': extension,
-          'file_bytes': file.bytes!,
-        },
-      ),
+    final call = AcademicAssistantToolCall(
+      name: 'add_material_file',
+      arguments: {
+        'course_name': courseName,
+        'file_name': file.name,
+        'file_type': extension,
+        'file_bytes': file.bytes!,
+      },
     );
-    if (result.changedData) {
-      setState(() => _pendingAttachment = null);
-      await widget.onDataChanged?.call();
-    }
-    return result.message;
+    return _executeTrackedActions(
+      [call],
+      source: 'attachment',
+      onSuccess: () async {
+        if (mounted) setState(() => _pendingAttachment = null);
+      },
+    );
   }
 
   void _showMessage(String message) {
@@ -313,6 +313,7 @@ $userMessage''';
     List<AcademicAssistantToolCall> calls, {
     required String source,
     String lead = '',
+    Future<void> Function()? onSuccess,
   }) async {
     if (calls.isEmpty) {
       return lead.trim().isEmpty
@@ -418,6 +419,7 @@ $userMessage''';
         );
         if (result.succeeded) {
           succeededCount++;
+          if (result.changedData) await onSuccess?.call();
           continue;
         }
 
