@@ -417,6 +417,7 @@ $userMessage''';
           changedData: result.changedData,
           failureCode: result.succeeded ? null : 'action_failed',
         );
+        currentStep = -1;
         if (result.succeeded) {
           succeededCount++;
           if (result.changedData) {
