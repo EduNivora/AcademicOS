@@ -73,6 +73,10 @@ export async function reserveAiQuota(pool, subject, {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    await client.query(
+      "DELETE FROM public.ai_usage_windows WHERE user_id = $1::uuid AND window_start < NOW() - INTERVAL '2 days'",
+      [subject],
+    );
     const minute = await client.query(
       `INSERT INTO public.ai_usage_windows (user_id, window_kind, window_start, request_count)
        VALUES ($1::uuid, 'minute', date_trunc('minute', NOW()), 1)
