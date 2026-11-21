@@ -374,6 +374,9 @@ class AcademicAssistantActionExecutor {
               final course = resolveCourse(args, required: true)!;
               touch('course:${course.id}');
               deletedCourseIds.add(course.id!);
+              simulatedSchedules.removeWhere(
+                (item) => _integer(item['course_id']) == course.id,
+              );
               break;
 
             case 'add_material_file':
