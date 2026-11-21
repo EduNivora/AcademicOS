@@ -189,4 +189,54 @@ void main() {
     });
   }
 
+
+  for (final dark in [false, true]) {
+    testWidgets('primary controls meet contrast and touch targets (dark=$dark)', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.lightTheme(),
+          darkTheme: AppTheme.darkTheme(),
+          themeMode: dark ? ThemeMode.dark : ThemeMode.light,
+          home: Scaffold(
+            body: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  FilledButton(
+                    onPressed: () {},
+                    child: const Text('Primary action'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {},
+                    child: const Text('Secondary action'),
+                  ),
+                  TextButton(
+                    onPressed: () {},
+                    child: const Text('Text action'),
+                  ),
+                  OutlinedButton(
+                    onPressed: () {},
+                    child: const Text('Outlined action'),
+                  ),
+                  const TextField(
+                    decoration: InputDecoration(labelText: 'Search'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final semantics = tester.ensureSemantics();
+      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(textContrastGuideline));
+      semantics.dispose();
+    });
+  }
+
 }
