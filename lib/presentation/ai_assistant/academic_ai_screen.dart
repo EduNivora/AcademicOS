@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/academic/academic_assistant_service.dart';
+import '../../core/academic/academic_assistant_action_plan.dart';
 import '../../core/academic/academic_assistant_action_executor.dart';
 import '../../data/database/database_helper.dart';
 import '../../data/models/student_profile_model.dart';
@@ -210,7 +211,7 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
               message: _buildActionPlanningPrompt(trimmed),
               context: await _buildAcademicContext(),
             );
-            final plan = _parseActionPlan(planned);
+            final plan = const AcademicAssistantActionPlanParser().parse(planned);
             if (plan == null) {
               reply = await _remote.sendMessage(
                 accessToken: token,
@@ -290,74 +291,50 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
 $userMessage''';
   }
 
-  Map<String, dynamic>? _parseActionPlan(String response) {
-    try {
-      final cleaned = response
-          .replaceFirst(RegExp(r'^```(?:json)?\s*', caseSensitive: false), '')
-          .replaceFirst(RegExp(r'\s*```$'), '')
-          .trim();
-      final decoded = jsonDecode(cleaned);
-      if (decoded is! Map<String, dynamic> || decoded['actions'] is! List) {
-        return null;
-      }
-      final actions = (decoded['actions'] as List)
-          .whereType<Map>()
-          .map((item) => Map<String, dynamic>.from(item))
-          .where(
-            (item) => const {
-              'update_profile',
-              'create_material',
-              'update_material',
-              'delete_material',
-              'create_task',
-              'complete_task',
-              'update_task',
-              'delete_task',
-              'add_lecture',
-              'update_lecture',
-              'delete_lecture',
-              'create_exam',
-              'update_exam',
-              'delete_exam',
-              'generate_report',
-            }.contains(item['name']),
-          )
-          .take(10)
-          .toList();
-      return {'reply': decoded['reply']?.toString() ?? '', 'actions': actions};
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<String> _executeActionPlan(Map<String, dynamic> plan) async {
+  Future<String> _executeActionPlan(AcademicAssistantActionPlan plan) async {
     final messages = <String>[];
-    final lead = plan['reply']?.toString().trim() ?? '';
+    final lead = plan.reply.trim();
     if (lead.isNotEmpty) messages.add(lead);
-    final actions = plan['actions'] as List? ?? const [];
-    for (final raw in actions) {
-      if (raw is! Map) continue;
-      final call = AcademicAssistantToolCall.fromJson(
-        Map<String, dynamic>.from(raw),
-      );
-      messages.add(await _executeTool(call));
+
+    for (var index = 0; index < plan.actions.length; index++) {
+      final result = await _executeTool(plan.actions[index]);
+      messages.add(result.message);
+      if (!result.succeeded) {
+        final remaining = plan.actions.length - index - 1;
+        if (remaining > 0) {
+          messages.add(
+            'أوقفت بقية الخطة لأن الإجراء ${index + 1} لم يكتمل بنجاح. '
+            'راجع النتيجة ثم اطلب متابعة الخطوات المتبقية.',
+          );
+        }
+        break;
+      }
     }
+
     return messages.isEmpty
         ? 'لم ينتج عن الطلب إجراء واضح. وضّح ما تريد تنفيذه.'
-        : messages.join('\n\n');
+        : messages.join('\\n\\n');
   }
 
   Future<String?> _runLocalCommand(String input) async {
     final call = const AcademicAssistantCommandParser().parse(input);
     if (call == null) return null;
-    return _executeTool(call);
+    final result = await _executeTool(call);
+    return result.message;
   }
 
-  Future<String> _executeTool(AcademicAssistantToolCall call) async {
+  Future<AcademicAssistantToolResult> _executeTool(
+    AcademicAssistantToolCall call,
+  ) async {
     try {
       var result = await _actionExecutor.execute(call);
       if (result.requiresConfirmation) {
-        if (!mounted) return 'تعذر عرض تأكيد العملية.';
+        if (!mounted) {
+          return const AcademicAssistantToolResult(
+            message: 'تعذر عرض تأكيد العملية.',
+            succeeded: false,
+          );
+        }
         final confirmed = await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
@@ -375,15 +352,23 @@ $userMessage''';
             ],
           ),
         );
-        if (confirmed != true) return 'تم إلغاء العملية بناءً على اختيارك.';
+        if (confirmed != true) {
+          return const AcademicAssistantToolResult(
+            message: 'تم إلغاء العملية بناءً على اختيارك.',
+            succeeded: false,
+          );
+        }
         result = await _actionExecutor.execute(call, confirmed: true);
       }
-      if (result.changedData) {
+      if (result.succeeded && result.changedData) {
         await widget.onDataChanged?.call();
       }
-      return result.message;
+      return result;
     } catch (error) {
-      return 'لم يتم تنفيذ «${call.name}»: $error';
+      return AcademicAssistantToolResult(
+        message: 'لم يتم تنفيذ «${call.name}»: $error',
+        succeeded: false,
+      );
     }
   }
 
