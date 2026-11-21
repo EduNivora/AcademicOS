@@ -211,7 +211,7 @@ export function createAiHandler({ verifyIdentity, apiKey, pool, allowedOrigins =
     } catch (error) {
       if (error instanceof AiQuotaExceededError) {
         const retryAfter = error.windowKind === "minute"
-          ? 60
+          ? Math.max(1, 60 - new Date().getUTCSeconds())
           : Math.max(1, Math.ceil((Date.UTC(
               new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate() + 1,
             ) - Date.now()) / 1000));
