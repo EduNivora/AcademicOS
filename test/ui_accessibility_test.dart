@@ -196,11 +196,14 @@ void main() {
     expect(find.byTooltip('إظهار كلمة المرور'), findsOneWidget);
     expect(find.byType(TextFormField), findsNWidgets(2));
 
-    final passwordField = find.byType(TextFormField).at(1);
-    expect(tester.widget<TextFormField>(passwordField).obscureText, isTrue);
+    final passwordField = find.descendant(
+      of: find.byType(TextFormField).at(1),
+      matching: find.byType(TextField),
+    );
+    expect(tester.widget<TextField>(passwordField).obscureText, isTrue);
     await tester.tap(find.byTooltip('إظهار كلمة المرور'));
     await tester.pump();
-    expect(tester.widget<TextFormField>(passwordField).obscureText, isFalse);
+    expect(tester.widget<TextField>(passwordField).obscureText, isFalse);
 
     await tester.tap(find.text('تسجيل الدخول'));
     await tester.pumpAndSettle();
