@@ -23,10 +23,16 @@ const verifyIdentity = createNeonIdentityVerifier({
   jwksUrl: process.env.NEON_AUTH_JWKS_URL,
 });
 const allowedOrigins = (process.env.APP_ORIGINS ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+const positiveInteger = (value, fallback) => {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback;
+};
 
 export default createAiHandler({
   verifyIdentity,
   apiKey: process.env.GEMINI_API_KEY,
   pool,
   allowedOrigins,
+  minuteLimit: positiveInteger(process.env.AI_MINUTE_LIMIT, 5),
+  dailyLimit: positiveInteger(process.env.AI_DAILY_LIMIT, 50),
 });
