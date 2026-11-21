@@ -100,6 +100,39 @@ void main() {
       expect(taskRepository.tasks, isEmpty);
     });
 
+
+    test('rejects invalid lecture reminder options during preflight', () async {
+      final invalidToggle = await executor.preflightPlan([
+        const AcademicAssistantToolCall(
+          name: 'add_lecture',
+          arguments: {
+            'course_name': 'الشبكات',
+            'day': 'الأحد',
+            'start_time': '08:00',
+            'end_time': '09:00',
+            'reminder_enabled': 'false',
+          },
+        ),
+      ]);
+      expect(invalidToggle.succeeded, isFalse);
+      expect(invalidToggle.message, contains('تذكير المحاضرة'));
+
+      final invalidOffset = await executor.preflightPlan([
+        const AcademicAssistantToolCall(
+          name: 'add_lecture',
+          arguments: {
+            'course_name': 'الشبكات',
+            'day': 'الأحد',
+            'start_time': '08:00',
+            'end_time': '09:00',
+            'reminder_offset_minutes': 'later',
+          },
+        ),
+      ]);
+      expect(invalidOffset.succeeded, isFalse);
+      expect(invalidOffset.message, contains('مدة التنبيه'));
+    });
+
     test('detects conflicts between two proposed lectures before the first write', () async {
       final result = await executor.preflightPlan([
         const AcademicAssistantToolCall(
