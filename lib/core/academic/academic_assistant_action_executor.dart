@@ -34,12 +34,14 @@ class AcademicAssistantToolCall {
 class AcademicAssistantToolResult {
   final String message;
   final bool changedData;
+  final bool succeeded;
   final bool requiresConfirmation;
   final String? confirmationPrompt;
 
   const AcademicAssistantToolResult({
     required this.message,
     this.changedData = false,
+    this.succeeded = false,
     this.requiresConfirmation = false,
     this.confirmationPrompt,
   });
@@ -269,6 +271,7 @@ class AcademicAssistantActionExecutor {
     await StudentProfile.save(updated);
     return const AcademicAssistantToolResult(
       message: 'تم تحديث الملف الأكاديمي وحفظ البيانات.',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -306,6 +309,7 @@ class AcademicAssistantActionExecutor {
     );
     return AcademicAssistantToolResult(
       message: 'تمت إضافة المادة «$name» بنجاح. رقمها الداخلي: $id.',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -361,6 +365,7 @@ class AcademicAssistantActionExecutor {
     return AcademicAssistantToolResult(
       message:
           'تم حفظ «$fileName» داخل مادة «${course.name}» وربطه بمعرّف المادة.',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -403,6 +408,7 @@ class AcademicAssistantActionExecutor {
     await courseUseCases.updateCourse(updated);
     return AcademicAssistantToolResult(
       message: 'تم تحديث بيانات المادة «${updated.name}».',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -445,6 +451,7 @@ class AcademicAssistantActionExecutor {
     return AcademicAssistantToolResult(
       message:
           'تم حذف المادة «${course.name}» والبيانات التابعة لها بعد تأكيدك.',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -515,6 +522,7 @@ class AcademicAssistantActionExecutor {
         : ' وربطتها بمادة ${courseResult.course!.name}';
     return AcademicAssistantToolResult(
       message: 'تم إنشاء المهمة «$title»$materialText وحفظها في النظام.',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -530,6 +538,7 @@ class AcademicAssistantActionExecutor {
     if (task.isCompleted) {
       return AcademicAssistantToolResult(
         message: 'المهمة «${task.title}» مكتملة بالفعل.',
+        succeeded: true,
       );
     }
     await taskUseCases.updateTask(
@@ -538,6 +547,7 @@ class AcademicAssistantActionExecutor {
     await NotificationService.instance.cancelTaskReminder(task.id!);
     return AcademicAssistantToolResult(
       message: 'تم تسجيل إنجاز المهمة «${task.title}» مع وقت الإنجاز الفعلي.',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -608,6 +618,7 @@ class AcademicAssistantActionExecutor {
     }
     return AcademicAssistantToolResult(
       message: 'تم تحديث المهمة «${updated.title}».',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -632,6 +643,7 @@ class AcademicAssistantActionExecutor {
     await NotificationService.instance.cancelTaskReminder(task.id!);
     return AcademicAssistantToolResult(
       message: 'تم حذف المهمة «${task.title}».',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -705,6 +717,7 @@ class AcademicAssistantActionExecutor {
     return AcademicAssistantToolResult(
       message:
           'تمت إضافة محاضرة ${course.name} يوم $day من $startTime إلى $endTime وربطها بمعرّف المادة.',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -801,6 +814,7 @@ class AcademicAssistantActionExecutor {
     );
     return AcademicAssistantToolResult(
       message: 'تم تحديث محاضرة ${course.name} في الجدول الأسبوعي.',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -837,6 +851,7 @@ class AcademicAssistantActionExecutor {
     await NotificationService.instance.cancelLectureReminder(scheduleId);
     return AcademicAssistantToolResult(
       message: 'تم حذف المحاضرة من الجدول وإلغاء تنبيهها.',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -867,6 +882,7 @@ class AcademicAssistantActionExecutor {
     return AcademicAssistantToolResult(
       message: 'تم إنشاء الاختبار «$title» بتاريخ ${examDate.toLocal()}'
           '${courseResult.course == null ? '' : ' وربطه بمادة ${courseResult.course!.name}'} (رقم $id).',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -905,6 +921,7 @@ class AcademicAssistantActionExecutor {
     await database.updateExam(updated);
     return AcademicAssistantToolResult(
       message: 'تم تحديث الاختبار «${updated.title}».',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -931,6 +948,7 @@ class AcademicAssistantActionExecutor {
     await database.deleteExam(id);
     return AcademicAssistantToolResult(
       message: 'تم حذف الاختبار «${exam.title}» بعد تأكيدك.',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -961,7 +979,7 @@ class AcademicAssistantActionExecutor {
       title: 'تم تجهيز التقرير ${period.arabicLabel}',
       body: 'التقرير جاهز داخل AcademicOS.',
     );
-    return AcademicAssistantToolResult(message: report);
+    return AcademicAssistantToolResult(message: report, succeeded: true);
   }
 
   Future<_ResolvedCourse> _resolveCourse(Map<String, dynamic> args) async {
