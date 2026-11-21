@@ -45,32 +45,6 @@ class _AccessibilityAuthRepository implements AuthRepository {
     required String email,
     required String otp,
   }) async => true;
-  for (final dark in [false, true]) {
-    testWidgets('shared brand footer meets text contrast guidance (dark=$dark)', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: AppTheme.lightTheme(),
-          darkTheme: AppTheme.darkTheme(),
-          themeMode: dark ? ThemeMode.dark : ThemeMode.light,
-          home: const Scaffold(
-            body: SingleChildScrollView(
-              child: Padding(
-                padding: EdgeInsets.all(16),
-                child: EduBrandFooter(),
-              ),
-            ),
-          ),
-        ),
-      );
-
-      final semantics = tester.ensureSemantics();
-      await expectLater(tester, meetsGuideline(textContrastGuideline));
-      semantics.dispose();
-    });
-  }
-
 }
 
 AuthUseCases _authUseCases() {
@@ -177,4 +151,30 @@ void main() {
     expect(find.byType(TextFormField), findsNWidgets(2));
     semantics.dispose();
   });
+  for (final dark in [false, true]) {
+    testWidgets('shared brand footer meets text contrast guidance (dark=$dark)', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.lightTheme(),
+          darkTheme: AppTheme.darkTheme(),
+          themeMode: dark ? ThemeMode.dark : ThemeMode.light,
+          home: const Scaffold(
+            body: SingleChildScrollView(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: EduBrandFooter(),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final semantics = tester.ensureSemantics();
+      await expectLater(tester, meetsGuideline(textContrastGuideline));
+      semantics.dispose();
+    });
+  }
+
 }
