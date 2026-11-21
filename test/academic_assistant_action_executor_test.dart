@@ -450,17 +450,17 @@ void main() {
           ),
         );
 
-        final created = await executor.execute(
-          const AcademicAssistantToolCall(
-            name: 'create_exam',
-            arguments: {
-              'title': 'اختبار الشبكات',
-              'exam_date': '2027-02-15T09:30:00.000',
-              'course_name': 'أمن الشبكات',
-            },
-          ),
+        const createExamCall = AcademicAssistantToolCall(
+          name: 'create_exam',
+          arguments: {
+            'title': 'اختبار الشبكات',
+            'exam_date': '2027-02-15T09:30:00.000',
+            'course_name': 'أمن الشبكات',
+          },
         );
+        final created = await executor.execute(createExamCall);
         expect(created.changedData, isTrue);
+        expect(await executor.verifyPostcondition(createExamCall, created), isTrue);
         final saved = (await database.getExams())
             .singleWhere((exam) => exam.title == 'اختبار الشبكات');
         createdExamId = saved.id;
@@ -477,6 +477,20 @@ void main() {
           ),
         );
         expect(updated.changedData, isTrue);
+        expect(
+          await executor.verifyPostcondition(
+            AcademicAssistantToolCall(
+              name: 'update_exam',
+              arguments: {
+                'exam_id': saved.id,
+                'title': 'اختبار الشبكات النهائي',
+                'exam_date': '2027-02-16T10:00:00.000',
+              },
+            ),
+            updated,
+          ),
+          isTrue,
+        );
         expect(
           (await database.getExamById(saved.id!))?.title,
           'اختبار الشبكات النهائي',
@@ -499,6 +513,16 @@ void main() {
           confirmed: true,
         );
         expect(deleted.changedData, isTrue);
+        expect(
+          await executor.verifyPostcondition(
+            AcademicAssistantToolCall(
+              name: 'delete_exam',
+              arguments: {'exam_id': saved.id},
+            ),
+            deleted,
+          ),
+          isTrue,
+        );
         expect(await database.getExamById(saved.id!), isNull);
         createdExamId = null;
       } finally {
