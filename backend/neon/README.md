@@ -23,6 +23,7 @@ Apply in numeric order after provisioning Neon Auth:
 
 1. `migrations/0001_initial.sql`
 2. `migrations/0002_neon_auth_and_delivery.sql`
+3. `migrations/0003_ai_usage_windows.sql` — required before deploying the AI function version that enforces per-account quotas.
 
 The migrations are idempotent for the existing empty EduNivora project. They
 must be tested on a Neon child branch before being applied to any database that
