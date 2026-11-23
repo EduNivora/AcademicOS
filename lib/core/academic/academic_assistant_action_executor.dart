@@ -307,18 +307,58 @@ class AcademicAssistantActionExecutor {
           final task = tasks.where((item) => item.id == id).firstOrNull;
           if (task == null) return false;
           if (call.name == 'complete_task') return task.isCompleted;
-          final title = _string(call.arguments, 'title');
-          final description = _string(call.arguments, 'description');
-          final priority = _string(call.arguments, 'priority');
-          final endDate = _date(call.arguments['end_date_time']);
-          final reminderOffset = _integer(call.arguments['reminder_offset_minutes']);
-          return (title.isEmpty || task.title == title) &&
-              (description.isEmpty || task.description == description) &&
-              (priority.isEmpty || task.priority == TaskPriorityX.fromName(priority)) &&
-              (endDate == null || task.endDateTime?.isAtSameMomentAs(endDate) == true) &&
-              (reminderOffset == null || task.reminderOffsetMinutes == reminderOffset) &&
-              (call.arguments['reminder_enabled'] is! bool ||
-                  task.reminderEnabled == call.arguments['reminder_enabled']);
+
+          final args = call.arguments;
+          final isCreate = call.name == 'create_task';
+          final title = _string(args, 'title');
+          final description = _string(args, 'description');
+          final priority = _string(args, 'priority');
+          final type = _string(args, 'type');
+          final endDate = _date(args['end_date_time']);
+          final rawReminderOffset = _integer(args['reminder_offset_minutes']);
+          final expectedReminderOffset = rawReminderOffset == null
+              ? (isCreate ? 15 : task.reminderOffsetMinutes)
+              : rawReminderOffset.clamp(0, 1440).toInt();
+          final courseSpecified =
+              args.containsKey('course_id') || _string(args, 'course_name').isNotEmpty;
+          if (courseSpecified) {
+            final courseResult = await _resolveCourse(args);
+            if (courseResult.error != null || courseResult.course == null) {
+              return false;
+            }
+            if (task.courseId != courseResult.course!.id ||
+                task.courseName != courseResult.course!.name) {
+              return false;
+            }
+          }
+          final expectedReminderEnabled = isCreate
+              ? endDate != null && args['reminder_enabled'] != false
+              : args['reminder_enabled'] is bool
+                  ? args['reminder_enabled'] as bool
+                  : task.reminderEnabled;
+          final effectiveEndDate = isCreate ? endDate : endDate ?? task.endDateTime;
+          final expectedReminderDate = expectedReminderEnabled &&
+                  effectiveEndDate != null
+              ? effectiveEndDate.subtract(
+                  Duration(minutes: expectedReminderOffset),
+                )
+              : null;
+
+          return (isCreate ? task.title == title : title.isEmpty || task.title == title) &&
+              (isCreate
+                  ? task.description == description
+                  : description.isEmpty || task.description == description) &&
+              ((isCreate || priority.isNotEmpty) &&
+                      task.priority != TaskPriorityX.fromName(priority)
+                  ? false
+                  : true) &&
+              (!isCreate || task.type == TaskTypeX.fromName(type)) &&
+              (!isCreate || task.startDateTime != null) &&
+              (isCreate || endDate == null ||
+                  task.endDateTime?.isAtSameMomentAs(endDate) == true) &&
+              task.reminderOffsetMinutes == expectedReminderOffset &&
+              task.reminderEnabled == expectedReminderEnabled &&
+              task.reminderDate == expectedReminderDate;
         case 'delete_task':
           if (id == null) return false;
           final tasks = await taskUseCases.getTasks();
@@ -326,24 +366,43 @@ class AcademicAssistantActionExecutor {
         case 'add_lecture':
         case 'update_lecture':
           if (id == null) return false;
+          final args = call.arguments;
+          final isCreate = call.name == 'add_lecture';
           final schedules = await database.getSchedules();
           final row = schedules.where((item) => item['id'] == id).firstOrNull;
           if (row == null) return false;
-          final day = _string(call.arguments, 'day');
-          final start = _string(call.arguments, 'start_time');
-          final end = _string(call.arguments, 'end_time');
-          final location = _string(call.arguments, 'location');
-          final reminderOffset = _integer(call.arguments['reminder_offset_minutes']);
-          final courseResult = await _resolveCourse(call.arguments);
+          final day = _string(args, 'day');
+          final start = _string(args, 'start_time');
+          final end = _string(args, 'end_time');
+          final location = _string(args, 'location');
+          final rawReminderOffset = _integer(args['reminder_offset_minutes']);
+          final reminderOffset = rawReminderOffset == null
+              ? (isCreate ? 15 : null)
+              : rawReminderOffset.clamp(0, 1440).toInt();
+          final courseSpecified =
+              args.containsKey('course_id') || _string(args, 'course_name').isNotEmpty;
+          final courseResult = courseSpecified ? await _resolveCourse(args) : null;
+          if (courseSpecified &&
+              (courseResult!.error != null || courseResult.course == null)) {
+            return false;
+          }
           final reminderValue = row['reminder_enabled'];
           final reminderEnabled = reminderValue == 1 || reminderValue == true;
+          final expectedReminderEnabled = isCreate
+              ? args['reminder_enabled'] is bool
+                  ? args['reminder_enabled'] as bool
+                  : true
+              : args['reminder_enabled'] is bool
+                  ? args['reminder_enabled'] as bool
+                  : null;
           return (day.isEmpty || row['day_of_week'] == day) &&
               (start.isEmpty || row['start_time'] == start) &&
               (end.isEmpty || row['end_time'] == end) &&
-              (location.isEmpty || row['location'] == location) &&
-              (courseResult.course == null || row['course_id'] == courseResult.course!.id) &&
-              (call.arguments['reminder_enabled'] is! bool ||
-                  reminderEnabled == call.arguments['reminder_enabled']) &&
+              (isCreate || location.isEmpty || row['location'] == location) &&
+              (!isCreate || row['location'] == location) &&
+              (!courseSpecified || row['course_id'] == courseResult!.course!.id) &&
+              (expectedReminderEnabled == null ||
+                  reminderEnabled == expectedReminderEnabled) &&
               (reminderOffset == null ||
                   row['reminder_offset_minutes'] == reminderOffset);
         case 'delete_lecture':
