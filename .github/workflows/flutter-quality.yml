@@ -157,6 +157,7 @@ jobs:
           fi
 
       - name: Run tests
+        shell: bash
         run: flutter test --no-pub 2>&1 | tee flutter-test.log
 
       - name: Verify native SQLite on Android emulator
