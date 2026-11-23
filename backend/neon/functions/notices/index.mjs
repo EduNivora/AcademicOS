@@ -7,7 +7,6 @@ const required = [
   "DATABASE_URL",
   "NEON_AUTH_BASE_URL",
   "NEON_AUTH_JWKS_URL",
-  "GUEST_METRICS_WORKER_SECRET",
 ];
 for (const key of required) {
   if (!process.env[key]) throw new Error(`Missing required runtime variable: ${key}`);
