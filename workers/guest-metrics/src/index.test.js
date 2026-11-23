@@ -5,18 +5,43 @@ import gateway, { GuestMetrics } from "./index.js";
 function createStorage() {
   const values = new Map();
   let alarm = null;
+  let tail = Promise.resolve();
   return {
     async get(key) { return values.get(key); },
     async put(key, value) { values.set(key, structuredClone(value)); },
     async delete(key) { return values.delete(key); },
     async setAlarm(value) { alarm = value; },
     get alarm() { return alarm; },
+    async transaction(callback) {
+      const operation = tail.then(async () => callback({
+        get: async (key) => values.get(key),
+        put: async (key, value) => values.set(key, structuredClone(value)),
+        delete: async (key) => values.delete(key),
+      }));
+      tail = operation.catch(() => {});
+      return operation;
+    },
   };
 }
 
-function createGatewayEnv({ allowed = true, status = 204 } = {}) {
+const announcementId = "f7d0b52a-4a36-4fd9-9ad5-8cbbece8f3d1";
+const otherAnnouncementId = "9c6d51f0-78b9-4b3e-8a3b-5cb08d0a29a0";
+
+function quotaRequest({ id = announcementId, date = "2026-11-23", event = "views" } = {}) {
+  return new Request("https://do.test/consume", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ announcementId: id, date, event }),
+  });
+}
+
+function createGatewayEnv({ limitStatus = 200, upstreamStatus = 204, perAnnouncement = "5000", global = "50000" } = {}) {
   const calls = { limiter: [], upstream: [] };
   const storage = createStorage();
+  const metrics = new GuestMetrics({ storage }, {
+    MAX_ANNOUNCEMENT_METRICS_PER_DAY: perAnnouncement,
+    MAX_GUEST_METRICS_PER_DAY: global,
+  });
   const env = {
     NEON_NOTICES_API_ORIGIN: "https://notices.example.test/",
     NEON_WORKER_SHARED_SECRET: "unit-test-secret",
@@ -26,50 +51,94 @@ function createGatewayEnv({ allowed = true, status = 204 } = {}) {
       get() {
         return {
           async fetch(request) {
-            const body = await request.json();
-            calls.limiter.push(body);
-            return Response.json({ allowed }, { status: allowed ? 200 : 429 });
+            const response = await metrics.fetch(request);
+            calls.limiter.push(response.status);
+            return response;
           },
         };
       },
     },
   };
-  return { env, calls, storage, upstreamStatus: status };
+  return { env, calls, storage, upstreamStatus };
 }
 
-test("Durable Object rejects malformed rate-limit payloads", async () => {
+test("Durable Object rejects malformed quota payloads", async () => {
   const metrics = new GuestMetrics({ storage: createStorage() });
-  const response = await metrics.fetch(new Request("https://do.test/rate-limit", {
+  const response = await metrics.fetch(new Request("https://do.test/consume", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ minute: "now", fingerprint: "invalid" }),
+    body: JSON.stringify({ date: "bad", announcementId: "not-a-uuid", event: "view" }),
   }));
   assert.equal(response.status, 400);
 });
 
-test("Durable Object enforces per-fingerprint minute limit and schedules cleanup", async () => {
+test("Durable Object enforces per-announcement daily limit atomically under concurrency", async () => {
   const storage = createStorage();
-  const metrics = new GuestMetrics({ storage });
-  const minute = 30_000;
-  const request = () => new Request("https://do.test/rate-limit", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ minute, fingerprint: "a".repeat(64) }),
+  const metrics = new GuestMetrics({ storage }, {
+    MAX_ANNOUNCEMENT_METRICS_PER_DAY: "5",
+    MAX_GUEST_METRICS_PER_DAY: "50",
   });
-  for (let index = 0; index < 60; index += 1) {
-    assert.equal((await metrics.fetch(request())).status, 200);
+  const results = await Promise.all(
+    Array.from({ length: 20 }, () => metrics.fetch(quotaRequest())),
+  );
+  assert.equal(results.filter((response) => response.status === 200).length, 5);
+  assert.equal(results.filter((response) => response.status === 429).length, 15);
+  const state = await storage.get("daily_metrics");
+  assert.equal(state.total, 5);
+  assert.equal(state.announcements[announcementId].views, 5);
+  assert.equal(storage.alarm, Date.parse("2026-11-24T00:00:00.000Z") + 1_000);
+  assert.equal(JSON.stringify(state).includes("203.0.113"), false);
+});
+
+test("Durable Object enforces a global daily ceiling across announcements", async () => {
+  const metrics = new GuestMetrics({ storage: createStorage() }, {
+    MAX_ANNOUNCEMENT_METRICS_PER_DAY: "5",
+    MAX_GUEST_METRICS_PER_DAY: "3",
+  });
+  const results = await Promise.all([
+    metrics.fetch(quotaRequest({ id: announcementId })),
+    metrics.fetch(quotaRequest({ id: otherAnnouncementId })),
+    metrics.fetch(quotaRequest({ id: announcementId, event: "delivered" })),
+    metrics.fetch(quotaRequest({ id: otherAnnouncementId, event: "delivered" })),
+  ]);
+  assert.equal(results.filter((response) => response.status === 200).length, 3);
+  assert.equal(results.filter((response) => response.status === 429).length, 1);
+});
+
+test("Durable Object resets counters when the UTC metric date changes", async () => {
+  const storage = createStorage();
+  const metrics = new GuestMetrics({ storage }, {
+    MAX_ANNOUNCEMENT_METRICS_PER_DAY: "1",
+    MAX_GUEST_METRICS_PER_DAY: "10",
+  });
+  assert.equal((await metrics.fetch(quotaRequest({ date: "2026-11-23" }))).status, 200);
+  assert.equal((await metrics.fetch(quotaRequest({ date: "2026-11-23" }))).status, 429);
+  assert.equal((await metrics.fetch(quotaRequest({ date: "2026-11-24" }))).status, 200);
+  assert.equal((await storage.get("daily_metrics")).date, "2026-11-24");
+});
+
+test("Durable Object alarm does not delete a newer UTC-day window", async () => {
+  const storage = createStorage();
+  const metrics = new GuestMetrics({ storage }, {
+    MAX_ANNOUNCEMENT_METRICS_PER_DAY: "5",
+    MAX_GUEST_METRICS_PER_DAY: "50",
+  });
+  await metrics.fetch(quotaRequest({ date: "2026-11-24" }));
+  const originalNow = Date;
+  globalThis.Date = class extends originalNow {
+    constructor(...args) { super(...args); }
+    static now() { return originalNow.parse("2026-11-24T00:00:05.000Z"); }
+  };
+  try {
+    await metrics.alarm();
+  } finally {
+    globalThis.Date = originalNow;
   }
-  assert.equal((await metrics.fetch(request())).status, 429);
-  assert.equal(storage.alarm, (minute + 1) * 60_000 + 1_000);
-  await metrics.alarm();
-  assert.equal(await storage.get("rate_window"), undefined);
+  assert.equal((await storage.get("daily_metrics")).date, "2026-11-24");
 });
 
 test("gateway fails closed when required configuration is missing", async () => {
-  const response = await gateway.fetch(
-    new Request("https://gateway.test/health"),
-    {},
-  );
+  const response = await gateway.fetch(new Request("https://gateway.test/health"), {});
   assert.equal(response.status, 503);
 });
 
@@ -82,7 +151,8 @@ test("gateway rejects browser origins not explicitly allowlisted", async () => {
 });
 
 test("gateway rate-limits guest metrics before proxying", async () => {
-  const { env, calls } = createGatewayEnv({ allowed: false });
+  const { env, calls } = createGatewayEnv({ limitStatus: 429 });
+  env.GUEST_METRICS.get = () => ({ fetch: async () => new Response("limited", { status: 429 }) });
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => {
     calls.upstream.push(true);
@@ -90,8 +160,8 @@ test("gateway rate-limits guest metrics before proxying", async () => {
   };
   try {
     const response = await gateway.fetch(new Request(
-      "https://gateway.test/v1/announcements/f7d0b52a-4a36-4fd9-9ad5-8cbbece8f3d1/guest-view",
-      { method: "POST", headers: { "CF-Connecting-IP": "203.0.113.10" } },
+      `https://gateway.test/v1/announcements/${announcementId}/guest-view`,
+      { method: "POST" },
     ), env);
     assert.equal(response.status, 429);
     assert.equal(calls.upstream.length, 0);
@@ -109,7 +179,7 @@ test("gateway injects its secret and strips client-supplied trust and IP headers
   };
   try {
     const response = await gateway.fetch(new Request(
-      "https://gateway.test/v1/announcements/f7d0b52a-4a36-4fd9-9ad5-8cbbece8f3d1/guest-view",
+      `https://gateway.test/v1/announcements/${announcementId}/guest-view`,
       {
         method: "POST",
         headers: {
@@ -148,6 +218,19 @@ test("gateway forwards registered bearer credentials without adding the guest se
     assert.equal(response.status, 200);
     assert.equal(calls.upstream[0].headers.get("Authorization"), "Bearer signed-user-token");
     assert.equal(calls.upstream[0].headers.has("X-EduNivora-Worker-Secret"), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("gateway returns 502 on upstream failure and does not leak internal details", async () => {
+  const { env } = createGatewayEnv();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => { throw new Error("private upstream details"); };
+  try {
+    const response = await gateway.fetch(new Request("https://gateway.test/health"), env);
+    assert.equal(response.status, 502);
+    assert.equal((await response.json()).error.code, "upstream_unavailable");
   } finally {
     globalThis.fetch = originalFetch;
   }
