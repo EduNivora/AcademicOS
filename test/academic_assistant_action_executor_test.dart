@@ -427,6 +427,16 @@ void main() {
         expect(materialId, isNotNull);
         expect(await executor.verifyPostcondition(call, result), isTrue);
 
+        // A same-length but corrupted BLOB must not pass postcondition checks.
+        final db = await database.database;
+        await db.update(
+          'course_materials',
+          {'file_bytes': Uint8List.fromList([37, 80, 68, 70, 1, 2, 4])},
+          where: 'id = ?',
+          whereArgs: [materialId],
+        );
+        expect(await executor.verifyPostcondition(call, result), isFalse);
+
         await database.deleteMaterial(materialId!);
         expect(await executor.verifyPostcondition(call, result), isFalse);
         materialId = null;
