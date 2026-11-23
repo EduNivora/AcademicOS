@@ -48,6 +48,155 @@ void main() {
     });
   });
 
+  group('AcademicAssistantActionExecutor plan preflight', () {
+    test('rejects a later missing reference before any earlier create action runs', () async {
+      final result = await executor.preflightPlan([
+        const AcademicAssistantToolCall(
+          name: 'create_material',
+          arguments: {'name': 'أمن الشبكات'},
+        ),
+        const AcademicAssistantToolCall(
+          name: 'add_lecture',
+          arguments: {
+            'course_name': 'مادة غير موجودة',
+            'day': 'الأحد',
+            'start_time': '08:00',
+            'end_time': '09:00',
+          },
+        ),
+      ]);
+
+      expect(result.succeeded, isFalse);
+      expect(result.message, contains('لم تُنفذ أي خطوة'));
+      expect(courseRepository.courses, isEmpty);
+    });
+
+
+    test('rejects malformed and mismatched course and task identifiers', () async {
+      taskRepository.tasks.add(
+        const TaskEntity(id: 1, title: 'عنوان صحيح', description: ''),
+      );
+      final malformedCourse = await executor.preflightPlan([
+        const AcademicAssistantToolCall(
+          name: 'create_task',
+          arguments: {'title': 'مراجعة', 'course_id': 'invalid'},
+        ),
+      ]);
+      expect(malformedCourse.succeeded, isFalse);
+      expect(malformedCourse.message, contains('معرّف المادة'));
+
+      final mismatchedTask = await executor.preflightPlan([
+        const AcademicAssistantToolCall(
+          name: 'complete_task',
+          arguments: {'task_id': 1, 'task_title': 'عنوان غير مطابق'},
+        ),
+      ]);
+      expect(mismatchedTask.succeeded, isFalse);
+      expect(mismatchedTask.message, contains('معرّف المهمة'));
+    });
+
+    test('allows later actions to reference a course created earlier in the same plan', () async {
+      final result = await executor.preflightPlan([
+        const AcademicAssistantToolCall(
+          name: 'create_material',
+          arguments: {'name': 'الشبكات'},
+        ),
+        const AcademicAssistantToolCall(
+          name: 'create_task',
+          arguments: {
+            'title': 'مراجعة أساسيات الشبكات',
+            'course_name': 'الشبكات',
+          },
+        ),
+        const AcademicAssistantToolCall(
+          name: 'add_lecture',
+          arguments: {
+            'course_name': 'الشبكات',
+            'day': 'الأحد',
+            'start_time': '08:00',
+            'end_time': '09:00',
+          },
+        ),
+      ]);
+
+      expect(result.succeeded, isTrue);
+      expect(courseRepository.courses, isEmpty);
+      expect(taskRepository.tasks, isEmpty);
+    });
+
+
+    test('rejects invalid lecture reminder options during preflight', () async {
+      courseRepository.courses.add(
+        const CourseEntity(
+          id: 1,
+          name: 'الشبكات',
+          instructor: 'محاضر',
+          code: 'NET101',
+        ),
+      );
+      final invalidToggle = await executor.preflightPlan([
+        const AcademicAssistantToolCall(
+          name: 'add_lecture',
+          arguments: {
+            'course_name': 'الشبكات',
+            'day': 'الأحد',
+            'start_time': '08:00',
+            'end_time': '09:00',
+            'reminder_enabled': 'false',
+          },
+        ),
+      ]);
+      expect(invalidToggle.succeeded, isFalse);
+      expect(invalidToggle.message, contains('تذكير المحاضرة'));
+
+      final invalidOffset = await executor.preflightPlan([
+        const AcademicAssistantToolCall(
+          name: 'add_lecture',
+          arguments: {
+            'course_name': 'الشبكات',
+            'day': 'الأحد',
+            'start_time': '08:00',
+            'end_time': '09:00',
+            'reminder_offset_minutes': 'later',
+          },
+        ),
+      ]);
+      expect(invalidOffset.succeeded, isFalse);
+      expect(invalidOffset.message, contains('مدة التنبيه'));
+    });
+
+    test('detects conflicts between two proposed lectures before the first write', () async {
+      final result = await executor.preflightPlan([
+        const AcademicAssistantToolCall(
+          name: 'create_material',
+          arguments: {'name': 'قواعد البيانات'},
+        ),
+        const AcademicAssistantToolCall(
+          name: 'add_lecture',
+          arguments: {
+            'course_name': 'قواعد البيانات',
+            'day': 'الأحد',
+            'start_time': '08:00',
+            'end_time': '09:00',
+          },
+        ),
+        const AcademicAssistantToolCall(
+          name: 'add_lecture',
+          arguments: {
+            'course_name': 'قواعد البيانات',
+            'day': 'الأحد',
+            'start_time': '08:30',
+            'end_time': '09:30',
+          },
+        ),
+      ]);
+
+      expect(result.succeeded, isFalse);
+      expect(result.message, contains('تعارض'));
+      expect(courseRepository.courses, isEmpty);
+    });
+  });
+
   group('AcademicAssistantActionExecutor', () {
     test(
       'updates the academic profile without clearing unspecified fields',
@@ -74,6 +223,7 @@ void main() {
         final profile = await StudentProfile.load();
 
         expect(result.changedData, isTrue);
+        expect(result.succeeded, isTrue);
         expect(profile.fullName, 'طالب');
         expect(profile.university, 'جامعة الاختبار');
         expect(profile.semester, 'الثاني');

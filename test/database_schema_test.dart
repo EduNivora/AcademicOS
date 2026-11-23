@@ -372,6 +372,9 @@ void main() {
         'file_type': 'pdf',
         'file_bytes': bytes,
       });
+      // Reopen the persistent database to prove attachment bytes survive the
+      // same lifecycle boundary as an application restart.
+      await helper.close();
       final row = await helper.getMaterialById(materialId);
       expect(row, isNotNull);
       expect(row!['file_bytes'], isA<Uint8List>());
@@ -588,7 +591,7 @@ void main() {
   );
 
   test(
-    'schema v11 upgrades to v13 and adds completion timestamps without losing course data',
+    'schema v11 upgrades to v14 and adds assistant ledger without losing course data',
     () async {
       final helper = DatabaseHelper.instance;
       await helper.close();
@@ -612,7 +615,7 @@ void main() {
 
         final upgradedDb = await helper.database;
         final version = await upgradedDb.rawQuery('PRAGMA user_version');
-        expect(version.single['user_version'], 13);
+        expect(version.single['user_version'], 14);
 
         final termColumns = await upgradedDb.rawQuery(
           'PRAGMA table_info(academic_terms)',
@@ -635,6 +638,14 @@ void main() {
             'idx_academic_terms_single_active',
           ]),
         );
+        final ledgerTables = await upgradedDb.rawQuery(
+          "SELECT name FROM sqlite_master WHERE type = 'table' "
+          "AND name IN ('assistant_action_runs', 'assistant_action_steps')",
+        );
+        expect(
+          ledgerTables.map((row) => row['name']),
+          containsAll(['assistant_action_runs', 'assistant_action_steps']),
+        );
         expect(
           (await helper.getCourseById(courseId))?.name,
           'Migration preservation',
@@ -645,4 +656,60 @@ void main() {
       }
     },
   );
+
+  test('assistant action ledger persists steps and marks interrupted runs after restart', () async {
+    final helper = DatabaseHelper.instance;
+    await helper.close();
+
+    final runId = await helper.createAssistantActionRun(
+      source: 'cloud_plan',
+      actionNames: const ['create_material', 'create_task'],
+    );
+    await helper.updateAssistantActionRun(runId: runId, status: 'running');
+    await helper.updateAssistantActionStep(
+      runId: runId,
+      stepIndex: 0,
+      status: 'running',
+    );
+    await helper.updateAssistantActionStep(
+      runId: runId,
+      stepIndex: 0,
+      status: 'succeeded',
+      changedData: true,
+    );
+    await helper.updateAssistantActionStep(
+      runId: runId,
+      stepIndex: 1,
+      status: 'running',
+    );
+    await helper.close();
+
+    // Reopening the database must preserve completed history and explicitly
+    // classify the in-flight operation as interrupted, never replay it.
+    await helper.recoverInterruptedAssistantRuns();
+    final db = await helper.database;
+    final runs = await db.query(
+      'assistant_action_runs',
+      where: 'id = ?',
+      whereArgs: [runId],
+    );
+    final steps = await db.query(
+      'assistant_action_steps',
+      where: 'run_id = ?',
+      whereArgs: [runId],
+      orderBy: 'step_index ASC',
+    );
+
+    expect(runs.single['status'], 'interrupted');
+    expect(runs.single['failure_code'], 'app_restarted');
+    expect(steps.map((row) => row['action_name']), [
+      'create_material',
+      'create_task',
+    ]);
+    expect(steps[0]['status'], 'succeeded');
+    expect(steps[0]['changed_data'], 1);
+    expect(steps[1]['status'], 'interrupted');
+    await helper.close();
+  });
+
 }

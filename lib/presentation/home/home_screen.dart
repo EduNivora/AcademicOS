@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/academic/academic_dashboard_service.dart';
 import '../../core/security/auth_secure_storage_service.dart';
 import '../../core/security/app_lock_service.dart';
@@ -372,15 +373,21 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     }
   }
 
-  Color _getPriorityTextColor(TaskPriority priority) {
+  Color _getPriorityTextColor(TaskPriority priority, bool isDark) {
     switch (priority) {
       case TaskPriority.urgent:
       case TaskPriority.high:
-        return const Color(0xFFE11D48);
+        return isDark
+            ? const Color(0xFFFDA4AF)
+            : const Color(0xFFBE123C);
       case TaskPriority.medium:
-        return const Color(0xFFD97706);
+        return isDark
+            ? const Color(0xFFFCD34D)
+            : const Color(0xFF92400E);
       case TaskPriority.low:
-        return const Color(0xFF16A34A);
+        return isDark
+            ? const Color(0xFF86EFAC)
+            : const Color(0xFF166534);
     }
   }
 
@@ -1404,7 +1411,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
   }
 
   Widget _buildTaskItemRefCard(TaskEntity task, bool isDark) {
-    final priorityColor = _getPriorityTextColor(task.priority);
+    final priorityColor = _getPriorityTextColor(task.priority, isDark);
     final priorityBg = _getPriorityBgColor(task.priority, isDark);
     final priorityLabel = _getPriorityLabel(task.priority);
 
@@ -1453,26 +1460,49 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
             child: Row(
               children: [
                 // Checkbox circle
-                GestureDetector(
-                  onTap: () => _toggleTaskCompletion(task),
-                  child: Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: task.isCompleted
-                            ? const Color(0xFF10B981)
-                            : const Color(0xFF94A3B8),
-                        width: 2,
+                Semantics(
+                  label: widget.isArabic
+                      ? (task.isCompleted
+                          ? 'إلغاء إكمال المهمة: ${task.title}'
+                          : 'إكمال المهمة: ${task.title}')
+                      : (task.isCompleted
+                          ? 'Mark task incomplete: ${task.title}'
+                          : 'Mark task complete: ${task.title}'),
+                  checked: task.isCompleted,
+                  child: GestureDetector(
+                    onTap: () => _toggleTaskCompletion(task),
+                    behavior: HitTestBehavior.opaque,
+                    child: SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: Center(
+                        child: Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: task.isCompleted
+                                  ? const Color(0xFF047857)
+                                  : (isDark
+                                        ? const Color(0xFF94A3B8)
+                                        : AppTheme.accessibleOutline),
+                              width: 2,
+                            ),
+                            color: task.isCompleted
+                                ? const Color(0xFF047857)
+                                : Colors.transparent,
+                          ),
+                          child: task.isCompleted
+                              ? const Icon(
+                                  Icons.check,
+                                  size: 16,
+                                  color: Colors.white,
+                                )
+                              : null,
+                        ),
                       ),
-                      color: task.isCompleted
-                          ? const Color(0xFF10B981)
-                          : Colors.transparent,
                     ),
-                    child: task.isCompleted
-                        ? const Icon(Icons.check, size: 16, color: Colors.white)
-                        : null,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1930,17 +1960,21 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                   children: [
                     Text(
                       widget.isArabic ? 'عرض الكل' : 'View all',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF2563EB),
+                        color: isDark
+                            ? const Color(0xFF93C5FD)
+                            : const Color(0xFF2563EB),
                       ),
                     ),
                     const SizedBox(width: 4),
-                    const Icon(
+                    Icon(
                       Icons.arrow_back_rounded,
                       size: 16,
-                      color: Color(0xFF2563EB),
+                      color: isDark
+                          ? Color(0xFF93C5FD)
+                          : Color(0xFF2563EB),
                     ),
                   ],
                 ),
@@ -2151,10 +2185,12 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
               child: Center(
                 child: Column(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.check_circle_outline_rounded,
                       size: 38,
-                      color: Color(0xFF10B981),
+                      color: isDark
+                          ? Color(0xFF34D399)
+                          : Color(0xFF047857),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -2880,7 +2916,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
             Icon(
               Icons.chevron_left_rounded,
               size: 20,
-              color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
+              color: isDark ? Colors.white70 : AppTheme.accessibleOutline,
             ),
           ],
         ),
@@ -3014,10 +3050,12 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     required bool isDark,
     required VoidCallback onTap,
   }) {
-    const activeColor = Color(0xFF2563EB);
+    final activeColor = isDark
+        ? const Color(0xFF93C5FD)
+        : const Color(0xFF2563EB);
     final inactiveColor = isDark
         ? const Color(0xFF94A3B8)
-        : const Color(0xFF64748B);
+        : AppTheme.accessibleOutline;
 
     return InkWell(
       onTap: onTap,

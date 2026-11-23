@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/config/edunivora_identity.dart';
 import '../../core/widgets/edunivora_ui.dart';
+import '../../core/theme/app_theme.dart';
 import '../../domain/usecases/auth_use_cases.dart';
 import 'register_screen.dart';
 import 'email_verification_screen.dart';
@@ -257,6 +258,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         EdunivoraIdentity.appName,
                         textAlign: TextAlign.center,
                         style: theme.textTheme.headlineMedium?.copyWith(
+                          color: isDark
+                              ? AppTheme.primaryTextDark
+                              : AppTheme.primaryTextLight,
                           fontWeight: FontWeight.w800,
                           letterSpacing: -0.5,
                         ),
@@ -266,7 +270,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         EdunivoraIdentity.officialTagline,
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: colors.primary,
+                          // The seed primary is intentionally vibrant for
+                          // surfaces and icons, but falls below WCAG AA for
+                          // small text on light surfaces. Use an accessible
+                          // tonal pair for this compact tagline.
+                          color: isDark
+                              ? AppTheme.primaryTextDark
+                              : AppTheme.primaryTextLight,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.2,
                         ),
@@ -401,8 +411,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ],
                             const SizedBox(height: 22),
-                            SizedBox(
-                              height: 54,
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(minHeight: 54),
                               child: FilledButton(
                                 onPressed: _isLoading
                                     ? null
@@ -421,14 +431,16 @@ class _LoginScreenState extends State<LoginScreen> {
                                           color: Colors.white,
                                         ),
                                       )
-                                    : const Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
+                                    : const Wrap(
+                                        alignment: WrapAlignment.center,
+                                        crossAxisAlignment:
+                                            WrapCrossAlignment.center,
+                                        spacing: 9,
                                         children: [
                                           Icon(Icons.login_rounded, size: 20),
-                                          SizedBox(width: 9),
                                           Text(
                                             'تسجيل الدخول',
+                                            textAlign: TextAlign.center,
                                             style: TextStyle(
                                               fontWeight: FontWeight.w700,
                                               fontSize: 15,
@@ -462,8 +474,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       const SizedBox(height: 22),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 4,
                         children: [
                           Text(
                             'ليس لديك حساب؟',
