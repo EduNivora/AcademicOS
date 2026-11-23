@@ -567,6 +567,7 @@ void main() {
       expect(result.succeeded, isTrue);
       expect(result.changedData, isTrue);
       expect(result.affectedRecordId, 31);
+      expect(courseRepository.courses.single.credits, 30);
       expect(await executor.verifyPostcondition(call, result), isTrue);
 
       courseRepository.courses[0] = courseRepository.courses.single.copyWith(
