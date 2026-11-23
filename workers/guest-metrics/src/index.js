@@ -2,6 +2,7 @@ export class GuestMetrics {
   constructor(ctx, env = {}) {
     this.ctx = ctx;
     this.env = env;
+    this.now = typeof env.now === "function" ? env.now : () => Date.now();
   }
 
   async fetch(request) {
@@ -77,7 +78,7 @@ export class GuestMetrics {
   }
 
   async alarm() {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = new Date(this.now()).toISOString().slice(0, 10);
     const announcementKeys = await this.ctx.storage.list({ prefix: "announcement:" });
     const globalKeys = await this.ctx.storage.list({ prefix: "global:" });
     const staleKeys = [];
