@@ -37,34 +37,33 @@ export class GuestMetrics {
       1,
       Number.parseInt(this.env.MAX_GUEST_METRICS_PER_DAY ?? "50000", 10) || 50000,
     );
+    const globalKey = `global:${input.date}`;
+    const announcementKey = `announcement:${input.date}:${input.announcementId}`;
 
     let allowed = false;
     let scheduleCleanup = false;
 
     await this.ctx.storage.transaction(async (txn) => {
-      const stored = await txn.get("daily_metrics");
-      const state = stored?.date === input.date
-        ? stored
-        : { date: input.date, total: 0, announcements: {} };
-
-      const current = state.announcements[input.announcementId] ?? {
+      const globalCount = (await txn.get(globalKey)) ?? 0;
+      const current = (await txn.get(announcementKey)) ?? {
         total: 0,
         views: 0,
         delivered: 0,
       };
 
-      if (state.total >= globalLimit || current.total >= perAnnouncementLimit) {
+      if (globalCount >= globalLimit || current.total >= perAnnouncementLimit) {
         allowed = false;
         return;
       }
 
-      state.total += 1;
-      current.total += 1;
-      current[input.event] += 1;
-      state.announcements[input.announcementId] = current;
-      await txn.put("daily_metrics", state);
+      await txn.put(globalKey, globalCount + 1);
+      await txn.put(announcementKey, {
+        total: current.total + 1,
+        views: current.views + (input.event === "views" ? 1 : 0),
+        delivered: current.delivered + (input.event === "delivered" ? 1 : 0),
+      });
       allowed = true;
-      scheduleCleanup = stored?.date !== input.date;
+      scheduleCleanup = globalCount === 0;
     });
 
     if (scheduleCleanup) {
@@ -79,12 +78,19 @@ export class GuestMetrics {
 
   async alarm() {
     const today = new Date().toISOString().slice(0, 10);
-    await this.ctx.storage.transaction(async (txn) => {
-      const stored = await txn.get("daily_metrics");
-      if (stored && stored.date < today) {
-        await txn.delete("daily_metrics");
-      }
-    });
+    const announcementKeys = await this.ctx.storage.list({ prefix: "announcement:" });
+    const globalKeys = await this.ctx.storage.list({ prefix: "global:" });
+    const staleKeys = [];
+
+    for (const key of announcementKeys.keys()) {
+      if (key.split(":")[1] < today) staleKeys.push(key);
+    }
+    for (const key of globalKeys.keys()) {
+      if (key.slice("global:".length) < today) staleKeys.push(key);
+    }
+    if (staleKeys.length > 0) {
+      await this.ctx.storage.delete(staleKeys);
+    }
   }
 }
 
@@ -196,8 +202,7 @@ export default {
     headers.delete("Cookie");
     headers.delete("X-EduNivora-Worker-Secret");
 
-    const isGuestMetric = Boolean(metricMatch);
-    if (isGuestMetric) {
+    if (metricMatch) {
       headers.set("X-EduNivora-Worker-Secret", env.NEON_WORKER_SHARED_SECRET);
     }
 
