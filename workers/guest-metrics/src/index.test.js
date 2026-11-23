@@ -155,6 +155,25 @@ test("gateway rejects browser origins not explicitly allowlisted", async () => {
   assert.equal(response.status, 403);
 });
 
+test("gateway rejects oversized metric payloads before consuming quota", async () => {
+  const { env, calls, storage } = createGatewayEnv();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => { calls.upstream.push(true); return new Response(null, { status: 204 }); };
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const response = await gateway.fetch(new Request(
+      `https://gateway.test/v1/announcements/${announcementId}/guest-view`,
+      { method: "POST", body: "x".repeat(65 * 1024) },
+    ), env);
+    assert.equal(response.status, 413);
+    assert.equal(await storage.get(`global:${today}`), undefined);
+    assert.equal(calls.upstream.length, 0);
+    assert.equal(calls.limiter.length, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("gateway rate-limits guest metrics before proxying", async () => {
   const { env, calls } = createGatewayEnv({ perAnnouncement: "1", global: "10" });
   await env.GUEST_METRICS.get().fetch(quotaRequest());
