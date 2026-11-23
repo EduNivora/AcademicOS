@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -291,7 +292,7 @@ void main() {
           'file_path': 'dbblob://test-attachment',
           'file_type': 'pdf',
           'created_at': DateTime.utc(2026, 11, 23).toIso8601String(),
-          'file_bytes': expectedBytes,
+          'file_bytes': Uint8List.fromList(expectedBytes),
         });
 
         // Simulate an application restart; the bytes must live in persistent
