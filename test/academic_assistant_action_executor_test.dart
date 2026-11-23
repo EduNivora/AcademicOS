@@ -691,13 +691,52 @@ void main() {
         expect(rows, hasLength(1));
         expect(rows.single['reminder_offset_minutes'], 1440);
 
+        final updateCall = AcademicAssistantToolCall(
+          name: 'update_lecture',
+          arguments: {
+            'schedule_id': scheduleId,
+            'course_id': 88,
+            'day': 'السبت',
+            'start_time': '23:15',
+            'end_time': '23:45',
+            'location': 'قاعة أخرى',
+            'reminder_enabled': false,
+            'reminder_offset_minutes': 2000,
+          },
+        );
+        final updated = await executor.execute(updateCall);
+        expect(updated.succeeded, isTrue);
+        expect(updated.changedData, isTrue);
+        expect(await executor.verifyPostcondition(updateCall, updated), isTrue);
+
         await db.update(
           'schedule',
           {'course_id': 999},
           where: 'id = ?',
           whereArgs: [scheduleId],
         );
-        expect(await executor.verifyPostcondition(call, result), isFalse);
+        expect(await executor.verifyPostcondition(updateCall, updated), isFalse);
+        await db.update(
+          'schedule',
+          {'course_id': 88},
+          where: 'id = ?',
+          whereArgs: [scheduleId],
+        );
+
+        const deleteCallName = 'delete_lecture';
+        final deleteCall = AcademicAssistantToolCall(
+          name: deleteCallName,
+          arguments: {'schedule_id': scheduleId},
+        );
+        final confirmation = await executor.execute(deleteCall);
+        expect(confirmation.requiresConfirmation, isTrue);
+        expect(confirmation.confirmationPrompt, contains('هندسة البرمجيات'));
+
+        final deleted = await executor.execute(deleteCall, confirmed: true);
+        expect(deleted.succeeded, isTrue);
+        expect(deleted.changedData, isTrue);
+        expect(await executor.verifyPostcondition(deleteCall, deleted), isTrue);
+        scheduleId = null;
       } finally {
         if (scheduleId != null) await database.deleteSchedule(scheduleId);
         await database.close();
