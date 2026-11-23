@@ -650,6 +650,60 @@ void main() {
       expect(await executor.verifyPostcondition(deleteCall, deleted), isTrue);
     });
 
+    test('verifies lecture course link and normalized reminder offset', () async {
+      final database = DatabaseHelper.instance;
+      await database.close();
+      int? scheduleId;
+      try {
+        courseRepository.courses.add(
+          const CourseEntity(
+            id: 88,
+            name: 'هندسة البرمجيات',
+            instructor: 'محاضر',
+            code: 'SWE-88',
+          ),
+        );
+        const call = AcademicAssistantToolCall(
+          name: 'add_lecture',
+          arguments: {
+            'course_name': 'هندسة البرمجيات',
+            'day': 'السبت',
+            'start_time': '23:00',
+            'end_time': '23:30',
+            'location': 'قاعة الاختبار',
+            'reminder_enabled': false,
+            'reminder_offset_minutes': 2000,
+          },
+        );
+
+        final result = await executor.execute(call);
+        scheduleId = result.affectedRecordId;
+        expect(result.succeeded, isTrue);
+        expect(scheduleId, isNotNull);
+        expect(await executor.verifyPostcondition(call, result), isTrue);
+
+        final db = await database.database;
+        final rows = await db.query(
+          'schedule',
+          where: 'id = ?',
+          whereArgs: [scheduleId],
+        );
+        expect(rows, hasLength(1));
+        expect(rows.single['reminder_offset_minutes'], 1440);
+
+        await db.update(
+          'schedule',
+          {'course_name': 'مادة أخرى'},
+          where: 'id = ?',
+          whereArgs: [scheduleId],
+        );
+        expect(await executor.verifyPostcondition(call, result), isFalse);
+      } finally {
+        if (scheduleId != null) await database.deleteSchedule(scheduleId);
+        await database.close();
+      }
+    });
+
     test('requires confirmation before deleting a task', () async {
       taskRepository.tasks.add(
         const TaskEntity(id: 12, title: 'مراجعة التشفير', description: ''),
