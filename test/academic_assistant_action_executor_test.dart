@@ -17,7 +17,7 @@ import 'package:academic_os/domain/usecases/task_use_cases.dart';
 void main() {
 
   group('AcademicAssistantCommandParser', () {
-    _testWithContext('parses material, task and report commands', () {
+    _testWithContext('parses material, task and report commands', (context) {
       const parser = AcademicAssistantCommandParser();
       expect(parser.parse('أضف مادة أمن الشبكات')?.name, 'create_material');
       expect(parser.parse('أنشئ مهمة مراجعة التشفير')?.name, 'create_task');
