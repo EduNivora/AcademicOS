@@ -543,6 +543,101 @@ void main() {
       }
     });
 
+    test('verifies course updates against the repository state', () async {
+      courseRepository.courses.add(
+        const CourseEntity(
+          id: 31,
+          name: 'الشبكات',
+          instructor: 'محاضر',
+          code: 'NET-31',
+          credits: 2,
+        ),
+      );
+      const call = AcademicAssistantToolCall(
+        name: 'update_material',
+        arguments: {
+          'course_id': 31,
+          'name': 'أمن الشبكات المتقدم',
+          'instructor': 'د. أحمد',
+          'credits': 3,
+        },
+      );
+
+      final result = await executor.execute(call);
+      expect(result.succeeded, isTrue);
+      expect(result.changedData, isTrue);
+      expect(result.affectedRecordId, 31);
+      expect(await executor.verifyPostcondition(call, result), isTrue);
+
+      courseRepository.courses[0] = courseRepository.courses.single.copyWith(
+        credits: 2,
+      );
+      expect(await executor.verifyPostcondition(call, result), isFalse);
+    });
+
+    test('verifies task updates and rejects stale persisted values', () async {
+      taskRepository.tasks.add(
+        TaskEntity(
+          id: 10,
+          title: 'مراجعة أولية',
+          description: 'الوصف القديم',
+          startDateTime: DateTime(2026, 11, 1),
+        ),
+      );
+      const call = AcademicAssistantToolCall(
+        name: 'update_task',
+        arguments: {
+          'task_id': 10,
+          'title': 'مراجعة نهائية',
+          'description': 'الوصف المعتمد',
+          'priority': 'urgent',
+          'end_date_time': '2027-02-15T09:30:00.000',
+        },
+      );
+
+      final result = await executor.execute(call);
+      expect(result.succeeded, isTrue);
+      expect(result.changedData, isTrue);
+      expect(await executor.verifyPostcondition(call, result), isTrue);
+
+      taskRepository.tasks[0] = taskRepository.tasks.single.copyWith(
+        title: 'قيمة قديمة',
+      );
+      expect(await executor.verifyPostcondition(call, result), isFalse);
+    });
+
+    test('verifies task completion and deletion after persistence', () async {
+      taskRepository.tasks.add(
+        const TaskEntity(id: 12, title: 'مراجعة التشفير', description: ''),
+      );
+      const completeCall = AcademicAssistantToolCall(
+        name: 'complete_task',
+        arguments: {'task_id': 12},
+      );
+
+      final completed = await executor.execute(completeCall);
+      expect(completed.succeeded, isTrue);
+      expect(completed.changedData, isTrue);
+      expect(await executor.verifyPostcondition(completeCall, completed), isTrue);
+
+      taskRepository.tasks[0] = taskRepository.tasks.single.copyWith(
+        isCompleted: false,
+      );
+      expect(await executor.verifyPostcondition(completeCall, completed), isFalse);
+
+      taskRepository.tasks[0] = taskRepository.tasks.single.copyWith(
+        isCompleted: true,
+      );
+      const deleteCall = AcademicAssistantToolCall(
+        name: 'delete_task',
+        arguments: {'task_id': 12},
+      );
+      final deleted = await executor.execute(deleteCall, confirmed: true);
+      expect(deleted.succeeded, isTrue);
+      expect(deleted.changedData, isTrue);
+      expect(await executor.verifyPostcondition(deleteCall, deleted), isTrue);
+    });
+
     test('requires confirmation before deleting a task', () async {
       taskRepository.tasks.add(
         const TaskEntity(id: 12, title: 'مراجعة التشفير', description: ''),
