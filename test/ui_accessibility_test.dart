@@ -166,43 +166,45 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   for (final dark in [false, true]) {
-    testWidgets(
-      'Arabic login remains usable at 320px width and 1.5x text scale (dark=$dark)',
-      (tester) async {
-        tester.view.physicalSize = const Size(320, 640);
-        tester.view.devicePixelRatio = 1;
-        addTearDown(tester.view.resetPhysicalSize);
-        addTearDown(tester.view.resetDevicePixelRatio);
+    for (final textScale in [1.5, 2.0]) {
+      testWidgets(
+        'Arabic login remains usable at 320px width and ${textScale}x text scale (dark=$dark)',
+        (tester) async {
+          tester.view.physicalSize = const Size(320, 640);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
 
-        await tester.pumpWidget(
-          _testApp(
-            dark: dark,
-            home: MediaQuery(
-              data: const MediaQueryData(
-                size: Size(320, 640),
-                textScaler: TextScaler.linear(1.5),
-              ),
-              child: LoginScreen(
-                authUseCases: _authUseCases(),
-                onLoginSuccess: () async {},
+          await tester.pumpWidget(
+            _testApp(
+              dark: dark,
+              home: MediaQuery(
+                data: MediaQueryData(
+                  size: const Size(320, 640),
+                  textScaler: TextScaler.linear(textScale),
+                ),
+                child: LoginScreen(
+                  authUseCases: _authUseCases(),
+                  onLoginSuccess: () async {},
+                ),
               ),
             ),
-          ),
-        );
-        await tester.pump(const Duration(milliseconds: 300));
+          );
+          await tester.pump(const Duration(milliseconds: 300));
 
-        expect(find.byType(TextFormField), findsNWidgets(2));
-        expect(find.text('تسجيل الدخول'), findsOneWidget);
-        expect(find.text('البريد الإلكتروني أو اسم المستخدم'), findsOneWidget);
-        expect(tester.takeException(), isNull);
+          expect(find.byType(TextFormField), findsNWidgets(2));
+          expect(find.text('تسجيل الدخول'), findsOneWidget);
+          expect(find.text('البريد الإلكتروني أو اسم المستخدم'), findsOneWidget);
+          expect(tester.takeException(), isNull);
 
-        final semantics = tester.ensureSemantics();
-        await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
-        await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
-        await expectLater(tester, meetsGuideline(textContrastGuideline));
-        semantics.dispose();
-      },
-    );
+          final semantics = tester.ensureSemantics();
+          await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+          await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+          await expectLater(tester, meetsGuideline(textContrastGuideline));
+          semantics.dispose();
+        },
+      );
+    }
   }
 
   testWidgets('login controls expose a password visibility label', (tester) async {
