@@ -82,18 +82,37 @@ export class GuestMetrics {
 
   async alarm() {
     const today = new Date(this.now()).toISOString().slice(0, 10);
-    const announcementKeys = await this.ctx.storage.list({ prefix: "announcement:" });
-    const globalKeys = await this.ctx.storage.list({ prefix: "global:" });
-    const staleKeys = [];
+    await this.deleteExpiredKeys(
+      "announcement:",
+      (key) => key.split(":")[1],
+      today,
+    );
+    await this.deleteExpiredKeys(
+      "global:",
+      (key) => key.slice("global:".length),
+      today,
+    );
+  }
 
-    for (const key of announcementKeys.keys()) {
-      if (key.split(":")[1] < today) staleKeys.push(key);
-    }
-    for (const key of globalKeys.keys()) {
-      if (key.slice("global:".length) < today) staleKeys.push(key);
-    }
-    if (staleKeys.length > 0) {
-      await this.ctx.storage.delete(staleKeys);
+  async deleteExpiredKeys(prefix, getDate, today) {
+    let startAfter;
+    while (true) {
+      const page = await this.ctx.storage.list({
+        prefix,
+        limit: 128,
+        ...(startAfter ? { startAfter } : {}),
+      });
+      const keys = [...page.keys()];
+      if (keys.length === 0) return;
+
+      const staleKeys = keys.filter((key) => getDate(key) < today);
+      if (staleKeys.length > 0) {
+        // Durable Object Storage.delete accepts at most 128 keys per call.
+        await this.ctx.storage.delete(staleKeys);
+      }
+
+      startAfter = keys[keys.length - 1];
+      if (keys.length < 128) return;
     }
   }
 }
