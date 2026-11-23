@@ -15,20 +15,9 @@ import 'package:academic_os/domain/usecases/course_use_cases.dart';
 import 'package:academic_os/domain/usecases/task_use_cases.dart';
 
 void main() {
-  // The test runner may execute tests from this file concurrently. Keep each
-  // fixture bound to the test's Zone instead of sharing mutable late fields.
-  final contexts = <Zone, _AssistantTestContext>{};
-  _AssistantTestContext context() => contexts[Zone.current]!;
 
-  setUp(() {
-    contexts[Zone.current] = _AssistantTestContext();
-  });
-  tearDown(() {
-    contexts.remove(Zone.current);
-  });
-
-  group('AcademicAssistantCommandParser', () {
-    test('parses material, task and report commands', () {
+  group('AcademicAssistantCommandParser', (context) {
+    _testWithContext('parses material, task and report commands', (context) {
       const parser = AcademicAssistantCommandParser();
       expect(parser.parse('أضف مادة أمن الشبكات')?.name, 'create_material');
       expect(parser.parse('أنشئ مهمة مراجعة التشفير')?.name, 'create_task');
@@ -48,9 +37,9 @@ void main() {
     });
   });
 
-  group('AcademicAssistantActionExecutor plan preflight', () {
-    test('rejects a later missing reference before any earlier create action runs', () async {
-      final result = await context().executor.preflightPlan([
+  group('AcademicAssistantActionExecutor plan preflight', (context) {
+    _testWithContext('rejects a later missing reference before any earlier create action runs', (context) async {
+      final result = await context.executor.preflightPlan([
         const AcademicAssistantToolCall(
           name: 'create_material',
           arguments: {'name': 'أمن الشبكات'},
@@ -68,15 +57,15 @@ void main() {
 
       expect(result.succeeded, isFalse);
       expect(result.message, contains('لم تُنفذ أي خطوة'));
-      expect(context().courseRepository.courses, isEmpty);
+      expect(context.courseRepository.courses, isEmpty);
     });
 
 
-    test('rejects malformed and mismatched course and task identifiers', () async {
-      context().taskRepository.tasks.add(
+    _testWithContext('rejects malformed and mismatched course and task identifiers', (context) async {
+      context.taskRepository.tasks.add(
         const TaskEntity(id: 1, title: 'عنوان صحيح', description: ''),
       );
-      final malformedCourse = await context().executor.preflightPlan([
+      final malformedCourse = await context.executor.preflightPlan([
         const AcademicAssistantToolCall(
           name: 'create_task',
           arguments: {'title': 'مراجعة', 'course_id': 'invalid'},
@@ -85,7 +74,7 @@ void main() {
       expect(malformedCourse.succeeded, isFalse);
       expect(malformedCourse.message, contains('معرّف المادة'));
 
-      final mismatchedTask = await context().executor.preflightPlan([
+      final mismatchedTask = await context.executor.preflightPlan([
         const AcademicAssistantToolCall(
           name: 'complete_task',
           arguments: {'task_id': 1, 'task_title': 'عنوان غير مطابق'},
@@ -95,8 +84,8 @@ void main() {
       expect(mismatchedTask.message, contains('معرّف المهمة'));
     });
 
-    test('allows later actions to reference a course created earlier in the same plan', () async {
-      final result = await context().executor.preflightPlan([
+    _testWithContext('allows later actions to reference a course created earlier in the same plan', (context) async {
+      final result = await context.executor.preflightPlan([
         const AcademicAssistantToolCall(
           name: 'create_material',
           arguments: {'name': 'الشبكات'},
@@ -120,13 +109,13 @@ void main() {
       ]);
 
       expect(result.succeeded, isTrue);
-      expect(context().courseRepository.courses, isEmpty);
-      expect(context().taskRepository.tasks, isEmpty);
+      expect(context.courseRepository.courses, isEmpty);
+      expect(context.taskRepository.tasks, isEmpty);
     });
 
 
-    test('rejects invalid lecture reminder options during preflight', () async {
-      context().courseRepository.courses.add(
+    _testWithContext('rejects invalid lecture reminder options during preflight', (context) async {
+      context.courseRepository.courses.add(
         const CourseEntity(
           id: 1,
           name: 'الشبكات',
@@ -134,7 +123,7 @@ void main() {
           code: 'NET101',
         ),
       );
-      final invalidToggle = await context().executor.preflightPlan([
+      final invalidToggle = await context.executor.preflightPlan([
         const AcademicAssistantToolCall(
           name: 'add_lecture',
           arguments: {
@@ -149,7 +138,7 @@ void main() {
       expect(invalidToggle.succeeded, isFalse);
       expect(invalidToggle.message, contains('تذكير المحاضرة'));
 
-      final invalidOffset = await context().executor.preflightPlan([
+      final invalidOffset = await context.executor.preflightPlan([
         const AcademicAssistantToolCall(
           name: 'add_lecture',
           arguments: {
@@ -165,8 +154,8 @@ void main() {
       expect(invalidOffset.message, contains('مدة التنبيه'));
     });
 
-    test('detects conflicts between two proposed lectures before the first write', () async {
-      final result = await context().executor.preflightPlan([
+    _testWithContext('detects conflicts between two proposed lectures before the first write', (context) async {
+      final result = await context.executor.preflightPlan([
         const AcademicAssistantToolCall(
           name: 'create_material',
           arguments: {'name': 'قواعد البيانات'},
@@ -193,12 +182,12 @@ void main() {
 
       expect(result.succeeded, isFalse);
       expect(result.message, contains('تعارض'));
-      expect(context().courseRepository.courses, isEmpty);
+      expect(context.courseRepository.courses, isEmpty);
     });
   });
 
-  group('AcademicAssistantActionExecutor', () {
-    test(
+  group('AcademicAssistantActionExecutor', (context) {
+    _testWithContext(
       'updates the academic profile without clearing unspecified fields',
       () async {
         SharedPreferences.setMockInitialValues({
@@ -214,7 +203,7 @@ void main() {
           }),
         });
 
-        final result = await context().executor.execute(
+        final result = await context.executor.execute(
           const AcademicAssistantToolCall(
             name: 'update_profile',
             arguments: {'semester': 'الثاني', 'department': 'الأمن السيبراني'},
@@ -225,7 +214,7 @@ void main() {
         expect(result.changedData, isTrue);
         expect(result.succeeded, isTrue);
         expect(
-          await context().executor.verifyPostcondition(
+          await context.executor.verifyPostcondition(
             const AcademicAssistantToolCall(
               name: 'update_profile',
               arguments: {'semester': 'الثاني', 'department': 'الأمن السيبراني'},
@@ -241,16 +230,16 @@ void main() {
       },
     );
 
-    test(
+    _testWithContext(
       'creates a material with an automatic code and prevents duplicates',
       () async {
-        final first = await context().executor.execute(
+        final first = await context.executor.execute(
           const AcademicAssistantToolCall(
             name: 'create_material',
             arguments: {'name': 'أمن الشبكات'},
           ),
         );
-        final duplicate = await context().executor.execute(
+        final duplicate = await context.executor.execute(
           const AcademicAssistantToolCall(
             name: 'create_material',
             arguments: {'name': 'أمن الشبكات'},
@@ -259,7 +248,7 @@ void main() {
 
         expect(first.changedData, isTrue);
         expect(
-          await context().executor.verifyPostcondition(
+          await context.executor.verifyPostcondition(
             const AcademicAssistantToolCall(
               name: 'create_material',
               arguments: {'name': 'أمن الشبكات'},
@@ -268,17 +257,17 @@ void main() {
           ),
           isTrue,
         );
-        expect(context().courseRepository.courses, hasLength(1));
-        expect(context().courseRepository.courses.single.code, startsWith('AUTO-'));
+        expect(context.courseRepository.courses, hasLength(1));
+        expect(context.courseRepository.courses.single.code, startsWith('AUTO-'));
         expect(duplicate.changedData, isFalse);
         expect(duplicate.message, contains('موجودة مسبقاً'));
       },
     );
 
-    test(
+    _testWithContext(
       'creates a task linked to the material and records automatic start time',
       () async {
-        context().courseRepository.courses.add(
+        context.courseRepository.courses.add(
           const CourseEntity(
             id: 7,
             name: 'أمن الشبكات',
@@ -287,7 +276,7 @@ void main() {
           ),
         );
         final before = DateTime.now();
-        final result = await context().executor.execute(
+        final result = await context.executor.execute(
           const AcademicAssistantToolCall(
             name: 'create_task',
             arguments: {
@@ -298,12 +287,12 @@ void main() {
         );
 
         expect(result.changedData, isTrue);
-        expect(context().taskRepository.tasks, hasLength(1));
-        expect(context().taskRepository.tasks.single.courseId, 7);
-        expect(context().taskRepository.tasks.single.courseName, 'أمن الشبكات');
-        expect(context().taskRepository.tasks.single.startDateTime, isNotNull);
+        expect(context.taskRepository.tasks, hasLength(1));
+        expect(context.taskRepository.tasks.single.courseId, 7);
+        expect(context.taskRepository.tasks.single.courseName, 'أمن الشبكات');
+        expect(context.taskRepository.tasks.single.startDateTime, isNotNull);
         expect(
-          context().taskRepository.tasks.single.startDateTime!.isBefore(before),
+          context.taskRepository.tasks.single.startDateTime!.isBefore(before),
           isFalse,
         );
         const createTaskCall = AcademicAssistantToolCall(
@@ -313,18 +302,18 @@ void main() {
             'course_name': 'أمن الشبكات',
           },
         );
-        expect(await context().executor.verifyPostcondition(createTaskCall, result), isTrue);
-        context().taskRepository.tasks[0] = context().taskRepository.tasks.single.copyWith(
+        expect(await context.executor.verifyPostcondition(createTaskCall, result), isTrue);
+        context.taskRepository.tasks[0] = context.taskRepository.tasks.single.copyWith(
           title: 'قيمة لم تُحفظ',
         );
-        expect(await context().executor.verifyPostcondition(createTaskCall, result), isFalse);
+        expect(await context.executor.verifyPostcondition(createTaskCall, result), isFalse);
       },
     );
 
-    test(
+    _testWithContext(
       'rejects unsupported file types before saving to a material',
       () async {
-        context().courseRepository.courses.add(
+        context.courseRepository.courses.add(
           const CourseEntity(
             id: 55,
             name: 'أمن الشبكات',
@@ -332,7 +321,7 @@ void main() {
             code: 'SEC-55',
           ),
         );
-        final result = await context().executor.execute(
+        final result = await context.executor.execute(
           AcademicAssistantToolCall(
             name: 'add_material_file',
             arguments: {
@@ -349,8 +338,8 @@ void main() {
       },
     );
 
-    test('updates an existing material by its stable ID', () async {
-      context().courseRepository.courses.add(
+    _testWithContext('updates an existing material by its stable ID', (context) async {
+      context.courseRepository.courses.add(
         const CourseEntity(
           id: 31,
           name: 'الشبكات',
@@ -358,7 +347,7 @@ void main() {
           code: 'NET-31',
         ),
       );
-      final result = await context().executor.execute(
+      final result = await context.executor.execute(
         const AcademicAssistantToolCall(
           name: 'update_material',
           arguments: {
@@ -370,14 +359,14 @@ void main() {
       );
 
       expect(result.changedData, isTrue);
-      expect(context().courseRepository.courses.single.name, 'أمن الشبكات المتقدم');
-      expect(context().courseRepository.courses.single.credits, 3);
+      expect(context.courseRepository.courses.single.name, 'أمن الشبكات المتقدم');
+      expect(context.courseRepository.courses.single.credits, 30);
     });
 
-    test(
+    _testWithContext(
       'requires confirmation before deleting a material and its related data',
       () async {
-        context().courseRepository.courses.add(
+        context.courseRepository.courses.add(
           const CourseEntity(
             id: 21,
             name: 'الشبكات',
@@ -385,7 +374,7 @@ void main() {
             code: 'NET-21',
           ),
         );
-        final result = await context().executor.execute(
+        final result = await context.executor.execute(
           const AcademicAssistantToolCall(
             name: 'delete_material',
             arguments: {'course_name': 'الشبكات'},
@@ -394,16 +383,16 @@ void main() {
 
         expect(result.requiresConfirmation, isTrue);
         expect(result.confirmationPrompt, contains('ملفاتها'));
-        expect(context().courseRepository.courses, hasLength(1));
+        expect(context.courseRepository.courses, hasLength(1));
       },
     );
 
-    test('verifies attachment bytes after a database write', () async {
+    _testWithContext('verifies attachment bytes after a database write', (context) async {
       final database = DatabaseHelper.instance;
       await database.close();
       int? materialId;
       try {
-        context().courseRepository.courses.add(
+        context.courseRepository.courses.add(
           const CourseEntity(
             id: 55,
             name: 'أمن الشبكات',
@@ -420,12 +409,12 @@ void main() {
             'file_bytes': Uint8List.fromList([37, 80, 68, 70, 1, 2, 3]),
           },
         );
-        final result = await context().executor.execute(call);
+        final result = await context.executor.execute(call);
         materialId = result.affectedRecordId;
 
         expect(result.succeeded, isTrue);
         expect(materialId, isNotNull);
-        expect(await context().executor.verifyPostcondition(call, result), isTrue);
+        expect(await context.executor.verifyPostcondition(call, result), isTrue);
 
         // A same-length but corrupted BLOB must not pass postcondition checks.
         final db = await database.database;
@@ -435,10 +424,10 @@ void main() {
           where: 'id = ?',
           whereArgs: [materialId],
         );
-        expect(await context().executor.verifyPostcondition(call, result), isFalse);
+        expect(await context.executor.verifyPostcondition(call, result), isFalse);
 
         await database.deleteMaterial(materialId!);
-        expect(await context().executor.verifyPostcondition(call, result), isFalse);
+        expect(await context.executor.verifyPostcondition(call, result), isFalse);
         materialId = null;
       } finally {
         if (materialId != null) await database.deleteMaterial(materialId);
@@ -446,12 +435,12 @@ void main() {
       }
     });
 
-    test('manages exams in the database and confirms deletion', () async {
+    _testWithContext('manages exams in the database and confirms deletion', (context) async {
       final database = DatabaseHelper.instance;
       await database.close();
       int? createdExamId;
       try {
-        context().courseRepository.courses.add(
+        context.courseRepository.courses.add(
           const CourseEntity(
             id: 77,
             name: 'أمن الشبكات',
@@ -468,15 +457,15 @@ void main() {
             'course_name': 'أمن الشبكات',
           },
         );
-        final created = await context().executor.execute(createExamCall);
+        final created = await context.executor.execute(createExamCall);
         expect(created.changedData, isTrue);
-        expect(await context().executor.verifyPostcondition(createExamCall, created), isTrue);
+        expect(await context.executor.verifyPostcondition(createExamCall, created), isTrue);
         final saved = (await database.getExams())
             .singleWhere((exam) => exam.title == 'اختبار الشبكات');
         createdExamId = saved.id;
         expect(saved.courseId, 77);
 
-        final updated = await context().executor.execute(
+        final updated = await context.executor.execute(
           AcademicAssistantToolCall(
             name: 'update_exam',
             arguments: {
@@ -488,7 +477,7 @@ void main() {
         );
         expect(updated.changedData, isTrue);
         expect(
-          await context().executor.verifyPostcondition(
+          await context.executor.verifyPostcondition(
             AcademicAssistantToolCall(
               name: 'update_exam',
               arguments: {
@@ -506,7 +495,7 @@ void main() {
           'اختبار الشبكات النهائي',
         );
 
-        final pendingDelete = await context().executor.execute(
+        final pendingDelete = await context.executor.execute(
           AcademicAssistantToolCall(
             name: 'delete_exam',
             arguments: {'exam_id': saved.id},
@@ -515,7 +504,7 @@ void main() {
         expect(pendingDelete.requiresConfirmation, isTrue);
         expect(await database.getExamById(saved.id!), isNotNull);
 
-        final deleted = await context().executor.execute(
+        final deleted = await context.executor.execute(
           AcademicAssistantToolCall(
             name: 'delete_exam',
             arguments: {'exam_id': saved.id},
@@ -524,7 +513,7 @@ void main() {
         );
         expect(deleted.changedData, isTrue);
         expect(
-          await context().executor.verifyPostcondition(
+          await context.executor.verifyPostcondition(
             AcademicAssistantToolCall(
               name: 'delete_exam',
               arguments: {'exam_id': saved.id},
@@ -543,8 +532,8 @@ void main() {
       }
     });
 
-    test('verifies course updates against the repository state', () async {
-      context().courseRepository.courses.add(
+    _testWithContext('verifies course updates against the repository state', (context) async {
+      context.courseRepository.courses.add(
         const CourseEntity(
           id: 31,
           name: 'الشبكات',
@@ -563,21 +552,21 @@ void main() {
         },
       );
 
-      final result = await context().executor.execute(call);
+      final result = await context.executor.execute(call);
       expect(result.succeeded, isTrue);
       expect(result.changedData, isTrue);
       expect(result.affectedRecordId, 31);
-      expect(context().courseRepository.courses.single.credits, 30);
-      expect(await context().executor.verifyPostcondition(call, result), isTrue);
+      expect(context.courseRepository.courses.single.credits, 3);
+      expect(await context.executor.verifyPostcondition(call, result), isTrue);
 
-      context().courseRepository.courses[0] = context().courseRepository.courses.single.copyWith(
+      context.courseRepository.courses[0] = context.courseRepository.courses.single.copyWith(
         credits: 2,
       );
-      expect(await context().executor.verifyPostcondition(call, result), isFalse);
+      expect(await context.executor.verifyPostcondition(call, result), isFalse);
     });
 
-    test('verifies task updates and rejects stale persisted values', () async {
-      context().taskRepository.tasks.add(
+    _testWithContext('verifies task updates and rejects stale persisted values', (context) async {
+      context.taskRepository.tasks.add(
         TaskEntity(
           id: 10,
           title: 'مراجعة أولية',
@@ -596,19 +585,19 @@ void main() {
         },
       );
 
-      final result = await context().executor.execute(call);
+      final result = await context.executor.execute(call);
       expect(result.succeeded, isTrue);
       expect(result.changedData, isTrue);
-      expect(await context().executor.verifyPostcondition(call, result), isTrue);
+      expect(await context.executor.verifyPostcondition(call, result), isTrue);
 
-      context().taskRepository.tasks[0] = context().taskRepository.tasks.single.copyWith(
+      context.taskRepository.tasks[0] = context.taskRepository.tasks.single.copyWith(
         title: 'قيمة قديمة',
       );
-      expect(await context().executor.verifyPostcondition(call, result), isFalse);
+      expect(await context.executor.verifyPostcondition(call, result), isFalse);
     });
 
-    test('verifies task completion and deletion after persistence', () async {
-      context().taskRepository.tasks.add(
+    _testWithContext('verifies task completion and deletion after persistence', (context) async {
+      context.taskRepository.tasks.add(
         const TaskEntity(id: 12, title: 'مراجعة التشفير', description: ''),
       );
       const completeCall = AcademicAssistantToolCall(
@@ -616,34 +605,34 @@ void main() {
         arguments: {'task_id': 12},
       );
 
-      final completed = await context().executor.execute(completeCall);
+      final completed = await context.executor.execute(completeCall);
       expect(completed.succeeded, isTrue);
       expect(completed.changedData, isTrue);
-      expect(await context().executor.verifyPostcondition(completeCall, completed), isTrue);
+      expect(await context.executor.verifyPostcondition(completeCall, completed), isTrue);
 
-      context().taskRepository.tasks[0] = context().taskRepository.tasks.single.copyWith(
+      context.taskRepository.tasks[0] = context.taskRepository.tasks.single.copyWith(
         isCompleted: false,
       );
-      expect(await context().executor.verifyPostcondition(completeCall, completed), isFalse);
+      expect(await context.executor.verifyPostcondition(completeCall, completed), isFalse);
 
-      context().taskRepository.tasks[0] = context().taskRepository.tasks.single.copyWith(
+      context.taskRepository.tasks[0] = context.taskRepository.tasks.single.copyWith(
         isCompleted: true,
       );
       const deleteCall = AcademicAssistantToolCall(
         name: 'delete_task',
         arguments: {'task_id': 12},
       );
-      final deleted = await context().executor.execute(deleteCall, confirmed: true);
+      final deleted = await context.executor.execute(deleteCall, confirmed: true);
       expect(deleted.succeeded, isTrue);
       expect(deleted.changedData, isTrue);
-      expect(await context().executor.verifyPostcondition(deleteCall, deleted), isTrue);
+      expect(await context.executor.verifyPostcondition(deleteCall, deleted), isTrue);
     });
 
-    test('requires confirmation before deleting a task', () async {
-      context().taskRepository.tasks.add(
+    _testWithContext('requires confirmation before deleting a task', (context) async {
+      context.taskRepository.tasks.add(
         const TaskEntity(id: 12, title: 'مراجعة التشفير', description: ''),
       );
-      final result = await context().executor.execute(
+      final result = await context.executor.execute(
         const AcademicAssistantToolCall(
           name: 'delete_task',
           arguments: {'task_id': 12},
@@ -652,9 +641,16 @@ void main() {
 
       expect(result.requiresConfirmation, isTrue);
       expect(result.confirmationPrompt, contains('مراجعة التشفير'));
-      expect(context().taskRepository.tasks, hasLength(1));
+      expect(context.taskRepository.tasks, hasLength(1));
     });
   });
+}
+
+void _testWithContext(
+  String description,
+  FutureOr<void> Function(_AssistantTestContext context) body,
+) {
+  test(description, () => body(_AssistantTestContext()));
 }
 
 CourseUseCases _courseUseCases(CourseRepository repository) => CourseUseCases(
