@@ -262,7 +262,7 @@ class AcademicAssistantActionExecutor {
           return (name.isEmpty || _normalize(course.name) == _normalize(name)) &&
               (instructor.isEmpty || course.instructor == instructor) &&
               (code.isEmpty || course.code == code) &&
-              (credits == null || course.credits == credits);
+              (credits == null || course.credits == credits.clamp(0, 30).toInt());
         case 'delete_material':
           if (id == null) return false;
           final courses = await courseUseCases.getCourses();
