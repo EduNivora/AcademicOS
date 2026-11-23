@@ -314,7 +314,18 @@ void main() {
           },
         );
         expect(await executor.verifyPostcondition(createTaskCall, result), isTrue);
+        expect(taskRepository.tasks.single.courseId, 7);
+        expect(taskRepository.tasks.single.courseName, 'أمن الشبكات');
+        expect(taskRepository.tasks.single.type, TaskType.other);
+        expect(taskRepository.tasks.single.priority, TaskPriority.medium);
         taskRepository.tasks[0] = taskRepository.tasks.single.copyWith(
+          courseId: null,
+          courseName: null,
+        );
+        expect(await executor.verifyPostcondition(createTaskCall, result), isFalse);
+        taskRepository.tasks[0] = taskRepository.tasks.single.copyWith(
+          courseId: 7,
+          courseName: 'أمن الشبكات',
           title: 'قيمة لم تُحفظ',
         );
         expect(await executor.verifyPostcondition(createTaskCall, result), isFalse);
