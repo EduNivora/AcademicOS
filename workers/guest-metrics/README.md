@@ -32,8 +32,13 @@ fingerprints, guest IDs, device IDs, cookies, or per-request identity.
 The global transaction is intentionally serialized to make the daily ceilings
 strict across Cloudflare locations. This is a deliberate throughput trade-off:
 guest analytics are best-effort and should never block public announcement
-reading. When the quota or limiter is unavailable, the Worker rejects only the
-metric write; the public feed remains readable.
+reading. An attacker can exhaust an announcement's daily quota and suppress
+later aggregate counts for that announcement; this is accepted rather than
+allowing unbounded counter inflation or database writes. If the upstream Neon
+service fails after quota reservation, the event is not refunded or retried
+automatically, preventing blind duplicate writes. When the quota or limiter is
+unavailable, the Worker rejects only the metric write; the public feed remains
+readable.
 
 The Neon Function remains the source of truth for daily aggregate counters.
 The shared secret blocks direct calls to the Neon guest metric routes.
