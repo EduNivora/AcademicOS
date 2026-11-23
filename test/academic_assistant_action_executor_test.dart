@@ -189,7 +189,7 @@ void main() {
   group('AcademicAssistantActionExecutor', () {
     _testWithContext(
       'updates the academic profile without clearing unspecified fields',
-      () async {
+      (context) async {
         SharedPreferences.setMockInitialValues({
           StudentProfile.storageKey: jsonEncode({
             'fullName': 'طالب',
@@ -232,7 +232,7 @@ void main() {
 
     _testWithContext(
       'creates a material with an automatic code and prevents duplicates',
-      () async {
+      (context) async {
         final first = await context.executor.execute(
           const AcademicAssistantToolCall(
             name: 'create_material',
@@ -266,7 +266,7 @@ void main() {
 
     _testWithContext(
       'creates a task linked to the material and records automatic start time',
-      () async {
+      (context) async {
         context.courseRepository.courses.add(
           const CourseEntity(
             id: 7,
@@ -312,7 +312,7 @@ void main() {
 
     _testWithContext(
       'rejects unsupported file types before saving to a material',
-      () async {
+      (context) async {
         context.courseRepository.courses.add(
           const CourseEntity(
             id: 55,
@@ -365,7 +365,7 @@ void main() {
 
     _testWithContext(
       'requires confirmation before deleting a material and its related data',
-      () async {
+      (context) async {
         context.courseRepository.courses.add(
           const CourseEntity(
             id: 21,
