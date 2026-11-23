@@ -104,7 +104,11 @@ export function createApp({ pool, verifyIdentity, allowedOrigins = [], guestMetr
 
   app.get("/health", async (c) => {
     await pool.query("SELECT 1");
-    return c.json({ ok: true, service: "edunivora-notices-api" });
+    return c.json({
+      ok: true,
+      service: "edunivora-notices-api",
+      guestMetricsGatewayConfigured: Boolean(guestMetricsSecret),
+    });
   });
 
   app.get("/v1/announcements", async (c) => {
