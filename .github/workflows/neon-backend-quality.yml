@@ -33,5 +33,7 @@ jobs:
         run: npm install --ignore-scripts --no-audit --no-fund
       - name: Check JavaScript syntax
         run: npm run check
+      - name: Validate Cloudflare guest metrics Worker bundle
+        run: npx --yes wrangler@4 deploy --dry-run --config workers/guest-metrics/wrangler.toml
       - name: Run backend tests
         run: npm test
