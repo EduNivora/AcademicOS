@@ -95,6 +95,8 @@ export class GuestMetrics {
   }
 }
 
+const MAX_PROXY_BODY_BYTES = 64 * 1024;
+
 const HOP_BY_HOP_HEADERS = [
   "connection", "content-length", "keep-alive", "proxy-authenticate",
   "proxy-authorization", "te", "trailer", "transfer-encoding", "upgrade", "host"
@@ -133,6 +135,17 @@ export default {
     const cors = origin ? corsHeaders(origin) : {};
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: cors });
+    }
+
+    let bodyBytes;
+    if (!["GET", "HEAD"].includes(request.method)) {
+      bodyBytes = await request.arrayBuffer();
+      if (bodyBytes.byteLength > MAX_PROXY_BODY_BYTES) {
+        return Response.json({ error: { code: "request_too_large", message: "Request body exceeds the gateway limit." } }, {
+          status: 413,
+          headers: { ...cors, "Cache-Control": "no-store" }
+        });
+      }
     }
 
     const metricMatch = request.method === "POST"
@@ -208,7 +221,7 @@ export default {
     }
 
     const init = { method: request.method, headers, redirect: "manual" };
-    if (!["GET", "HEAD"].includes(request.method)) init.body = await request.arrayBuffer();
+    if (bodyBytes) init.body = bodyBytes;
 
     try {
       const upstream = await fetch(target, init);
