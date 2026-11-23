@@ -411,8 +411,7 @@ class AcademicAssistantActionExecutor {
               (isCreate || location.isEmpty || row['location'] == location) &&
               (!isCreate || row['location'] == location) &&
               (!courseSpecified ||
-                  (row['course_id'] == courseResult!.course!.id &&
-                      row['course_name'] == courseResult.course!.name)) &&
+                  row['course_id'] == courseResult!.course!.id) &&
               (expectedReminderEnabled == null ||
                   reminderEnabled == expectedReminderEnabled) &&
               (reminderOffset == null ||
@@ -1319,7 +1318,6 @@ class AcademicAssistantActionExecutor {
         .toInt();
     final id = await database.insertSchedule({
       'course_id': course.id,
-      'course_name': course.name,
       'day_of_week': day,
       'start_time': startTime,
       'end_time': endTime,
@@ -1418,7 +1416,6 @@ class AcademicAssistantActionExecutor {
     await database.updateSchedule({
       'id': scheduleId,
       'course_id': course.id,
-      'course_name': course.name,
       'day_of_week': day,
       'start_time': startTime,
       'end_time': endTime,
@@ -1462,7 +1459,15 @@ class AcademicAssistantActionExecutor {
         message: 'المحاضرة غير موجودة في الجدول.',
       );
     }
-    final courseName = existing['course_name']?.toString() ?? 'المادة';
+    final rawCourseId = existing['course_id'];
+    final courseId = rawCourseId is int
+        ? rawCourseId
+        : int.tryParse(rawCourseId?.toString() ?? '');
+    final courses = await courseUseCases.getCourses();
+    final courseName = courseId == null
+        ? 'المادة'
+        : courses.where((course) => course.id == courseId).firstOrNull?.name ??
+            'المادة';
     if (!confirmed) {
       return AcademicAssistantToolResult(
         message: 'حذف المحاضرة يحتاج إلى تأكيدك.',
