@@ -2,7 +2,7 @@ class EdunivoraApiConfig {
   EdunivoraApiConfig._();
 
   static const String noticesBaseUrl =
-      'https://br-late-bread-bajll3is-notices.compute.c-8.eu-central-1.aws.neon.tech';
+      'https://edunivora-guest-metrics.m-gh-alaosimi.workers.dev';
 
   static const String aiBaseUrl =
       'https://br-late-bread-bajll3is-ai.compute.c-8.eu-central-1.aws.neon.tech';
