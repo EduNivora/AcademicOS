@@ -134,20 +134,13 @@ test("Durable Object alarm deletes expired keys but preserves the current UTC-da
     MAX_ANNOUNCEMENT_METRICS_PER_DAY: "5",
     MAX_GUEST_METRICS_PER_DAY: "50",
   });
-  await metrics.fetch(quotaRequest({ date: "2026-11-23" }));
-  await metrics.fetch(quotaRequest({ date: "2026-11-24" }));
-  const originalNow = Date;
-  globalThis.Date = class extends originalNow {
-    constructor(...args) { super(...args); }
-    static now() { return originalNow.parse("2026-11-24T00:00:05.000Z"); }
-  };
-  try {
-    await metrics.alarm();
-  } finally {
-    globalThis.Date = originalNow;
-  }
-  assert.equal(await storage.get("global:2026-11-23"), undefined);
-  assert.equal(await storage.get("global:2026-11-24"), 1);
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+  await metrics.fetch(quotaRequest({ date: yesterday }));
+  await metrics.fetch(quotaRequest({ date: today }));
+  await metrics.alarm();
+  assert.equal(await storage.get(`global:${yesterday}`), undefined);
+  assert.equal(await storage.get(`global:${today}`), 1);
 });
 
 test("gateway fails closed when required configuration is missing", async () => {
