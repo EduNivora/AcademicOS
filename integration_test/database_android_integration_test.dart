@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,7 +12,7 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets(
-    'Android native SQLite creates schema and persists a row after reopen',
+    'Android native SQLite persists academic rows and attachment BLOBs after reopen',
     (tester) async {
       expect(Platform.isAndroid, isTrue);
       debugPrint(
@@ -25,6 +26,9 @@ void main() {
       await helper.close();
 
       int? insertedId;
+      int? insertedCourseId;
+      int? insertedMaterialId;
+      final attachmentBytes = Uint8List.fromList([37, 80, 68, 70, 45, 49, 46, 52]);
       try {
         final firstOpen = await helper.database;
         expect(firstOpen.path, isNot(inMemoryDatabasePath));
@@ -51,6 +55,31 @@ void main() {
         expect(beforeClose, hasLength(1));
         expect(beforeClose.single['title'], marker);
 
+        insertedCourseId = await firstOpen.insert('courses', {
+          'name': 'Android attachment persistence',
+          'instructor': 'Integration test',
+          'code': 'ANDROID-BLOB-${DateTime.now().microsecondsSinceEpoch}',
+          'credits': 3,
+        });
+        insertedMaterialId = await firstOpen.insert('course_materials', {
+          'course_id': insertedCourseId,
+          'title': 'android-persistence.pdf',
+          'file_path': 'dbblob://android-persistence',
+          'file_type': 'pdf',
+          'file_bytes': attachmentBytes,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+        final materialBeforeClose = await firstOpen.query(
+          'course_materials',
+          where: 'id = ?',
+          whereArgs: [insertedMaterialId],
+        );
+        expect(materialBeforeClose, hasLength(1));
+        expect(
+          List<int>.from(materialBeforeClose.single['file_bytes'] as Uint8List),
+          orderedEquals(attachmentBytes),
+        );
+
         await helper.close();
 
         final reopened = await helper.database;
@@ -66,14 +95,30 @@ void main() {
           afterReopen.single['description'],
           'Native Android SQLite persistence verification',
         );
+        final materialAfterReopen = await reopened.query(
+          'course_materials',
+          where: 'id = ?',
+          whereArgs: [insertedMaterialId],
+        );
+        expect(materialAfterReopen, hasLength(1));
+        expect(
+          List<int>.from(materialAfterReopen.single['file_bytes'] as Uint8List),
+          orderedEquals(attachmentBytes),
+        );
       } finally {
-        if (insertedId != null) {
-          try {
-            final db = await helper.database;
-            await db.delete('tasks', where: 'id = ?', whereArgs: [insertedId]);
-          } finally {
-            await helper.close();
+        try {
+          final db = await helper.database;
+          if (insertedMaterialId != null) {
+            await db.delete('course_materials', where: 'id = ?', whereArgs: [insertedMaterialId]);
           }
+          if (insertedCourseId != null) {
+            await db.delete('courses', where: 'id = ?', whereArgs: [insertedCourseId]);
+          }
+          if (insertedId != null) {
+            await db.delete('tasks', where: 'id = ?', whereArgs: [insertedId]);
+          }
+        } finally {
+          await helper.close();
         }
       }
     },
