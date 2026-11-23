@@ -306,7 +306,9 @@ class AcademicAssistantActionExecutor {
           final tasks = await taskUseCases.getTasks();
           final task = tasks.where((item) => item.id == id).firstOrNull;
           if (task == null) return false;
-          if (call.name == 'complete_task') return task.isCompleted;
+          if (call.name == 'complete_task') {
+            return task.isCompleted && task.completedAt != null;
+          }
 
           final args = call.arguments;
           final isCreate = call.name == 'create_task';
@@ -348,14 +350,16 @@ class AcademicAssistantActionExecutor {
               (isCreate
                   ? task.description == description
                   : description.isEmpty || task.description == description) &&
-              ((isCreate || priority.isNotEmpty) &&
-                      task.priority != TaskPriorityX.fromName(priority)
-                  ? false
-                  : true) &&
+              (!(isCreate || priority.isNotEmpty) ||
+                  task.priority == TaskPriorityX.fromName(priority)) &&
               (!isCreate || task.type == TaskTypeX.fromName(type)) &&
               (!isCreate || task.startDateTime != null) &&
-              (isCreate || endDate == null ||
-                  task.endDateTime?.isAtSameMomentAs(endDate) == true) &&
+              (isCreate
+                  ? endDate == null
+                      ? task.endDateTime == null
+                      : task.endDateTime?.isAtSameMomentAs(endDate) == true
+                  : endDate == null ||
+                      task.endDateTime?.isAtSameMomentAs(endDate) == true) &&
               task.reminderOffsetMinutes == expectedReminderOffset &&
               task.reminderEnabled == expectedReminderEnabled &&
               task.reminderDate == expectedReminderDate;
@@ -395,12 +399,20 @@ class AcademicAssistantActionExecutor {
               : args['reminder_enabled'] is bool
                   ? args['reminder_enabled'] as bool
                   : null;
-          return (day.isEmpty || row['day_of_week'] == day) &&
-              (start.isEmpty || row['start_time'] == start) &&
-              (end.isEmpty || row['end_time'] == end) &&
+          return (isCreate
+                  ? row['day_of_week'] == day
+                  : day.isEmpty || row['day_of_week'] == day) &&
+              (isCreate
+                  ? row['start_time'] == start
+                  : start.isEmpty || row['start_time'] == start) &&
+              (isCreate
+                  ? row['end_time'] == end
+                  : end.isEmpty || row['end_time'] == end) &&
               (isCreate || location.isEmpty || row['location'] == location) &&
               (!isCreate || row['location'] == location) &&
-              (!courseSpecified || row['course_id'] == courseResult!.course!.id) &&
+              (!courseSpecified ||
+                  (row['course_id'] == courseResult!.course!.id &&
+                      row['course_name'] == courseResult.course!.name)) &&
               (expectedReminderEnabled == null ||
                   reminderEnabled == expectedReminderEnabled) &&
               (reminderOffset == null ||
