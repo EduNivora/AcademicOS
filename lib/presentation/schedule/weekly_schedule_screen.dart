@@ -278,7 +278,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         return;
       }
 
-      final savedIds = await _databaseHelper.insertSchedules(toSave);
+      final databaseEntries = toSave.map((entry) {
+        final persistedEntry = Map<String, dynamic>.from(entry)
+          ..remove('course_name');
+        return persistedEntry;
+      }).toList(growable: false);
+      final savedIds = await _databaseHelper.insertSchedules(databaseEntries);
       for (var index = 0; index < toSave.length; index++) {
         final entry = toSave[index];
         await NotificationService.instance.scheduleLectureReminder(
