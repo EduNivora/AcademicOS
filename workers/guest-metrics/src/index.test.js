@@ -5,21 +5,29 @@ import gateway, { GuestMetrics } from "./index.js";
 function createStorage() {
   const values = new Map();
   let alarm = null;
+  let maxDeleteBatch = 0;
   let tail = Promise.resolve();
   return {
     async get(key) { return values.get(key); },
     async put(key, value) { values.set(key, structuredClone(value)); },
     async delete(keys) {
       const list = Array.isArray(keys) ? keys : [keys];
+      maxDeleteBatch = Math.max(maxDeleteBatch, list.length);
+      if (list.length > 128) throw new RangeError("delete accepts at most 128 keys");
       let deleted = false;
       for (const key of list) deleted = values.delete(key) || deleted;
       return deleted;
     },
-    async list({ prefix = "" } = {}) {
-      return new Map([...values.entries()].filter(([key]) => key.startsWith(prefix)));
+    async list({ prefix = "", limit = 128, startAfter } = {}) {
+      const entries = [...values.entries()]
+        .filter(([key]) => key.startsWith(prefix) && (!startAfter || key > startAfter))
+        .sort(([left], [right]) => left.localeCompare(right))
+        .slice(0, limit);
+      return new Map(entries);
     },
     async setAlarm(value) { alarm = value; },
     get alarm() { return alarm; },
+    get maxDeleteBatch() { return maxDeleteBatch; },
     async transaction(callback) {
       const operation = tail.then(async () => callback());
       tail = operation.catch(() => {});
@@ -124,18 +132,35 @@ test("Durable Object resets counters when the UTC metric date changes", async ()
   assert.equal(await storage.get("global:2026-11-24"), 1);
 });
 
-test("Durable Object alarm deletes expired keys but preserves the current UTC-day quota", async () => {
+test("Durable Object alarm paginates expired keys and deletes in batches of 128", async () => {
   const storage = createStorage();
   const metrics = new GuestMetrics({ storage }, {
     MAX_ANNOUNCEMENT_METRICS_PER_DAY: "5",
     MAX_GUEST_METRICS_PER_DAY: "50",
     now: () => Date.parse("2026-11-24T00:00:05.000Z"),
   });
-  await metrics.fetch(quotaRequest({ date: "2026-11-23" }));
-  await metrics.fetch(quotaRequest({ date: "2026-11-24" }));
+  for (let index = 0; index < 260; index += 1) {
+    await storage.put(`announcement:2026-11-23:legacy-${String(index).padStart(3, "0")}`, {
+      total: 1,
+      views: 1,
+      delivered: 0,
+    });
+  }
+  await storage.put("global:2026-11-23", 260);
+  await storage.put("announcement:2026-11-24:current", {
+    total: 1,
+    views: 1,
+    delivered: 0,
+  });
+  await storage.put("global:2026-11-24", 1);
+
   await metrics.alarm();
+
+  const expired = await storage.list({ prefix: "announcement:2026-11-23:" });
+  assert.equal(expired.size, 0);
   assert.equal(await storage.get("global:2026-11-23"), undefined);
   assert.equal(await storage.get("global:2026-11-24"), 1);
+  assert.equal(storage.maxDeleteBatch, 128);
 });
 
 test("gateway fails closed when required configuration is missing", async () => {
