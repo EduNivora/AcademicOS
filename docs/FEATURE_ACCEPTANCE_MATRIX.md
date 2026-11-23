@@ -3,6 +3,22 @@
 **Audit basis:** repository source and tests on the unified execution branch as of 2026-11-15.  
 **Important:** “Present in source” is not equivalent to accepted, production-ready, or verified on every platform. The latest CI result applies only to its recorded commit SHA.
 
+## Live revalidation addendum — 2026-11-23
+
+This addendum supersedes older status notes where they conflict. All evidence below is tied to the recorded PR heads and workflow runs; it does not imply that any draft PR has been merged.
+
+| Area | Current verified state | Release decision |
+|---|---|---|
+| Mainline | `main` remains at `50dc34a2`; the newer assistant, quota and edge-gateway stacks remain separate open PRs | Do not describe draft work as part of production |
+| Assistant execution | PR #52 read-after-write verification passed build-free CI on head `0a996309`: 197/197 Flutter tests and Dart analysis passed in run #44963973733 | Await PR #50 native SQLite emulator gate and integration-stack review before merge |
+| AI per-account quotas | PR #47 passed 39/39 backend tests and built the Neon Function bundle in run #44909953287. Migration 0003 passed isolated Neon schema verification | Production `ai_usage_windows` table is absent; migration and Function deployment are not active |
+| Gemini provider | Active Neon AI Function deployment 3 has a configured `GEMINI_API_KEY`; source uses `gemini-3.8-flash`, a currently documented Google model | Authenticated real-user request/response, quota enforcement and error behavior remain unverified live |
+| Guest announcement metrics | PR #53 stages a Cloudflare proxy, atomic daily quotas and a Neon shared-secret guard; exact-head backend run is pending after the latest test addition | Current live Worker is still the older counter implementation; Cloudflare secret list is empty and Neon Notices deployment 8 has no guest-metrics secret. Not protected in production |
+| Neon Auth | Email/password + OTP are enabled; a Google OAuth provider entry is configured. Only local loopback is listed as a trusted origin | Real Android device login, production email delivery and production Web origin remain unverified |
+| Android build | PR #50 run #45223262593 has passed Dart analysis and Flutter tests; native SQLite emulator verification is still in progress | No signed release APK/AAB. Production signing remains owner-gated |
+| SQLite encryption at rest | Production database remains unencrypted; PR #12 is an isolated SQLite3MC proof | Keep status **Not implemented**. No production driver switch or data migration is authorized |
+| Cloudflare/Neon deployment | Existing live services were inspected read-only; no production deployment or secret mutation was performed | Coordinate secrets, Worker and Function rollout only after exact-head tests and explicit release approval |
+
 ## Status definitions
 
 - **Present / partially verified:** implementation exists and some automated tests cover the domain; end-to-end acceptance is still required.
