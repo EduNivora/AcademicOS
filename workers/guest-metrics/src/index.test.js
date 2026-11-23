@@ -228,6 +228,25 @@ test("gateway forwards registered bearer credentials without adding the guest se
   }
 });
 
+test("guest metric upstream failure does not retry or refund the reserved quota", async () => {
+  const { env, calls, storage } = createGatewayEnv();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => { calls.upstream.push(true); throw new Error("private upstream details"); };
+  try {
+    const response = await gateway.fetch(new Request(
+      `https://gateway.test/v1/announcements/${announcementId}/guest-view`,
+      { method: "POST" },
+    ), env);
+    assert.equal(response.status, 502);
+    assert.equal(calls.upstream.length, 1);
+    assert.equal(calls.limiter.length, 1);
+    const today = new Date().toISOString().slice(0, 10);
+    assert.equal(await storage.get(`global:${today}`), 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("gateway returns 502 on upstream failure and does not leak internal details", async () => {
   const { env } = createGatewayEnv();
   const originalFetch = globalThis.fetch;
