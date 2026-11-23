@@ -2,10 +2,12 @@
 
 The Worker is the public edge entrypoint for the Neon Notices API.
 
+The configuration declares the already-provisioned SQLite Durable Object class using Cloudflare's declarative `exports` lifecycle; it does not create a second namespace or replay a legacy migration.
+
 ## Deployment
 
 ```bash
-npx wrangler deploy --config workers/guest-metrics/wrangler.toml
+npx wrangler@4 deploy --config workers/guest-metrics/wrangler.toml
 ```
 
 ## Bindings and secrets
