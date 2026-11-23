@@ -44,9 +44,12 @@ export class GuestMetrics {
     let allowed = false;
     let scheduleCleanup = false;
 
-    await this.ctx.storage.transaction(async (txn) => {
-      const globalCount = (await txn.get(globalKey)) ?? 0;
-      const current = (await txn.get(announcementKey)) ?? {
+    await this.ctx.storage.transaction(async () => {
+      // SQLite-backed Durable Objects transact operations made through ctx.storage.
+      // Keep the reads and both writes inside this callback to reserve the two
+      // counters atomically across concurrent requests.
+      const globalCount = (await this.ctx.storage.get(globalKey)) ?? 0;
+      const current = (await this.ctx.storage.get(announcementKey)) ?? {
         total: 0,
         views: 0,
         delivered: 0,
@@ -57,8 +60,8 @@ export class GuestMetrics {
         return;
       }
 
-      await txn.put(globalKey, globalCount + 1);
-      await txn.put(announcementKey, {
+      await this.ctx.storage.put(globalKey, globalCount + 1);
+      await this.ctx.storage.put(announcementKey, {
         total: current.total + 1,
         views: current.views + (input.event === "views" ? 1 : 0),
         delivered: current.delivered + (input.event === "delivered" ? 1 : 0),
