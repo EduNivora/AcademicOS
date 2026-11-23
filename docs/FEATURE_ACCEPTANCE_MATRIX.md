@@ -156,9 +156,9 @@ Do not mark Release 1 ready from the backend or bundle checks alone. The exact-h
 
 ## Assistant postcondition verification — current QA stack
 
-The assistant postcondition implementation is being carried onto the current QA candidate so it can be reviewed and tested against the latest Android attachment persistence, accessibility, and bounded emulator CI changes.
-
-- Source: `feat/assistant-postcondition-verification-current-qa` (stacked on QA head `2280186caa59485047116a5123efc0febb070834`).
-- Scope: read-after-write verification for course, task, attachment, schedule, exam, and profile mutations; exact attachment-byte comparison; dependent-step stop on failed verification.
-- Added regression coverage: course credit normalization, course update verification, task update/completion/deletion verification, and same-length attachment corruption rejection.
-- Acceptance: exact-head Dart analysis, full Flutter tests, native Android SQLite integration, Android Debug build, and Web build must pass before this stack is accepted. No production release or deployment is implied.
+- Active PR: [#55](https://github.com/EduNivora/AcademicOS/pull/55), based on the current QA candidate. Exact head `fff3a21ae7fa59646e1324b91d0dd098a4b1f37a` passed [run #45232872758](https://github.com/EduNivora/AcademicOS/actions/runs/45232872758): **203 Flutter tests and Dart analysis passed**.
+- Verified postconditions cover course updates/credit normalization, task creation/course linkage/update/completion/deletion, attachment BLOB bytes (including same-length corruption rejection), lecture add/update/confirmed deletion, exams, and profile changes.
+- Fixed schedule persistence to match the real SQLite schema: `course_name` is derived through `course_id`, not written as a nonexistent column. The schedule-image import now strips this derived field before batch insert.
+- Failed postconditions preserve the action as uncertain/failed and stop dependent plan steps. Do not blindly replay interrupted writes.
+- Old PR #52 remains preserved for history but is superseded due to a stale/diverged QA base. Do not merge it.
+- Release acceptance still requires the parent QA native Android SQLite emulator, Android Debug/Web builds, production signing availability where required, and the separate backend deployment smoke tests. No production release or deployment is implied.
