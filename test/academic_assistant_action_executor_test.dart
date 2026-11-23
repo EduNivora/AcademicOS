@@ -364,7 +364,7 @@ void main() {
           arguments: {
             'course_id': 31,
             'name': 'أمن الشبكات المتقدم',
-            'credits': 99,
+            'credits': 3,
           },
         ),
       );
@@ -559,7 +559,7 @@ void main() {
           'course_id': 31,
           'name': 'أمن الشبكات المتقدم',
           'instructor': 'د. أحمد',
-          'credits': 3,
+          'credits': 99,
         },
       );
 
