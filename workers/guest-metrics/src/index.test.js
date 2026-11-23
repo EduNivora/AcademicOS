@@ -21,11 +21,7 @@ function createStorage() {
     async setAlarm(value) { alarm = value; },
     get alarm() { return alarm; },
     async transaction(callback) {
-      const operation = tail.then(async () => callback({
-        get: async (key) => values.get(key),
-        put: async (key, value) => values.set(key, structuredClone(value)),
-        delete: async (key) => values.delete(key),
-      }));
+      const operation = tail.then(async () => callback());
       tail = operation.catch(() => {});
       return operation;
     },
