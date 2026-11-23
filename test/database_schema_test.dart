@@ -372,6 +372,9 @@ void main() {
         'file_type': 'pdf',
         'file_bytes': bytes,
       });
+      // Reopen the persistent database to prove attachment bytes survive the
+      // same lifecycle boundary as an application restart.
+      await helper.close();
       final row = await helper.getMaterialById(materialId);
       expect(row, isNotNull);
       expect(row!['file_bytes'], isA<Uint8List>());
