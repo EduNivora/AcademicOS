@@ -195,6 +195,35 @@ test("gateway rejects oversized metric payloads before consuming quota", async (
   }
 });
 
+test("gateway cancels oversized streamed bodies without buffering the full request", async () => {
+  const { env, calls, storage } = createGatewayEnv();
+  const today = new Date().toISOString().slice(0, 10);
+  let chunksProduced = 0;
+  let cancelled = false;
+  const stream = new ReadableStream({
+    pull(controller) {
+      chunksProduced += 1;
+      controller.enqueue(new Uint8Array(32 * 1024));
+      if (chunksProduced >= 10) controller.close();
+    },
+    cancel() {
+      cancelled = true;
+    },
+  });
+
+  const response = await gateway.fetch(new Request(
+    `https://gateway.test/v1/announcements/${announcementId}/guest-view`,
+    { method: "POST", body: stream, duplex: "half" },
+  ), env);
+
+  assert.equal(response.status, 413);
+  assert.equal(cancelled, true);
+  assert.ok(chunksProduced < 10);
+  assert.equal(await storage.get(`global:${today}`), undefined);
+  assert.equal(calls.limiter.length, 0);
+  assert.equal(calls.upstream.length, 0);
+});
+
 test("gateway rate-limits guest metrics before proxying", async () => {
   const { env, calls } = createGatewayEnv({ perAnnouncement: "1", global: "10" });
   await env.GUEST_METRICS.get().fetch(quotaRequest());
