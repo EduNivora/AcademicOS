@@ -283,14 +283,22 @@ class AcademicAssistantActionExecutor {
           if (id == null) return false;
           final row = await database.getMaterialById(id);
           final rawBytes = call.arguments['file_bytes'];
-          final expectedLength = rawBytes is List ? rawBytes.length : -1;
+          final expectedBytes = rawBytes is List ? rawBytes : const <int>[];
+          final storedBytes = row?['file_bytes'];
+          final bytesMatch = storedBytes is List &&
+              expectedBytes.isNotEmpty &&
+              storedBytes.length == expectedBytes.length &&
+              List<int>.generate(
+                expectedBytes.length,
+                (index) => storedBytes[index] as int,
+              ).asMap().entries.every(
+                (entry) => entry.value == expectedBytes[entry.key],
+              );
           final courseResult = await _resolveCourse(call.arguments);
           return row != null &&
               courseResult.course?.id == row['course_id'] &&
               row['title'] == _string(call.arguments, 'file_name') &&
-              row['file_bytes'] is List &&
-              (row['file_bytes'] as List).length == expectedLength &&
-              expectedLength > 0;
+              bytesMatch;
         case 'create_task':
         case 'complete_task':
         case 'update_task':
