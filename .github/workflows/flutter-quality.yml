@@ -210,8 +210,7 @@ jobs:
           echo "Production signing configuration verified."
 
       - name: Build optimized signed ARM64 APK
-        if: github.event_name == 'workflow_dispatch' && inputs.release_build == true
-        if: env.PRODUCTION_SIGNING_READY == 'true'
+        if: github.event_name == 'workflow_dispatch' && inputs.release_build == true && env.PRODUCTION_SIGNING_READY == 'true'
         env:
           ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/edunivora-production-upload.jks
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -226,8 +225,7 @@ jobs:
           --dart-define=GOOGLE_SERVER_CLIENT_ID="$GOOGLE_SERVER_CLIENT_ID"
 
       - name: Verify signed ARM64 APK and size
-        if: github.event_name == 'workflow_dispatch' && inputs.release_build == true
-        if: env.PRODUCTION_SIGNING_READY == 'true'
+        if: github.event_name == 'workflow_dispatch' && inputs.release_build == true && env.PRODUCTION_SIGNING_READY == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -248,8 +246,7 @@ jobs:
           sha256sum "$apk" | tee SHA256SUMS-release.txt
 
       - name: Upload signed ARM64 release APK
-        if: github.event_name == 'workflow_dispatch' && inputs.release_build == true
-        if: env.PRODUCTION_SIGNING_READY == 'true'
+        if: github.event_name == 'workflow_dispatch' && inputs.release_build == true && env.PRODUCTION_SIGNING_READY == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: edunivora-android-arm64-release-${{ github.sha }}
