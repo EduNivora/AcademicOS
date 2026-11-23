@@ -1,11 +1,12 @@
 export class GuestMetrics {
-  constructor(ctx) {
+  constructor(ctx, env = {}) {
     this.ctx = ctx;
+    this.env = env;
   }
 
   async fetch(request) {
     const url = new URL(request.url);
-    if (request.method !== "POST" || url.pathname !== "/rate-limit") {
+    if (request.method !== "POST" || url.pathname !== "/consume") {
       return new Response("Not Found", { status: 404 });
     }
 
@@ -13,36 +14,77 @@ export class GuestMetrics {
     try {
       input = await request.json();
     } catch {
-      return Response.json({ error: "Invalid rate-limit payload" }, { status: 400 });
+      return Response.json({ error: "Invalid quota payload" }, { status: 400 });
     }
 
-    if (!Number.isInteger(input?.minute) ||
-        typeof input?.fingerprint !== "string" ||
-        !/^[a-f0-9]{64}$/.test(input.fingerprint)) {
-      return Response.json({ error: "Invalid rate-limit payload" }, { status: 400 });
+    const validDate = typeof input?.date === "string" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(input.date) &&
+      !Number.isNaN(Date.parse(input.date)) &&
+      new Date(input.date).toISOString().slice(0, 10) === input.date;
+    const validAnnouncement = typeof input?.announcementId === "string" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.announcementId);
+    const validEvent = input?.event === "views" || input?.event === "delivered";
+
+    if (!validDate || !validAnnouncement || !validEvent) {
+      return Response.json({ error: "Invalid quota payload" }, { status: 400 });
     }
 
-    const stored = await this.ctx.storage.get("rate_window");
-    const windowState = stored?.minute === input.minute
-      ? stored
-      : { minute: input.minute, total: 0, counts: {} };
+    const perAnnouncementLimit = Math.max(
+      1,
+      Number.parseInt(this.env.MAX_ANNOUNCEMENT_METRICS_PER_DAY ?? "5000", 10) || 5000,
+    );
+    const globalLimit = Math.max(
+      1,
+      Number.parseInt(this.env.MAX_GUEST_METRICS_PER_DAY ?? "50000", 10) || 50000,
+    );
 
-    const current = windowState.counts[input.fingerprint] || 0;
-    if (current >= 60 || windowState.total >= 5000) {
-      return Response.json({ allowed: false }, { status: 429 });
+    let allowed = false;
+    let scheduleCleanup = false;
+
+    await this.ctx.storage.transaction(async (txn) => {
+      const stored = await txn.get("daily_metrics");
+      const state = stored?.date === input.date
+        ? stored
+        : { date: input.date, total: 0, announcements: {} };
+
+      const current = state.announcements[input.announcementId] ?? {
+        total: 0,
+        views: 0,
+        delivered: 0,
+      };
+
+      if (state.total >= globalLimit || current.total >= perAnnouncementLimit) {
+        allowed = false;
+        return;
+      }
+
+      state.total += 1;
+      current.total += 1;
+      current[input.event] += 1;
+      state.announcements[input.announcementId] = current;
+      await txn.put("daily_metrics", state);
+      allowed = true;
+      scheduleCleanup = stored?.date !== input.date;
+    });
+
+    if (scheduleCleanup) {
+      const nextUtcDay = Date.parse(input.date + "T00:00:00.000Z") + 86_400_000;
+      await this.ctx.storage.setAlarm(nextUtcDay + 1_000);
     }
 
-    windowState.counts[input.fingerprint] = current + 1;
-    windowState.total += 1;
-    await this.ctx.storage.put("rate_window", windowState);
-    if (stored?.minute !== input.minute) {
-      await this.ctx.storage.setAlarm((input.minute + 1) * 60000 + 1000);
-    }
-    return Response.json({ allowed: true });
+    return allowed
+      ? Response.json({ allowed: true })
+      : Response.json({ error: { code: "daily_limit_reached", message: "Guest metrics daily limit reached." } }, { status: 429 });
   }
 
   async alarm() {
-    await this.ctx.storage.delete("rate_window");
+    const today = new Date().toISOString().slice(0, 10);
+    await this.ctx.storage.transaction(async (txn) => {
+      const stored = await txn.get("daily_metrics");
+      if (stored && stored.date < today) {
+        await txn.delete("daily_metrics");
+      }
+    });
   }
 }
 
@@ -61,27 +103,11 @@ function corsHeaders(origin) {
   };
 }
 
-async function fingerprintForMinute(ip, minute, secret) {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  const signature = await crypto.subtle.sign(
-    "HMAC",
-    key,
-    new TextEncoder().encode(`${minute}:${ip}`)
-  );
-  return Array.from(new Uint8Array(signature))
-    .map((value) => value.toString(16).padStart(2, "0"))
-    .join("");
-}
-
 export default {
   async fetch(request, env) {
-    if (!env.NEON_NOTICES_API_ORIGIN || !env.NEON_WORKER_SHARED_SECRET) {
+    if (!env.NEON_NOTICES_API_ORIGIN ||
+        !env.NEON_WORKER_SHARED_SECRET ||
+        !env.GUEST_METRICS) {
       return Response.json({ error: "Gateway is not configured" }, {
         status: 503,
         headers: { "Cache-Control": "no-store" }
@@ -102,31 +128,38 @@ export default {
       return new Response(null, { status: 204, headers: cors });
     }
 
-    const isGuestMetric = request.method === "POST" &&
-      /^\/v1\/announcements\/[0-9a-f-]+\/guest-(view|delivered)$/i.test(incomingUrl.pathname);
+    const metricMatch = request.method === "POST"
+      ? incomingUrl.pathname.match(/^\/v1\/announcements\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/guest-(view|delivered)$/i)
+      : null;
 
-    if (isGuestMetric) {
-      const ip = request.headers.get("CF-Connecting-IP") || "unknown";
-      const minute = Math.floor(Date.now() / 60000);
-      const fingerprint = await fingerprintForMinute(
-        ip,
-        minute,
-        env.NEON_WORKER_SHARED_SECRET
-      );
+    if (metricMatch) {
+      const announcementId = metricMatch[1];
+      const event = metricMatch[2].toLowerCase() === "view" ? "views" : "delivered";
+      const date = new Date().toISOString().slice(0, 10);
       const id = env.GUEST_METRICS.idFromName("global");
       const limiter = env.GUEST_METRICS.get(id);
-      const limitResponse = await limiter.fetch(
-        "https://guest-metrics.internal/rate-limit",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ minute, fingerprint })
-        }
-      );
+
+      let limitResponse;
+      try {
+        limitResponse = await limiter.fetch(new Request(
+          "https://guest-metrics.internal/consume",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ announcementId, date, event })
+          }
+        ));
+      } catch {
+        return Response.json({ error: "Rate limiter unavailable" }, {
+          status: 503,
+          headers: { ...cors, "Cache-Control": "no-store" }
+        });
+      }
+
       if (limitResponse.status === 429) {
-        return Response.json({ error: { code: "rate_limited", message: "Please retry later." } }, {
+        return Response.json({ error: { code: "rate_limited", message: "Daily guest metrics limit reached." } }, {
           status: 429,
-          headers: { ...cors, "Retry-After": "60", "Cache-Control": "no-store" }
+          headers: { ...cors, "Retry-After": "86400", "Cache-Control": "no-store" }
         });
       }
       if (!limitResponse.ok) {
@@ -163,6 +196,7 @@ export default {
     headers.delete("Cookie");
     headers.delete("X-EduNivora-Worker-Secret");
 
+    const isGuestMetric = Boolean(metricMatch);
     if (isGuestMetric) {
       headers.set("X-EduNivora-Worker-Secret", env.NEON_WORKER_SHARED_SECRET);
     }
