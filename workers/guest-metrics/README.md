@@ -46,6 +46,7 @@ The shared secret blocks direct calls to the Neon guest metric routes.
 ## Endpoints
 
 The Worker proxies `GET /health`, `GET /v1/announcements`, authenticated
-account endpoints, and the two guest metric POST endpoints. It strips
-client-supplied gateway-secret and forwarding/IP headers before constructing
-trusted upstream requests.
+account endpoints, and the two guest metric POST endpoints. It rejects request
+bodies larger than 64 KiB before reserving metric quota or forwarding upstream,
+and strips client-supplied gateway-secret and forwarding/IP headers before
+constructing trusted upstream requests.
