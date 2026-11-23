@@ -9,7 +9,15 @@ function createStorage() {
   return {
     async get(key) { return values.get(key); },
     async put(key, value) { values.set(key, structuredClone(value)); },
-    async delete(key) { return values.delete(key); },
+    async delete(keys) {
+      const list = Array.isArray(keys) ? keys : [keys];
+      let deleted = false;
+      for (const key of list) deleted = values.delete(key) || deleted;
+      return deleted;
+    },
+    async list({ prefix = "" } = {}) {
+      return new Map([...values.entries()].filter(([key]) => key.startsWith(prefix)));
+    },
     async setAlarm(value) { alarm = value; },
     get alarm() { return alarm; },
     async transaction(callback) {
@@ -35,7 +43,7 @@ function quotaRequest({ id = announcementId, date = "2026-11-23", event = "views
   });
 }
 
-function createGatewayEnv({ limitStatus = 200, upstreamStatus = 204, perAnnouncement = "5000", global = "50000" } = {}) {
+function createGatewayEnv({ perAnnouncement = "5000", global = "50000" } = {}) {
   const calls = { limiter: [], upstream: [] };
   const storage = createStorage();
   const metrics = new GuestMetrics({ storage }, {
@@ -59,7 +67,7 @@ function createGatewayEnv({ limitStatus = 200, upstreamStatus = 204, perAnnounce
       },
     },
   };
-  return { env, calls, storage, upstreamStatus };
+  return { env, calls, storage };
 }
 
 test("Durable Object rejects malformed quota payloads", async () => {
@@ -83,11 +91,13 @@ test("Durable Object enforces per-announcement daily limit atomically under conc
   );
   assert.equal(results.filter((response) => response.status === 200).length, 5);
   assert.equal(results.filter((response) => response.status === 429).length, 15);
-  const state = await storage.get("daily_metrics");
+  assert.equal(await storage.get("global:2026-11-23"), 5);
+  const state = await storage.get(`announcement:2026-11-23:${announcementId}`);
   assert.equal(state.total, 5);
-  assert.equal(state.announcements[announcementId].views, 5);
+  assert.equal(state.views, 5);
   assert.equal(storage.alarm, Date.parse("2026-11-24T00:00:00.000Z") + 1_000);
-  assert.equal(JSON.stringify(state).includes("203.0.113"), false);
+  const storedValues = JSON.stringify([...await storage.list({ prefix: "" })]);
+  assert.equal(storedValues.includes("203.0.113"), false);
 });
 
 test("Durable Object enforces a global daily ceiling across announcements", async () => {
@@ -103,6 +113,7 @@ test("Durable Object enforces a global daily ceiling across announcements", asyn
   ]);
   assert.equal(results.filter((response) => response.status === 200).length, 3);
   assert.equal(results.filter((response) => response.status === 429).length, 1);
+  assert.equal(await metrics.ctx.storage.get("global:2026-11-23"), 3);
 });
 
 test("Durable Object resets counters when the UTC metric date changes", async () => {
@@ -114,15 +125,16 @@ test("Durable Object resets counters when the UTC metric date changes", async ()
   assert.equal((await metrics.fetch(quotaRequest({ date: "2026-11-23" }))).status, 200);
   assert.equal((await metrics.fetch(quotaRequest({ date: "2026-11-23" }))).status, 429);
   assert.equal((await metrics.fetch(quotaRequest({ date: "2026-11-24" }))).status, 200);
-  assert.equal((await storage.get("daily_metrics")).date, "2026-11-24");
+  assert.equal(await storage.get("global:2026-11-24"), 1);
 });
 
-test("Durable Object alarm does not delete a newer UTC-day window", async () => {
+test("Durable Object alarm deletes expired keys but preserves the current UTC-day quota", async () => {
   const storage = createStorage();
   const metrics = new GuestMetrics({ storage }, {
     MAX_ANNOUNCEMENT_METRICS_PER_DAY: "5",
     MAX_GUEST_METRICS_PER_DAY: "50",
   });
+  await metrics.fetch(quotaRequest({ date: "2026-11-23" }));
   await metrics.fetch(quotaRequest({ date: "2026-11-24" }));
   const originalNow = Date;
   globalThis.Date = class extends originalNow {
@@ -134,7 +146,8 @@ test("Durable Object alarm does not delete a newer UTC-day window", async () => 
   } finally {
     globalThis.Date = originalNow;
   }
-  assert.equal((await storage.get("daily_metrics")).date, "2026-11-24");
+  assert.equal(await storage.get("global:2026-11-23"), undefined);
+  assert.equal(await storage.get("global:2026-11-24"), 1);
 });
 
 test("gateway fails closed when required configuration is missing", async () => {
@@ -151,8 +164,8 @@ test("gateway rejects browser origins not explicitly allowlisted", async () => {
 });
 
 test("gateway rate-limits guest metrics before proxying", async () => {
-  const { env, calls } = createGatewayEnv({ limitStatus: 429 });
-  env.GUEST_METRICS.get = () => ({ fetch: async () => new Response("limited", { status: 429 }) });
+  const { env, calls } = createGatewayEnv({ perAnnouncement: "1", global: "10" });
+  await env.GUEST_METRICS.get().fetch(quotaRequest());
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => {
     calls.upstream.push(true);
