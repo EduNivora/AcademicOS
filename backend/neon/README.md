@@ -63,11 +63,13 @@ device fingerprints, or stable guest identifiers. Guest counters are event
 counts, not unique visitor counts, and must be interpreted accordingly.
 
 Guest metric writes are accepted only through the Cloudflare Worker
-`edunivora-guest-metrics`. The Worker applies a per-minute HMAC-derived,
-short-lived rate limit in a SQLite-backed Durable Object (60 requests per
-network address per minute, plus a 5,000-request global ceiling). The raw IP is
-not persisted or forwarded to Neon. The HMAC fingerprint includes the current
-minute and is deleted by the Durable Object alarm.
+`edunivora-guest-metrics`. A SQLite-backed Durable Object uses one atomic
+transaction to enforce a default ceiling of 5,000 events per announcement per
+UTC day and 50,000 events globally per UTC day. The object stores only daily
+aggregate counts by announcement and event type; it does not store IP addresses,
+guest IDs, device identifiers, HMAC fingerprints, cookies, or per-request
+identity. The global transaction is intentionally serialized to make the
+limits strict across Cloudflare locations.
 
 The Neon Function validates `X-EduNivora-Worker-Secret` before either guest
 counter route can write to PostgreSQL. Configure the same
