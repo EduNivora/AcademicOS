@@ -152,3 +152,13 @@ This addendum supersedes stale CI/PR references above where they conflict with t
 - Google Drive backup, encrypted archive, restore and scheduled backup remain deferred to Release 2 by approved scope. Production SQLite encryption is not accepted for Release 1.
 
 Do not mark Release 1 ready from the backend or bundle checks alone. The exact-head Flutter gate, real auth/JWT flows, deployed API verification, Web origin/CORS, first-admin bootstrap, and platform runtime acceptance remain release blockers.
+
+
+## Assistant postcondition verification — current QA stack
+
+The assistant postcondition implementation is being carried onto the current QA candidate so it can be reviewed and tested against the latest Android attachment persistence, accessibility, and bounded emulator CI changes.
+
+- Source: `feat/assistant-postcondition-verification-current-qa` (stacked on QA head `2280186caa59485047116a5123efc0febb070834`).
+- Scope: read-after-write verification for course, task, attachment, schedule, exam, and profile mutations; exact attachment-byte comparison; dependent-step stop on failed verification.
+- Added regression coverage: course credit normalization, course update verification, task update/completion/deletion verification, and same-length attachment corruption rejection.
+- Acceptance: exact-head Dart analysis, full Flutter tests, native Android SQLite integration, Android Debug build, and Web build must pass before this stack is accepted. No production release or deployment is implied.
