@@ -319,8 +319,8 @@ void main() {
         expect(taskRepository.tasks.single.type, TaskType.other);
         expect(taskRepository.tasks.single.priority, TaskPriority.medium);
         taskRepository.tasks[0] = taskRepository.tasks.single.copyWith(
-          courseId: null,
-          courseName: null,
+          courseId: 999,
+          courseName: 'مادة أخرى',
         );
         expect(await executor.verifyPostcondition(createTaskCall, result), isFalse);
         taskRepository.tasks[0] = taskRepository.tasks.single.copyWith(
@@ -693,7 +693,7 @@ void main() {
 
         await db.update(
           'schedule',
-          {'course_name': 'مادة أخرى'},
+          {'course_id': 999},
           where: 'id = ?',
           whereArgs: [scheduleId],
         );
