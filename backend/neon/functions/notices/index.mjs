@@ -3,7 +3,12 @@ import { attachDatabasePool } from "@neon/functions";
 import { createApp } from "./app.mjs";
 import { createNeonIdentityVerifier } from "./token_verifier.mjs";
 
-const required = ["DATABASE_URL", "NEON_AUTH_BASE_URL", "NEON_AUTH_JWKS_URL"];
+const required = [
+  "DATABASE_URL",
+  "NEON_AUTH_BASE_URL",
+  "NEON_AUTH_JWKS_URL",
+  "GUEST_METRICS_WORKER_SECRET",
+];
 for (const key of required) {
   if (!process.env[key]) throw new Error(`Missing required runtime variable: ${key}`);
 }
@@ -29,4 +34,9 @@ const allowedOrigins = (process.env.APP_ORIGINS ?? "")
   .map((origin) => origin.trim())
   .filter(Boolean);
 
-export default createApp({ pool, verifyIdentity, allowedOrigins });
+export default createApp({
+  pool,
+  verifyIdentity,
+  allowedOrigins,
+  guestMetricsSecret: process.env.GUEST_METRICS_WORKER_SECRET,
+});
