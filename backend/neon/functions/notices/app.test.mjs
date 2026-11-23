@@ -62,6 +62,7 @@ function makeApp(options = {}) {
       ? { sub: userId, iss: "https://auth.example.test" }
       : null),
     allowedOrigins: ["https://app.example.test"],
+    guestMetricsSecret: options.guestMetricsSecret ?? "test-worker-secret",
   });
 }
 
@@ -87,7 +88,7 @@ test("guest view stores aggregate metric without identity", async () => {
   const pool = createPool();
   const response = await makeApp({ pool }).request(
     `/v1/announcements/${announcementId}/guest-view`,
-    { method: "POST" },
+    { method: "POST", headers: { "X-EduNivora-Worker-Secret": "test-worker-secret" } },
   );
   assert.equal(response.status, 204);
   const metricCall = pool.calls.find((call) =>
@@ -95,6 +96,22 @@ test("guest view stores aggregate metric without identity", async () => {
   );
   assert.ok(metricCall);
   assert.equal(metricCall.params.length, 1);
+});
+
+test("guest metrics reject direct calls without the Cloudflare gateway secret", async () => {
+  const pool = createPool();
+  const app = createApp({
+    pool,
+    verifyIdentity: async () => null,
+    allowedOrigins: [],
+    guestMetricsSecret: "test-worker-secret",
+  });
+  const response = await app.request(
+    `/v1/announcements/${announcementId}/guest-view`,
+    { method: "POST" },
+  );
+  assert.equal(response.status, 403);
+  assert.equal(pool.calls.length, 0);
 });
 
 test("registered delivery endpoint rejects requests without bearer token", async () => {
@@ -211,7 +228,7 @@ test("guest delivery is recorded as an aggregate event without identity", async 
   const pool = createPool();
   const response = await makeApp({ pool }).request(
     `/v1/announcements/${announcementId}/guest-delivered`,
-    { method: "POST" },
+    { method: "POST", headers: { "X-EduNivora-Worker-Secret": "test-worker-secret" } },
   );
   assert.equal(response.status, 204);
   const metricCall = pool.calls.find((call) =>
