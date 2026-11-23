@@ -121,7 +121,7 @@ const MAX_PROXY_BODY_BYTES = 64 * 1024;
 
 async function readRequestBodyWithLimit(request, maxBytes) {
   const declaredLength = request.headers.get("Content-Length");
-  if (declaredLength && /^\\d+$/.test(declaredLength) &&
+  if (declaredLength && /^\d+$/.test(declaredLength) &&
       Number(declaredLength) > maxBytes) {
     try { await request.body?.cancel(); } catch {}
     return { tooLarge: true, bytes: null };
