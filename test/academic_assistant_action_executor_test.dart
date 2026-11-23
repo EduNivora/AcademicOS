@@ -16,8 +16,8 @@ import 'package:academic_os/domain/usecases/task_use_cases.dart';
 
 void main() {
 
-  group('AcademicAssistantCommandParser', (context) {
-    _testWithContext('parses material, task and report commands', (context) {
+  group('AcademicAssistantCommandParser', () {
+    _testWithContext('parses material, task and report commands', () {
       const parser = AcademicAssistantCommandParser();
       expect(parser.parse('أضف مادة أمن الشبكات')?.name, 'create_material');
       expect(parser.parse('أنشئ مهمة مراجعة التشفير')?.name, 'create_task');
@@ -37,7 +37,7 @@ void main() {
     });
   });
 
-  group('AcademicAssistantActionExecutor plan preflight', (context) {
+  group('AcademicAssistantActionExecutor plan preflight', () {
     _testWithContext('rejects a later missing reference before any earlier create action runs', (context) async {
       final result = await context.executor.preflightPlan([
         const AcademicAssistantToolCall(
@@ -186,7 +186,7 @@ void main() {
     });
   });
 
-  group('AcademicAssistantActionExecutor', (context) {
+  group('AcademicAssistantActionExecutor', () {
     _testWithContext(
       'updates the academic profile without clearing unspecified fields',
       () async {
