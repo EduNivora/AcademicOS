@@ -119,6 +119,45 @@ export class GuestMetrics {
 
 const MAX_PROXY_BODY_BYTES = 64 * 1024;
 
+async function readRequestBodyWithLimit(request, maxBytes) {
+  const declaredLength = request.headers.get("Content-Length");
+  if (declaredLength && /^\\d+$/.test(declaredLength) &&
+      Number(declaredLength) > maxBytes) {
+    try { await request.body?.cancel(); } catch {}
+    return { tooLarge: true, bytes: null };
+  }
+
+  if (!request.body) return { tooLarge: false, bytes: undefined };
+
+  const reader = request.body.getReader();
+  const chunks = [];
+  let totalBytes = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) {
+        try { await reader.cancel(); } catch {}
+        return { tooLarge: true, bytes: null };
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return { tooLarge: false, bytes };
+}
+
 const HOP_BY_HOP_HEADERS = [
   "connection", "content-length", "keep-alive", "proxy-authenticate",
   "proxy-authorization", "te", "trailer", "transfer-encoding", "upgrade", "host"
@@ -161,13 +200,14 @@ export default {
 
     let bodyBytes;
     if (!["GET", "HEAD"].includes(request.method)) {
-      bodyBytes = await request.arrayBuffer();
-      if (bodyBytes.byteLength > MAX_PROXY_BODY_BYTES) {
+      const body = await readRequestBodyWithLimit(request, MAX_PROXY_BODY_BYTES);
+      if (body.tooLarge) {
         return Response.json({ error: { code: "request_too_large", message: "Request body exceeds the gateway limit." } }, {
           status: 413,
           headers: { ...cors, "Cache-Control": "no-store" }
         });
       }
+      bodyBytes = body.bytes;
     }
 
     const metricMatch = request.method === "POST"
