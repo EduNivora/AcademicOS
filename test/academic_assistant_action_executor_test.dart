@@ -364,7 +364,7 @@ void main() {
           arguments: {
             'course_id': 31,
             'name': 'أمن الشبكات المتقدم',
-            'credits': 3,
+            'credits': 99,
           },
         ),
       );
