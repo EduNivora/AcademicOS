@@ -46,11 +46,19 @@ void main() {
 
   test('rejects unsupported or mismatched document extensions', () async {
     await expectLater(
-      service().preparePdfForViewing(materialId: 1, title: 'lecture.docx', fileType: 'docx'),
+      service().preparePdfForViewing(
+        materialId: 1,
+        title: 'lecture.docx',
+        fileType: 'docx',
+      ),
       throwsA(isA<UnsupportedMaterialFormatException>()),
     );
     await expectLater(
-      service().openOfficeExternally(materialId: 1, title: 'lecture.exe', fileType: 'exe'),
+      service().openOfficeExternally(
+        materialId: 1,
+        title: 'lecture.exe',
+        fileType: 'exe',
+      ),
       throwsA(isA<UnsupportedMaterialFormatException>()),
     );
   });
@@ -60,7 +68,10 @@ void main() {
       loadBytes: (_) async => null,
       temporaryDirectory: () async => root,
     );
-    await expectLater(missing.loadMaterialBytes(1), throwsA(isA<MaterialFileUnavailableException>()));
+    await expectLater(
+      missing.loadMaterialBytes(1),
+      throwsA(isA<MaterialFileUnavailableException>()),
+    );
     await expectLater(
       service(bytes: Uint8List(0)).loadMaterialBytes(1),
       throwsA(isA<MaterialFileUnavailableException>()),
@@ -70,59 +81,73 @@ void main() {
       throwsA(isA<MaterialFileUnavailableException>()),
     );
     await expectLater(
-      service(bytes: Uint8List.fromList([1, 2, 3])).preparePdfForViewing(
-        materialId: 1, title: 'bad.pdf', fileType: 'pdf',
-      ),
+      service(
+        bytes: Uint8List.fromList([1, 2, 3]),
+      ).preparePdfForViewing(materialId: 1, title: 'bad.pdf', fileType: 'pdf'),
       throwsA(isA<MaterialFileUnavailableException>()),
     );
   });
 
-  test('keeps Office files available after the external activity is launched', () async {
-    String? openedPath;
-    final fileService = service(
-      bytes: Uint8List.fromList([0x50, 0x4b, 0x03, 0x04]),
-      opener: (path) async {
-        openedPath = path;
-        expect(await File(path).exists(), isTrue);
-        return ExternalMaterialOpenStatus.opened;
-      },
-    );
-    final status = await fileService.openOfficeExternally(
-      materialId: 9, title: 'lecture.docx', fileType: 'docx',
-    );
-    expect(status, ExternalMaterialOpenStatus.opened);
-    expect(openedPath, isNotNull);
-    expect(await File(openedPath!).exists(), isTrue);
-  });
+  test(
+    'keeps Office files available after the external activity is launched',
+    () async {
+      String? openedPath;
+      final fileService = service(
+        bytes: Uint8List.fromList([0x50, 0x4b, 0x03, 0x04]),
+        opener: (path) async {
+          openedPath = path;
+          expect(await File(path).exists(), isTrue);
+          return ExternalMaterialOpenStatus.opened;
+        },
+      );
+      final status = await fileService.openOfficeExternally(
+        materialId: 9,
+        title: 'lecture.docx',
+        fileType: 'docx',
+      );
+      expect(status, ExternalMaterialOpenStatus.opened);
+      expect(openedPath, isNotNull);
+      expect(await File(openedPath!).exists(), isTrue);
+    },
+  );
 
-  test('surfaces temporary-directory creation failures instead of opening an unsafe path', () async {
-    final fileService = CourseMaterialFileService(
-      loadBytes: (_) async => pdfBytes,
-      temporaryDirectory: () async => throw const FileSystemException('cache unavailable'),
-    );
-    await expectLater(
-      fileService.preparePdfForViewing(
-        materialId: 12,
-        title: 'lecture.pdf',
-        fileType: 'pdf',
-      ),
-      throwsA(isA<FileSystemException>()),
-    );
-  });
+  test(
+    'surfaces temporary-directory creation failures instead of opening an unsafe path',
+    () async {
+      final fileService = CourseMaterialFileService(
+        loadBytes: (_) async => pdfBytes,
+        temporaryDirectory: () async =>
+            throw const FileSystemException('cache unavailable'),
+      );
+      await expectLater(
+        fileService.preparePdfForViewing(
+          materialId: 12,
+          title: 'lecture.pdf',
+          fileType: 'pdf',
+        ),
+        throwsA(isA<FileSystemException>()),
+      );
+    },
+  );
 
-  test('removes a temporary Office file when no compatible application exists', () async {
-    String? openedPath;
-    final fileService = service(
-      bytes: Uint8List.fromList([0x50, 0x4b, 0x03, 0x04]),
-      opener: (path) async {
-        openedPath = path;
-        return ExternalMaterialOpenStatus.noApp;
-      },
-    );
-    final status = await fileService.openOfficeExternally(
-      materialId: 10, title: 'slides.pptx', fileType: 'pptx',
-    );
-    expect(status, ExternalMaterialOpenStatus.noApp);
-    expect(await File(openedPath!).exists(), isFalse);
-  });
+  test(
+    'removes a temporary Office file when no compatible application exists',
+    () async {
+      String? openedPath;
+      final fileService = service(
+        bytes: Uint8List.fromList([0x50, 0x4b, 0x03, 0x04]),
+        opener: (path) async {
+          openedPath = path;
+          return ExternalMaterialOpenStatus.noApp;
+        },
+      );
+      final status = await fileService.openOfficeExternally(
+        materialId: 10,
+        title: 'slides.pptx',
+        fileType: 'pptx',
+      );
+      expect(status, ExternalMaterialOpenStatus.noApp);
+      expect(await File(openedPath!).exists(), isFalse);
+    },
+  );
 }

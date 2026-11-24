@@ -4,7 +4,13 @@ import 'package:flutter_pdf_text/flutter_pdf_text.dart';
 import 'package:path/path.dart' as p;
 
 enum PdfTextExtractionStatus {
-  success, fileMissing, emptyFile, unsupportedFormat, tooLarge, noExtractableText, failed,
+  success,
+  fileMissing,
+  emptyFile,
+  unsupportedFormat,
+  tooLarge,
+  noExtractableText,
+  failed,
 }
 
 class PdfTextExtractionResult {
@@ -14,7 +20,8 @@ class PdfTextExtractionResult {
   bool get isSuccess => status == PdfTextExtractionStatus.success;
 }
 
-typedef PdfPageTextReader = Future<String> Function(File file, {required int maxCharacters});
+typedef PdfPageTextReader =
+    Future<String> Function(File file, {required int maxCharacters});
 
 class PdfTextExtractionService {
   static const int defaultMaxFileBytes = 50 * 1024 * 1024;
@@ -32,36 +39,55 @@ class PdfTextExtractionService {
     this.maxCharacters = defaultMaxCharacters,
     Directory Function()? temporaryDirectory,
     DateTime Function()? now,
-  })  : _reader = reader ?? _readPdfPages,
-        _temporaryDirectory = temporaryDirectory ?? (() => Directory.systemTemp),
-        _now = now ?? DateTime.now;
+  }) : _reader = reader ?? _readPdfPages,
+       _temporaryDirectory = temporaryDirectory ?? (() => Directory.systemTemp),
+       _now = now ?? DateTime.now;
 
   Future<PdfTextExtractionResult> extract(String filePath) async {
     final source = File(filePath);
     if (p.extension(filePath).toLowerCase() != '.pdf') {
-      return const PdfTextExtractionResult(status: PdfTextExtractionStatus.unsupportedFormat);
+      return const PdfTextExtractionResult(
+        status: PdfTextExtractionStatus.unsupportedFormat,
+      );
     }
     try {
       if (!await source.exists()) {
-        return const PdfTextExtractionResult(status: PdfTextExtractionStatus.fileMissing);
+        return const PdfTextExtractionResult(
+          status: PdfTextExtractionStatus.fileMissing,
+        );
       }
       final size = await source.length();
-      if (size == 0) return const PdfTextExtractionResult(status: PdfTextExtractionStatus.emptyFile);
-      if (size > maxFileBytes) return const PdfTextExtractionResult(status: PdfTextExtractionStatus.tooLarge);
+      if (size == 0)
+        return const PdfTextExtractionResult(
+          status: PdfTextExtractionStatus.emptyFile,
+        );
+      if (size > maxFileBytes)
+        return const PdfTextExtractionResult(
+          status: PdfTextExtractionStatus.tooLarge,
+        );
 
       final directory = _temporaryDirectory();
       await directory.create(recursive: true);
-      final copy = File(p.join(
-        directory.path,
-        'edunivora_summary_' + _now().microsecondsSinceEpoch.toString() + '.pdf',
-      ));
+      final copy = File(
+        p.join(
+          directory.path,
+          'edunivora_summary_' +
+              _now().microsecondsSinceEpoch.toString() +
+              '.pdf',
+        ),
+      );
       try {
         await source.copy(copy.path);
         final text = (await _reader(copy, maxCharacters: maxCharacters)).trim();
         if (text.isEmpty) {
-          return const PdfTextExtractionResult(status: PdfTextExtractionStatus.noExtractableText);
+          return const PdfTextExtractionResult(
+            status: PdfTextExtractionStatus.noExtractableText,
+          );
         }
-        return PdfTextExtractionResult(status: PdfTextExtractionStatus.success, text: text);
+        return PdfTextExtractionResult(
+          status: PdfTextExtractionStatus.success,
+          text: text,
+        );
       } finally {
         try {
           if (await copy.exists()) await copy.delete();
@@ -70,22 +96,35 @@ class PdfTextExtractionService {
         }
       }
     } on FileSystemException {
-      return const PdfTextExtractionResult(status: PdfTextExtractionStatus.failed);
+      return const PdfTextExtractionResult(
+        status: PdfTextExtractionStatus.failed,
+      );
     } catch (_) {
-      return const PdfTextExtractionResult(status: PdfTextExtractionStatus.failed);
+      return const PdfTextExtractionResult(
+        status: PdfTextExtractionStatus.failed,
+      );
     }
   }
 
-  static Future<String> _readPdfPages(File file, {required int maxCharacters}) async {
+  static Future<String> _readPdfPages(
+    File file, {
+    required int maxCharacters,
+  }) async {
     final document = await PDFDoc.fromFile(file);
     try {
       final output = StringBuffer();
-      for (var pageNumber = 1;
-          pageNumber <= document.length && output.length < maxCharacters;
-          pageNumber++) {
+      for (
+        var pageNumber = 1;
+        pageNumber <= document.length && output.length < maxCharacters;
+        pageNumber++
+      ) {
         final pageText = await document.pageAt(pageNumber).text;
         final remaining = maxCharacters - output.length;
-        output.write(pageText.length > remaining ? pageText.substring(0, remaining) : pageText);
+        output.write(
+          pageText.length > remaining
+              ? pageText.substring(0, remaining)
+              : pageText,
+        );
         output.write('\n');
       }
       return output.toString();

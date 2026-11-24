@@ -3,7 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:academic_os/presentation/course/document_viewer_screen.dart';
 
 void main() {
-  testWidgets('shows the current page count and enables valid navigation', (tester) async {
+  testWidgets('shows the current page count and enables valid navigation', (
+    tester,
+  ) async {
     var previous = 0;
     var next = 0;
     var zoomIn = 0;
@@ -34,7 +36,9 @@ void main() {
     expect(zoomOut, 1);
   });
 
-  testWidgets('disables previous and next controls at document boundaries', (tester) async {
+  testWidgets('disables previous and next controls at document boundaries', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -50,8 +54,12 @@ void main() {
         ),
       ),
     );
-    final previous = tester.widget<IconButton>(find.byKey(const Key('pdf-previous-page')));
-    final next = tester.widget<IconButton>(find.byKey(const Key('pdf-next-page')));
+    final previous = tester.widget<IconButton>(
+      find.byKey(const Key('pdf-previous-page')),
+    );
+    final next = tester.widget<IconButton>(
+      find.byKey(const Key('pdf-next-page')),
+    );
     expect(previous.onPressed, isNull);
     expect(next.onPressed, isNull);
   });
