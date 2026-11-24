@@ -44,7 +44,7 @@ void main() {
 
         expect(answer, 'شرح واضح');
         expect(requestedUri.toString(), 'https://ai.example.test/v1/chat');
-        expect(requestedHeaders!['Authorization'], '***');
+        expect(requestedHeaders!['Authorization'], 'Bearer neon-session-jwt');
         expect(requestedHeaders!['Content-Type'], 'application/json');
         expect(requestedBody!['message'], 'اشرح قواعد البيانات');
         expect(requestedBody!['context'], contains('Database'));
@@ -230,7 +230,7 @@ void main() {
           requestedUri.toString(),
           'https://ai.example.test/v1/schedule/parse',
         );
-        expect(requestedHeaders!['Authorization'], '***');
+        expect(requestedHeaders!['Authorization'], 'Bearer neon-session-jwt');
         expect(requestedBody!['mimeType'], 'image/png');
         expect(requestedBody!['image'], base64Encode([1, 2, 3]));
         expect(entries.single['course_name'], 'أمن الشبكات');
