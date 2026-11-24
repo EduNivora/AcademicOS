@@ -86,7 +86,12 @@ jobs:
                   -e '/^test\/academic_report_service_test\.dart$/d'
           )
           if (("${#changed_dart_files[@]}" > 0)); then
-            dart format --output=none --set-exit-if-changed "${changed_dart_files[@]}"
+            if ! dart format --output=none --set-exit-if-changed "${changed_dart_files[@]}"; then
+              echo "::group::Formatted Dart output for correction"
+              dart format --output=show "${changed_dart_files[@]}"
+              echo "::endgroup::"
+              exit 1
+            fi
           else
             echo "No in-scope changed Dart files to format."
           fi
