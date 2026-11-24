@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -105,7 +106,7 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
     PreparedMaterialFile? preparedPdf;
     try {
       final extension = material.fileType.toLowerCase().replaceFirst('.', '');
-      var bytes = await _fileService.loadMaterialBytes(materialId);
+      Uint8List? bytes = await _fileService.loadMaterialBytes(materialId);
       if (!mounted) return;
 
       if (extension == 'txt') {
