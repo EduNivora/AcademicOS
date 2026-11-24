@@ -49,7 +49,7 @@ GitHub API inventory and file reads were available. A local Git clone could not 
 - GitHub returned 61 pull requests: 35 open, 26 closed, 12 merged.
 - GitHub returned 68 branch refs. This includes the active Phase 0 and Phase 1 branches and six superseded Phase 1 branches retained for audit traceability.
 - PR #60 is the active Phase 0 PR: `chore/phase0-baseline-ci-hardening` at `a73f8a87657c09dc9be7178d9c72d8936028a1df`, based directly on the baseline `main` SHA.
-- PR #67 is the active Phase 1 PR: `feat/phase1-remove-backup-separate-reports-v7` at `e7afd7ea03e4534cdda847abcda56eab2462b5d2`, based on Phase 0 branch head `a73f8a87657c09dc9be7178d9c72d8936028a1df`.
+- PR #68 is the active Phase 1 PR: `feat/phase1-remove-backup-separate-reports-v8`, based on Phase 0 branch head `d6478747d13111c4fc4fe3cbf53b330e54433577`. Its live head SHA is authoritative in GitHub because CI-driven corrections may advance the branch.
 - PRs #61–#66 were superseded and closed without merging. PRs #18–#20 were closed because backup/restore is excluded from AcademicOS.
 - No PR was merged and no production branch, database, secret or user data was changed.
 
