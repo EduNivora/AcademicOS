@@ -229,11 +229,8 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
             );
             final plan = _parseActionPlan(planned);
             if (plan == null) {
-              reply = await _remote.sendMessage(
-                accessToken: token,
-                message: trimmed,
-                context: await _buildAcademicContext(),
-              );
+              reply =
+                  'لم أتمكن من قراءة خطة تنفيذ آمنة من المساعد. لم يتم تنفيذ أي إجراء أو تغيير بيانات. أعد صياغة طلبك بوضوح.';
             } else {
               reply = await _executeActionPlan(plan);
             }
@@ -259,7 +256,8 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
         reply = await _runLocalCommand(trimmed) ?? error.message;
       }
     } catch (error) {
-      reply = 'تعذر تنفيذ الطلب: $error';
+      debugPrint('Academic assistant request failed: ${error.runtimeType}');
+      reply = 'تعذر تنفيذ الطلب بسبب خطأ غير متوقع. لم أؤكد نجاح أي تغيير.';
     }
 
     if (!mounted) return;
@@ -317,30 +315,36 @@ $userMessage''';
       if (decoded is! Map<String, dynamic> || decoded['actions'] is! List) {
         return null;
       }
-      final actions = (decoded['actions'] as List)
-          .whereType<Map>()
-          .map((item) => Map<String, dynamic>.from(item))
-          .where(
-            (item) => const {
-              'update_profile',
-              'create_material',
-              'update_material',
-              'delete_material',
-              'create_task',
-              'complete_task',
-              'update_task',
-              'delete_task',
-              'add_lecture',
-              'update_lecture',
-              'delete_lecture',
-              'create_exam',
-              'update_exam',
-              'delete_exam',
-              'generate_report',
-            }.contains(item['name']),
-          )
-          .take(10)
-          .toList();
+      const allowedActions = {
+        'update_profile',
+        'create_material',
+        'update_material',
+        'delete_material',
+        'create_task',
+        'complete_task',
+        'update_task',
+        'delete_task',
+        'add_lecture',
+        'update_lecture',
+        'delete_lecture',
+        'create_exam',
+        'update_exam',
+        'delete_exam',
+        'generate_report',
+      };
+      final rawActions = decoded['actions'] as List;
+      if (rawActions.length > 10) return null;
+      final actions = <Map<String, dynamic>>[];
+      for (final raw in rawActions) {
+        if (raw is! Map) return null;
+        final action = Map<String, dynamic>.from(raw);
+        if (action['name'] is! String ||
+            !allowedActions.contains(action['name']) ||
+            action['arguments'] is! Map) {
+          return null;
+        }
+        actions.add(action);
+      }
       return {'reply': decoded['reply']?.toString() ?? '', 'actions': actions};
     } catch (_) {
       return null;
