@@ -14,7 +14,7 @@ Product principles:
 
 ## Current repository reality (2026-11-15)
 
-The repository is a Flutter application with a local SQLite/sqflite data layer and a broad set of academic screens. Existing code includes tasks, courses, weekly schedules, exams, grades/GPA tools, study planning/focus, reminders, academic reporting/dashboard, local auth/Google auth integration, app lock, settings, and backup UI. Feature presence in source is not proof that every workflow is complete or production-ready.
+The repository is a Flutter application with a local SQLite/sqflite data layer and a broad set of academic screens. Existing code includes tasks, courses, weekly schedules, exams, grades/GPA tools, study planning/focus, reminders, academic reporting/dashboard, local auth/Google auth integration, app lock, settings, and a standalone academic reports screen. Feature presence in source is not proof that every workflow is complete or production-ready.
 
 ### Recently implemented on the unified execution branch
 - Brand identity unified as `EduNivora` across UI, app label, launcher icon, and splash screen, while preserving technical namespace `com.arfatalkamli.academicos`.
@@ -29,8 +29,8 @@ The repository is a Flutter application with a local SQLite/sqflite data layer a
 
 ### Explicitly not complete
 - SQLite database-at-rest encryption is not implemented. The secure-storage database key is not connected to an encrypted SQLite engine.
-- Backup currently does not package attachment bytes. Course-material metadata can contain device-local paths; that is not a portable attachment backup.
-- Attachment import/export, file integrity checks, and cross-device restore are not complete.
+- Backup and restore are excluded from AcademicOS. Academic reports remain a separate local feature and TXT report export is not a database snapshot.
+- Course-material import and file-integrity checks still require platform-specific acceptance; no cross-device data restoration workflow is provided.
 - Cross-platform file-picker behavior and browser persistence have not been validated on real targets.
 - CI on the newest unified head must complete analysis, all tests, and Android build before that head is considered verified.
 - No physical-device, browser, desktop, release-signing, migration/rollback, or store-distribution validation has been recorded.
@@ -52,16 +52,15 @@ The repository is a Flutter application with a local SQLite/sqflite data layer a
 - [ ] Foreign keys, indexes, constraints, transactions, and recovery behavior are verified.
 - [ ] Database encryption at rest is implemented and cryptographically verified on each supported platform.
 - [ ] Wrong-key open fails closed; key rotation and recovery are tested.
-- [ ] Plaintext-to-encrypted migration has backup, integrity verification, atomic switch, and rollback.
+- [ ] Plaintext-to-encrypted migration uses a verified staging database, integrity verification, atomic switch, and rollback.
 - [ ] No database or attachment writes are silently redirected to ephemeral storage.
 
-### Gate C — Backup and restore
-- [ ] Versioned backup format and strict schema validation.
-- [ ] Export/import through native and Web-supported file flows.
-- [ ] Package attachment bytes with safe relative paths, size limits, checksums, and MIME validation.
-- [ ] Restore stages into temporary storage, verifies all data/files/references, then atomically commits.
-- [ ] Failure injection proves original data remains intact after any interrupted restore.
-- [ ] Cross-device restore is verified, not just same-device JSON parsing.
+### Gate C — Academic reports and local data workflows
+- [ ] Daily, weekly, monthly and final reports use the actual local courses, tasks, exams and schedule.
+- [ ] Empty-data and report-generation error states are explicit.
+- [ ] Report preview, TXT save and clipboard copy are verified on supported platforms.
+- [ ] Report generation and export have unit/widget regression coverage.
+- [ ] Academic report export remains separate from database persistence and ordinary academic CRUD.
 
 ### Gate D — Identity and application security
 - [ ] Argon2id migration tests and real-device performance benchmarks.
