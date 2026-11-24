@@ -54,19 +54,13 @@ Accounts are optional, but public notices are available to all installations, in
 
 The operator interface is strictly for notices. It is not an administration portal and has no student management, lecturer management, attendance, finance, institutional messaging, or university operations.
 
-## 5. Release 2 — deferred personal backup
+## 5. Explicitly excluded functionality
 
-**Decision (2026-11-15): Google Drive backup and restore are explicitly excluded from Release 1 and deferred to Release 2.** This is a deliberate release-scope decision, not a claim that backup is complete.
+**Backup and restore are not features of AcademicOS.** The product does not provide or plan in-app backup, restore, Google Drive backup, archive creation/import, whole-database export, or replacement of the student's academic workspace.
 
-The following approved product decisions remain the target for Release 2:
-- Destination: a normal, visible `EduNivora` folder in each student's own Google Drive.
-- Backup is student-initiated and is backup/restore only, never live sync.
-- A complete archive must include the database snapshot, attachment bytes, required settings, a versioned manifest and integrity checks.
-- Encrypt before upload using a student-chosen password, a memory-hard KDF such as Argon2id, a random data-encryption key and authenticated encryption. Never persist plaintext passwords or keys.
-- Restore must validate the archive and all content before mutation, stage files, support rollback/recovery, and require explicit overwrite confirmation.
-- Release 2 acceptance must include cross-device/reinstall restore, platform tests, interrupted transfer/corruption/wrong-password/no-space failure tests, and evidence tied to the release candidate.
+Academic report generation and TXT export remain supported. A report is a derived text document and is not a database snapshot or a restorable archive.
 
-Any backup-related code already present on feature branches is retained as unaccepted work-in-progress. It must not be merged into the Release 1 branch, surfaced as an available Release 1 feature, or represented as production-ready. Reassess and rebase it when Release 2 planning begins.
+This exclusion applies to presentation, application services, domain models, data repositories, API routes, platform permissions and product documentation. It does not prohibit ordinary academic CRUD, attachment persistence, or report export.
 
 ## 6. Explicit exclusions
 
@@ -83,7 +77,7 @@ The current scope excludes:
 
 ## 7. Security and privacy boundaries
 
-- Account identity data, notice delivery/read events and backup authorization metadata are the only approved server-side data categories in this scope.
+- Account identity data and notice delivery/read events are the only approved server-side data categories in this scope.
 - Guest notice analytics are anonymous aggregates; do not retain a stable cross-session guest identifier for named tracking.
 - Use access control for operator notice tools and audit publication/report access.
 - Minimize notice event retention and document the retention period before production release.
@@ -101,7 +95,7 @@ The current scope excludes:
 7. Operator interface is limited to notice publishing/reporting.
 8. Automated and platform-specific tests pass on the exact release candidate SHA.
 
-Google Drive backup, encrypted archives, upload and restore are Release 2 acceptance gates only; they are not Release 1 blockers.
+Backup and restore are excluded and are not acceptance gates.
 
 ## 9. Authoritative related documents
 
