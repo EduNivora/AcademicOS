@@ -40,7 +40,7 @@ class SecureStorageService {
       if (!_isKeystoreDecryptionError(error)) {
         rethrow;
       }
-      // On Android reinstall/backup restore, an orphaned Keystore entry can
+      // An orphaned Keystore entry from a prior Android installation can
       // fail decryption. Since SQLite is not currently encrypted with this key,
       // safely reset only this unreadable entry and regenerate it without
       // touching any user database tables.
