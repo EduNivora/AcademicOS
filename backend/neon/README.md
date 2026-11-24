@@ -62,10 +62,27 @@ Guest metrics contain counters only. They do not store guest IDs, IP addresses,
 device fingerprints, or stable guest identifiers. Guest counters are event
 counts, not unique visitor counts, and must be interpreted accordingly.
 
-Abuse protection for these unauthenticated counter endpoints is not yet
-implemented. Treat guest aggregates as provisional, not authoritative analytics,
-until the privacy-preserving controls tracked in GitHub issue #24 are completed
-and tested. Public notice reading remains available independently of metrics.
+Guest metric writes are accepted only through the Cloudflare Worker
+`edunivora-guest-metrics`. A SQLite-backed Durable Object uses one atomic
+transaction to enforce a default ceiling of 5,000 events per announcement per
+UTC day and 50,000 events globally per UTC day. The object stores only daily
+aggregate counts by announcement and event type; it does not store IP addresses,
+guest IDs, device identifiers, HMAC fingerprints, cookies, or per-request
+identity. The global transaction is intentionally serialized to make the
+limits strict across Cloudflare locations.
+
+The Neon Function validates `X-EduNivora-Worker-Secret` before either guest
+counter route can write to PostgreSQL. Configure the same
+`GUEST_METRICS_WORKER_SECRET` value in the Neon Function environment and the
+Cloudflare Worker secret `NEON_WORKER_SHARED_SECRET`; configure
+`NEON_NOTICES_API_ORIGIN` in the Worker with the Neon `notices` Function
+origin. Never expose this secret to Flutter or commit it. Direct calls to the
+Neon guest metric routes must return HTTP 403 after the updated Function is
+deployed. Public notice reading remains available independently of metrics.
+
+The gateway implementation is staged in a draft mainline PR. Do not merge or
+switch the Flutter API base URL until the Worker and Function are both deployed
+with the same secret and the live smoke tests pass.
 
 ## Authentication setup status
 

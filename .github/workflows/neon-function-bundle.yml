@@ -10,6 +10,7 @@ on:
       - main
       - chore/edunivora-phase0-execution
       - feat/neon-managed-auth-and-notices
+      - feat/guest-metrics-edge-gateway-mainline
     paths:
       - "backend/neon/functions/notices/**"
       - "package.json"

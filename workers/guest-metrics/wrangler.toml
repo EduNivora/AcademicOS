@@ -1,0 +1,11 @@
+name = "edunivora-guest-metrics"
+main = "src/index.js"
+compatibility_date = "2026-11-17"
+
+[[durable_objects.bindings]]
+name = "GUEST_METRICS"
+class_name = "GuestMetrics"
+
+[exports.GuestMetrics]
+type = "durable-object"
+storage = "sqlite"
