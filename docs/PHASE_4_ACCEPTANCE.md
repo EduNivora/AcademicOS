@@ -10,7 +10,7 @@ Product boundary: local-first academic records; Gemini is a remote planner/answe
 |---|---|---|
 | Inspect current assistant and PR #59 | Reviewed PR #59 and ported postcondition verification without importing its stacked QA preflight/ledger changes wholesale | Implemented; exact-head CI required |
 | Model cannot access database directly | Gemini returns an untrusted plan; local allowlisted executor uses existing repositories/SQLite only | Implemented by architecture and code review |
-| Fixed action allowlist | Executor switch plus per-action argument-key allowlist; unknown/identity/owner fields rejected | Implemented; unit tests cover identity-field rejection |
+| Fixed action allowlist | Dedicated plan parser rejects malformed/unknown actions; executor switch plus per-action argument-key allowlist rejects identity/owner fields | Implemented; parser and executor unit tests cover malformed plans and identity-field rejection |
 | Input validation | Bounded strings, attachment bytes, numeric/date/boolean type checks | Implemented; exact-head CI required |
 | Postcondition verification | Read-after-write checks for courses, profile, attachments, tasks, lectures, exams and deletes | Implemented; exact-head CI required |
 | Truthful success reporting | succeeded state plus postcondition check; failed steps stop the remaining action plan | Implemented; exact-head UI and test evidence required |
@@ -22,7 +22,7 @@ Product boundary: local-first academic records; Gemini is a remote planner/answe
 | Gemini key isolation | Runtime secret remains on Neon Function; no client key added | Implemented by existing server boundary; no secret was created or changed |
 | Per-account quotas | Atomic PostgreSQL minute/day reservations, fail-closed database behavior, 429 + Retry-After | Implemented in source; migration 0003 not applied and function not deployed |
 | Cloudflare guest metrics | Not used for academic assistant execution or quota enforcement | Kept separate; no Cloudflare change |
-| Prompt injection | Document content is not sent to Gemini; action output remains constrained by allowlists and confirmations | Implemented at current data boundary; adversarial tests should be expanded |
+| Prompt injection | Document content is not sent to Gemini; malformed/unknown action plans fail closed; executor argument allowlists and confirmations remain authoritative | Implemented at current data boundary; broader adversarial document/context tests should be expanded |
 | Conversation history | Current chat messages are in-memory for the screen session | Not implemented as durable history; not claimed |
 | Durable action ledger | No persisted operation receipt across process death | Not implemented; follow-up before crash-safe multi-step execution |
 | Real account / production acceptance | Requires real Neon Auth session and configured Gemini runtime | Not run; owner-gated |
@@ -38,6 +38,7 @@ The following are the CI commands configured for this branch; they are not claim
 - npm run check
 - npm test
 - npm run build:ai
+- `flutter test test/academic_assistant_action_plan_parser_test.dart` (included in the full Flutter test suite)
 
 The backend test suite uses an injected fake PostgreSQL pool; it does not connect to production. Flutter database tests use the repository's test database path.
 

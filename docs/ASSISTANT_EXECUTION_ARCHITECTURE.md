@@ -10,7 +10,7 @@ This is intentionally a local-first architecture. The current product does not s
 
 1. The student enters a prompt in AcademicAiScreen.
 2. For a signed-in cloud session, the client sends the prompt and a bounded academic context to the authenticated Neon AI function. The context contains profile fields, course/task/schedule/exam data and attachment metadata; it does not contain attachment BLOB bytes or document text.
-3. Gemini returns a proposed action plan as untrusted JSON. It is a plan, not an instruction with execution authority.
+3. Gemini returns a proposed action plan as untrusted JSON. `AcademicAssistantActionPlanParser` rejects malformed JSON, malformed entries, unknown action names, and plans above ten actions as a whole. It is a plan, not an instruction with execution authority.
 4. AcademicAssistantActionExecutor.execute checks the action name against the fixed action switch and checks every argument against the per-action field allowlist. Unknown fields—including user_id, userId, owner_id, SQL fragments, and arbitrary nested values—are rejected.
 5. The executor resolves records against the local repositories. Ambiguous or missing records return a clarification/error result instead of selecting a random record.
 6. Destructive operations and all record-update operations return a confirmation request. The UI requires explicit student confirmation before the second execution attempt.
@@ -31,7 +31,7 @@ The current executor supports only its explicit switch cases:
 - Exams: create, update after confirmation, and delete after confirmation.
 - Academic reports: generate a local report from persisted records.
 
-Any other action name is rejected. A model response cannot add a new capability by naming a tool.
+Any other action name is rejected. A malformed plan is rejected without a free-form model fallback for the same action request. A model response cannot add a new capability by naming a tool.
 
 ## Postcondition verification
 

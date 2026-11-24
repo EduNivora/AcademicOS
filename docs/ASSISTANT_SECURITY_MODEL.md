@@ -23,9 +23,10 @@
 ## Model and prompt-injection controls
 
 - Model output is parsed as untrusted JSON.
-- Action names are fixed in the executor switch; unknown names are rejected.
+- Action names are fixed in the executor switch and the dedicated `AcademicAssistantActionPlanParser`; malformed JSON, malformed action entries, unknown names, and plans above ten actions are rejected as a whole before execution.
 - Each action has an explicit allowed argument-key set. Unexpected keys, identity fields, arbitrary maps, SQL text, and unsupported values are rejected.
 - Numeric, boolean, date, string-length, and attachment-size inputs are validated before execution.
+- A malformed or unrecognized model plan does not fall back to a free-form Gemini answer for an action request, preventing a model-only success claim when no tool ran.
 - No model-controlled SQL, filesystem path, URL, database table, or service endpoint is executed.
 - Attachment contents and extracted PDF text are not sent to Gemini. Only bounded academic metadata is included in the AI context. The system instruction also frames context as data, not authority.
 - Even if a malicious filename or model output contains instructions, it cannot expand the action allowlist or bypass postcondition checks.
