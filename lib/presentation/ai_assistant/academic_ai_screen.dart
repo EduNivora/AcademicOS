@@ -405,17 +405,32 @@ $userMessage''';
           stepIndex: index,
           status: 'running',
         );
-        final result = await _executeTool(
+        var result = await _executeTool(
           calls[index],
           confirmed: approvedDestructiveActions.contains(index),
         );
+        if (result.succeeded && result.changedData) {
+          final verified = await _actionExecutor.verifyPostcondition(
+            calls[index],
+            result,
+          );
+          if (!verified) {
+            result = AcademicAssistantToolResult(
+              message: 'تم تنفيذ عملية الكتابة، لكن تعذر تأكيد حفظ النتيجة عند إعادة قراءتها. '
+                  'أوقفت بقية الخطة لتجنب تكرار العملية. راجع البيانات قبل المحاولة مجدداً.',
+              succeeded: false,
+              changedData: true,
+              affectedRecordId: result.affectedRecordId,
+            );
+          }
+        }
         messages.add(result.message);
         await ledger.updateAssistantActionStep(
           runId: runId,
           stepIndex: index,
           status: result.succeeded ? 'succeeded' : 'failed',
           changedData: result.changedData,
-          failureCode: result.succeeded ? null : 'action_failed',
+          failureCode: result.succeeded ? null : 'postcondition_or_action_failed',
         );
         currentStep = -1;
         if (result.succeeded) {
