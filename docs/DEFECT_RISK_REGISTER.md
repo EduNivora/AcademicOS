@@ -23,3 +23,6 @@
 - PR #58: Flutter test step passed on exact head; emulator logs include system_server crash and DeadSystemException. This is not proof of attachment BLOB regression.
 - Android manifest `android:allowBackup="false"` is an OS-level application backup opt-out. Preserve it; it is not the in-app Backup/Restore feature being removed.
 - Academic reports are an active, separate screen under `lib/presentation/reports/academic_reports_screen.dart`, launched from the home screen. Preserve this route and the local report service.
+
+
+| CI-03 | Repository-wide Dart format check finds 74 pre-existing unformatted files | Medium | The initial full-repository `dart format --output=none --set-exit-if-changed .` run reported 74 files requiring formatting, including unrelated legacy files. | Do not mass-format unrelated files in this task. CI now formats only changed, non-deleted Dart files; track repository-wide formatting debt separately. | IMPLEMENTED — NOT VERIFIED |
