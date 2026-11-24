@@ -52,7 +52,7 @@ The comparisons below use the then-current main SHA `989ad5212971097df868dabab55
 ### Backup PR disposition
 
 - #18 encrypted archive, #19 encrypted archive integration, and #20 Google Drive backup were closed with explicit comments because backup/restore are excluded from AcademicOS. Their branches remain only as Git history and must not be merged.
-- #61, #62 and #63 were superseded and closed as Phase 1 was rebased to the final Phase 0 CI baseline. No code was merged from those superseded PRs.
-- Current execution PRs: #60 (Phase 0) and #65 (Phase 1, stacked on #60). PR #64 was superseded and closed without merging.
+- #61–#65 were superseded and closed as Phase 1 was rebased to the final Phase 0 CI baseline. No code was merged from those superseded PRs.
+- Current execution PRs: #60 (Phase 0) and #66 (Phase 1, stacked on #60). PRs #64 and #65 were superseded and closed without merging.
 
 The comparison is a point-in-time integration snapshot. Refresh the base/head SHAs and CI before merging either current PR.
