@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/academic/academic_assistant_service.dart';
 import '../../core/academic/academic_assistant_action_executor.dart';
+import '../../core/academic/academic_assistant_action_plan_parser.dart';
 import '../../data/database/database_helper.dart';
 import '../../data/models/student_profile_model.dart';
 import '../../data/datasources/academic_ai_remote_data_source.dart';
@@ -227,7 +228,7 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
               message: _buildActionPlanningPrompt(trimmed),
               context: await _buildAcademicContext(),
             );
-            final plan = _parseActionPlan(planned);
+            final plan = const AcademicAssistantActionPlanParser().parse(planned);
             if (plan == null) {
               reply =
                   'لم أتمكن من قراءة خطة تنفيذ آمنة من المساعد. لم يتم تنفيذ أي إجراء أو تغيير بيانات. أعد صياغة طلبك بوضوح.';
@@ -303,52 +304,6 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
 
 طلب المستخدم:
 $userMessage''';
-  }
-
-  Map<String, dynamic>? _parseActionPlan(String response) {
-    try {
-      final cleaned = response
-          .replaceFirst(RegExp(r'^```(?:json)?\s*', caseSensitive: false), '')
-          .replaceFirst(RegExp(r'\s*```$'), '')
-          .trim();
-      final decoded = jsonDecode(cleaned);
-      if (decoded is! Map<String, dynamic> || decoded['actions'] is! List) {
-        return null;
-      }
-      const allowedActions = {
-        'update_profile',
-        'create_material',
-        'update_material',
-        'delete_material',
-        'create_task',
-        'complete_task',
-        'update_task',
-        'delete_task',
-        'add_lecture',
-        'update_lecture',
-        'delete_lecture',
-        'create_exam',
-        'update_exam',
-        'delete_exam',
-        'generate_report',
-      };
-      final rawActions = decoded['actions'] as List;
-      if (rawActions.length > 10) return null;
-      final actions = <Map<String, dynamic>>[];
-      for (final raw in rawActions) {
-        if (raw is! Map) return null;
-        final action = Map<String, dynamic>.from(raw);
-        if (action['name'] is! String ||
-            !allowedActions.contains(action['name']) ||
-            action['arguments'] is! Map) {
-          return null;
-        }
-        actions.add(action);
-      }
-      return {'reply': decoded['reply']?.toString() ?? '', 'actions': actions};
-    } catch (_) {
-      return null;
-    }
   }
 
   Future<String> _executeActionPlan(Map<String, dynamic> plan) async {
