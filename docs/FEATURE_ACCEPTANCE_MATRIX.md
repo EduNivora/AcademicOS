@@ -152,3 +152,28 @@ This addendum supersedes stale CI/PR references above where they conflict with t
 - Google Drive backup, encrypted archive, restore and scheduled backup remain deferred to Release 2 by approved scope. Production SQLite encryption is not accepted for Release 1.
 
 Do not mark Release 1 ready from the backend or bundle checks alone. The exact-head Flutter gate, real auth/JWT flows, deployed API verification, Web origin/CORS, first-admin bootstrap, and platform runtime acceptance remain release blockers.
+
+
+## Assistant postcondition verification — current QA stack
+
+- Active PR: [#55](https://github.com/EduNivora/AcademicOS/pull/55), based on the current QA candidate. Exact head `fff3a21ae7fa59646e1324b91d0dd098a4b1f37a` passed [run #45232872758](https://github.com/EduNivora/AcademicOS/actions/runs/45232872758): **203 Flutter tests and Dart analysis passed**.
+- Verified postconditions cover course updates/credit normalization, task creation/course linkage/update/completion/deletion, attachment BLOB bytes (including same-length corruption rejection), lecture add/update/confirmed deletion, exams, and profile changes.
+- Fixed schedule persistence to match the real SQLite schema: `course_name` is derived through `course_id`, not written as a nonexistent column. The schedule-image import now strips this derived field before batch insert.
+- Failed postconditions preserve the action as uncertain/failed and stop dependent plan steps. Do not blindly replay interrupted writes.
+- Old PR #52 remains preserved for history but is superseded due to a stale/diverged QA base. Do not merge it.
+- Release acceptance still requires the parent QA native Android SQLite emulator, Android Debug/Web builds, production signing availability where required, and the separate backend deployment smoke tests. No production release or deployment is implied.
+
+
+## Live evidence addendum — 2026-11-24
+
+This addendum supersedes older CI references above wherever they conflict. Evidence is tied to exact heads:
+
+- QA workflow hardening: PR #56 merged to QA as `b0faf98777d482baf01cee18df198611ebe420e5`; exact-head run #45439852629 succeeded, including native Android SQLite. The strict Bash `set -euo pipefail` step is preserved in the current QA workflow.
+- Assistant postcondition verification: the previous PR #55 head is not accepted for merge because its base diverged. Its application changes are being reapplied on the current QA base; this rebased candidate must pass fresh exact-head analysis, tests, and Android integration before acceptance.
+- Guest metrics gateway: PR #53 exact-head backend and Flutter runs #45271485684 and #45271485543 succeeded, including Android SQLite, Android Debug APK and Web Release. Deployment remains blocked until the Cloudflare proxy and Neon guard are configured with the same newly generated secret and all public-feed, authenticated-route, guest-write, direct-call rejection, quota and failure-mode smoke tests pass.
+- Gemini quotas: backend run #44909953287 passed 39/39 tests and built the AI Function bundle. Flutter run #44909953393 was cancelled during Android SQLite verification; retry is pending/in progress. Migration 0003 has only been checked on an isolated Neon child branch, not production.
+- Main workflow pipefail: PR #57 exact head `2fdafc0aa7ef95c6e49e0e95038e396152482a08` has passed analysis and Flutter tests; Android SQLite verification is not yet complete.
+- Attachment durability: PR #58 exact head `877e7c637c263c0c3eedfd984aa26e8d260f8faf` has passed analysis and Flutter tests; Android SQLite verification is not yet complete. Its added close/reopen assertion still requires exact-head CI success.
+- Mainline run #45433357599 passed analysis, Flutter tests, Android SQLite emulator, Android Debug APK and Web Release. No signed production ARM64 artifact was produced.
+- Physical-device behavior, real authenticated account flows, production signing, production migrations/deployments, notification delivery after process restart, and Web persistence runtime acceptance remain open gates.
+
