@@ -175,6 +175,9 @@ void main() {
           title: 'عنوان مختلف',
         );
         expect(await executor.verifyPostcondition(createTaskCall, result), isFalse);
+        taskRepository.tasks[0] = taskRepository.tasks.single.copyWith(
+          title: 'مراجعة المحاضرة الأولى',
+        );
         final retry = await executor.execute(createTaskCall);
         expect(retry.succeeded, isTrue);
         expect(retry.changedData, isFalse);
