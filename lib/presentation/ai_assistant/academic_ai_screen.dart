@@ -228,7 +228,9 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
               message: _buildActionPlanningPrompt(trimmed),
               context: await _buildAcademicContext(),
             );
-            final plan = const AcademicAssistantActionPlanParser().parse(planned);
+            final plan = const AcademicAssistantActionPlanParser().parse(
+              planned,
+            );
             if (plan == null) {
               reply =
                   'لم أتمكن من قراءة خطة تنفيذ آمنة من المساعد. لم يتم تنفيذ أي إجراء أو تغيير بيانات. أعد صياغة طلبك بوضوح.';
@@ -269,7 +271,7 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
   }
 
   bool _looksLikeActionRequest(String value) => RegExp(
-    r'(أضف|اضف|إضافة|اضافة|أنشئ|انشئ|إنشاء|انشاء|احذف|حذف|عدّل|عدل|تعديل|حدّث|حدث|تحديث|أكمل|اكمل|ضع|أدرج|ادرج|تقرير|ذكرني|ذكّرني|تذكير|رتّب|رتب|نظّم|نظم|اعرض|أعرض|عرض|استعرض|ابحث|بحث|غيّر|غير|تغيير)',
+    r'(أضف|اضف|أنشئ|انشئ|احذف|حذف|عدّل|عدل|حدّث|حدث|أكمل|اكمل|ضع|أدرج|تقرير)',
   ).hasMatch(value);
 
   String _buildActionPlanningPrompt(String userMessage) {
