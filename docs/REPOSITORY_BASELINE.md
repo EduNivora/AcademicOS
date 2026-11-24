@@ -46,11 +46,13 @@ GitHub API inventory and file reads were available. A local Git clone could not 
 **Verified after PR creation and backup PR closure (2026-11-24):**
 
 - `main` remains unchanged at `989ad5212971097df868dabab557c1c076d91720`.
-- GitHub returned 62 pull requests: 35 open, 27 closed, 12 merged.
+- GitHub returned 62 pull requests: 34 open, 28 closed, 12 merged.
 - GitHub returned 69 branch refs. This includes the active Phase 0 and Phase 1 branches and seven superseded Phase 1 branches retained for audit traceability.
-- PR #60 is the active Phase 0 PR: `chore/phase0-baseline-ci-hardening` at `a73f8a87657c09dc9be7178d9c72d8936028a1df`, based directly on the baseline `main` SHA.
-- PR #68 is the active Phase 1 PR: `feat/phase1-remove-backup-separate-reports-v8`, based on Phase 0 branch head `d6478747d13111c4fc4fe3cbf53b330e54433577`. Its live head SHA is authoritative in GitHub because CI-driven corrections may advance the branch.
-- PRs #61–#67 were superseded and closed without merging. PRs #18–#20 were closed because backup/restore is excluded from AcademicOS.
+- Latest commit timestamps for the main integration branches (UTC): `main` 2026-11-24 16:07; #47 2026-11-21 13:39; #50 2026-11-24 16:58; #53 2026-11-23 21:36; #58 2026-11-24 16:54; #59 2026-11-24 17:02; Phase 0 #60 2026-11-24 22:31. The active Phase 1 branch was last updated 2026-11-24 22:33 before synchronization with Phase 0.
+- PR #60 is the active Phase 0 PR: `chore/phase0-baseline-ci-hardening` at `d4962ea5f0bb803f5a67d9a08cfeef60c07a1134`, based directly on the baseline `main` SHA.
+- PR #68 is the active Phase 1 PR: `feat/phase1-remove-backup-separate-reports-v8`, synchronized with Phase 0 head `d4962ea5f0bb803f5a67d9a08cfeef60c07a1134` by a two-parent merge commit. The current head SHA is authoritative in GitHub.
+- PR #57 was closed as superseded by PR #60 after its emulator sizing and Package Manager readiness changes were incorporated.
+- PRs #61–#67 were superseded Phase 1 attempts and closed without merging. PRs #18–#20 were closed because backup/restore is excluded from AcademicOS.
 - No PR was merged and no production branch, database, secret or user data was changed.
 
 The PR inventory and branch count above are a current execution snapshot; refresh them again before merging.

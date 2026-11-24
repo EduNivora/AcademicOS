@@ -161,11 +161,11 @@ Baseline SHA: `989ad5212971097df868dabab557c1c076d91720`.
 | Feature / gate | Evidence | State | Remaining |
 |---|---|---|---|
 | Repository identity and baseline | Public repository, default branch `main`, exact SHA verified through GitHub refs API | COMPLETED | Refresh before merge |
-| PR inventory and integration dependencies | 53 PRs: 36 open, 17 closed, 12 merged; detailed active overlap map in `docs/PR_INTEGRATION_MAP.md` | COMPLETED | Refresh before merge |
+| PR inventory and integration dependencies | 62 PRs: 34 open, 28 closed, 12 merged; 69 branch refs; detailed active overlap map in `docs/PR_INTEGRATION_MAP.md` | COMPLETED | Refresh before merge |
 | Mainline quality baseline | Actions run [#45433357599](https://github.com/EduNivora/AcademicOS/actions/runs/45433357599) succeeded on exact baseline SHA | COMPLETED | Re-run on this branch |
-| Flutter `tee` failure propagation | Strict Bash pipefail applied to all relevant tee pipelines in the workflow | IMPLEMENTED — NOT VERIFIED | Exact-head CI |
+| Flutter `tee` failure propagation | Strict Bash pipefail applied to all seven `tee` pipelines; related CI workflows use direct commands without tee | IMPLEMENTED — NOT VERIFIED | Exact-head CI run #45501790768 on `d4962ea...` |
 | Android emulator failures on #57/#58 | Flutter tests and analysis passed; emulator failed independently with debug log-reader/system_server instability | BLOCKED | Stable fresh emulator run |
-| Phase 1 backup/restore removal | Source removal and report preservation are implemented in PR #68 | IMPLEMENTED — NOT VERIFIED | Exact-head tests and CI |
+| Phase 1 backup/restore removal | Source removal and report preservation are implemented in PR #68; branch synchronized with latest Phase 0 head | IMPLEMENTED — NOT VERIFIED | Exact-head tests and CI on synchronized merge commit |
 | Academic report preservation | Dedicated report screen is already launched from home; report service and unit tests exist | COMPLETED for current implementation | Keep independent in Phase 1 |
 
 The Phase 0 branch is not accepted until exact-head CI passes. The Phase 1 acceptance matrix will be updated in its own PR.
