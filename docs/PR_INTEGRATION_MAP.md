@@ -18,7 +18,7 @@
 | #55 assistant postconditions (older) | QA → `feat/assistant-postcondition-verification-current-qa` | Same assistant files as #59 | Closed unmerged; historical source only. #59 is the current rebased candidate. |
 | #56 QA pipefail | QA → `fix/qa-flutter-test-pipefail` | Flutter workflow | Merged into QA only; not main. Do not treat as mainline fix. |
 | #17 attachment storage | historical phase0 branch → durable attachment branch | DB helper, BLOB persistence, backup serialization | Already merged into the phase0 integration line; BLOB implementation is current persistence evidence, not a final architecture decision. |
-| #18–#20 backup archive / Drive | phase0 / encrypted archive stack | Backup archive, crypto and Drive integration | Open Release 2 work; excluded from current Release 1 scope. Do not merge. |
+| #18–#20 backup archive / Drive | phase0 / encrypted archive stack | Backup archive, crypto and Drive integration | Closed after the product owner excluded backup/restore from AcademicOS. Branches remain as Git history only; do not merge. |
 | #13 attachment path guard | phase0 integration line | Material path and PDF viewer | Historical mitigation. Its stale base and backup-era references must not be pulled into the current mainline without re-review. |
 
 ## Suggested integration order
@@ -53,6 +53,6 @@ The comparisons below use the then-current main SHA `989ad5212971097df868dabab55
 
 - #18 encrypted archive, #19 encrypted archive integration, and #20 Google Drive backup were closed with explicit comments because backup/restore are excluded from AcademicOS. Their branches remain only as Git history and must not be merged.
 - #61, #62 and #63 were superseded and closed as Phase 1 was rebased to the final Phase 0 CI baseline. No code was merged from those superseded PRs.
-- Current execution PRs: #60 (Phase 0) and #64 (Phase 1, stacked on #60).
+- Current execution PRs: #60 (Phase 0) and #65 (Phase 1, stacked on #60). PR #64 was superseded and closed without merging.
 
 The comparison is a point-in-time integration snapshot. Refresh the base/head SHAs and CI before merging either current PR.
