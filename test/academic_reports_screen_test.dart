@@ -19,7 +19,8 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.scrollUntilVisible(find.text('حفظ التقرير ومشاركته'), 300);
+    await tester.ensureVisible(find.text('حفظ التقرير ومشاركته'));
+    await tester.pumpAndSettle();
     expect(find.text('حفظ التقرير ومشاركته'), findsOneWidget);
   });
 
