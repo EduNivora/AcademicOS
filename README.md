@@ -349,4 +349,4 @@ announcements feed is available to guests through the Flutter Announcements
 screen and is cached locally for offline reading; academic records and files
 are never uploaded to Neon.
 
-> **Release 1 delivery scope:** EduNivora ships as an Android application only. The Web application, Web administration, and Cloudflare Pages deployment are deferred to a future release. Backup and restore are excluded from AcademicOS. Production SQLite encryption remains a separate product decision. Do not treat the existing Web or backup source files as supported Release 1 delivery features.
+> **Release 1 delivery scope:** EduNivora ships as an Android application only. The Web application, Web administration, and Cloudflare Pages deployment are deferred to a future release. Backup and restore are excluded from AcademicOS. Production SQLite encryption remains a separate product decision. Do not treat the existing Web source files as supported Release 1 delivery features.
