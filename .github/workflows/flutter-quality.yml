@@ -75,7 +75,7 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
         run: |
           set -euo pipefail
-          mapfile -t changed_dart_files < <(git diff --name-only "$BASE_SHA" "$GITHUB_SHA" -- '*.dart')
+          mapfile -t changed_dart_files < <(git diff --name-only --diff-filter=ACMRT "$BASE_SHA" "$GITHUB_SHA" -- '*.dart')
           if (("${#changed_dart_files[@]}" > 0)); then
             dart format --output=none --set-exit-if-changed "${changed_dart_files[@]}"
           else
