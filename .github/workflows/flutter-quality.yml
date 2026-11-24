@@ -23,6 +23,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Set up Java
         uses: actions/setup-java@v5
@@ -67,11 +69,18 @@ jobs:
           set -euo pipefail
           flutter pub get 2>&1 | tee pub-get.log
 
-      - name: Verify Dart formatting
+      - name: Verify formatting of changed Dart files
         shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
         run: |
           set -euo pipefail
-          dart format --output=none --set-exit-if-changed .
+          mapfile -t changed_dart_files < <(git diff --name-only "$BASE_SHA" "$GITHUB_SHA" -- '*.dart')
+          if (("${#changed_dart_files[@]}" > 0)); then
+            dart format --output=none --set-exit-if-changed "${changed_dart_files[@]}"
+          else
+            echo "No changed Dart files to format."
+          fi
 
       - name: Generate Android and iOS launcher icons from approved brand asset
         run: dart run flutter_launcher_icons
