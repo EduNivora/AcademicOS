@@ -168,12 +168,13 @@ jobs:
           target: default
           arch: x86_64
           profile: pixel_2
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -memory 4096
+          cores: 4
           disable-animations: true
-          # This action executes each newline as a separate shell command, so keep the
-          # complete POSIX shell program on one folded line.
+          # Wait for Android package services, then run one bounded integration attempt.
+          # Reinstalling the app on a degraded emulator caused repeated long stalls.
           script: >-
-            test_file=integration_test/database_android_integration_test.dart; for attempt in 1 2; do adb wait-for-device; package_ready=0; for probe in $(seq 1 30); do if adb shell cmd package list packages >/dev/null 2>&1; then package_ready=1; break; fi; sleep 5; done; if [ "$package_ready" -eq 1 ] && flutter test "$test_file" --no-pub; then exit 0; fi; echo "Android SQLite integration attempt $attempt failed."; if [ "$attempt" -lt 2 ]; then adb reconnect || true; sleep 15; fi; done; echo "Android SQLite integration test failed after retry."; adb logcat -d -t 2000 || true; exit 1
+            set -eu; test_file=integration_test/database_android_integration_test.dart; adb wait-for-device; package_ready=0; for probe in $(seq 1 60); do if adb shell cmd package list packages >/dev/null 2>&1; then package_ready=1; break; fi; sleep 5; done; if [ "$package_ready" -ne 1 ]; then echo "Android package manager did not become ready."; adb devices -l || true; adb logcat -d -t 2000 || true; exit 1; fi; timeout 900 flutter test "$test_file" --no-pub; test_status=$?; if [ "$test_status" -ne 0 ]; then echo "Android SQLite integration test failed with exit $test_status."; adb devices -l || true; adb logcat -d -t 2000 || true; exit "$test_status"; fi
 
       - name: Prepare optional production signing
         shell: bash
