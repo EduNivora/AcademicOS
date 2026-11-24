@@ -8,7 +8,7 @@
 
 EduNivora is a guest-first, local-first personal academic workspace. It helps an individual student organize their own academic life. It is not a university information system, institutional ERP, or student administration platform.
 
-**Core rule:** academic data belongs to the student and remains on the student's device. For Release 1, network services are limited to optional account identity and public notices with minimal delivery/read receipts. Personal Google Drive backup is deferred to Release 2.
+**Core rule:** academic data belongs to the student and remains on the student's device. Network services are limited to optional account identity and public notices with minimal delivery/read receipts. Backup and restore are excluded from AcademicOS.
 
 ## 2. Entry and identity
 
@@ -81,8 +81,8 @@ The current scope excludes:
 - Guest notice analytics are anonymous aggregates; do not retain a stable cross-session guest identifier for named tracking.
 - Use access control for operator notice tools and audit publication/report access.
 - Minimize notice event retention and document the retention period before production release.
-- Encrypting a Google Drive backup does not mean the active SQLite database is encrypted at rest. Production database encryption remains a separate release gate.
-- Never log OAuth access/refresh tokens, backup passwords, plaintext keys, or academic record contents.
+- Production database encryption remains a separate security decision.
+- Never log OAuth access/refresh tokens, plaintext keys, or academic record contents.
 
 ## 8. Release acceptance gates
 
