@@ -34,7 +34,7 @@ The temporary file is app-owned and created under the application cache director
 ## Lazy loading and memory limits
 
 - getAllMaterials and getMaterialsByCourseId are metadata-only queries.
-- Attachment BLOB bytes are read for one material ID after a user action.
+- Attachment BLOB bytes are read for one material ID after a user action. The current SQLite API materializes that selected BLOB as one bounded `Uint8List` (maximum 50 MiB) while copying it to the private cache; this is not streaming/zero-copy. The viewer does not retain a second Dart byte buffer for the route lifetime, and physical low-memory profiling remains an acceptance gate.
 - The existing 50 MiB attachment ceiling is enforced again before writing a cache file.
 - No PDF file is downloaded or fetched from a remote URL by the viewer.
 - The viewer uses a file path; it does not keep a second full Uint8List copy alive for the lifetime of the route.
