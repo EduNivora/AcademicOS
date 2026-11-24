@@ -2,7 +2,7 @@ name: Flutter quality gate
 
 on:
   pull_request:
-    branches: [main, chore/edunivora-phase0-execution, feat/durable-attachment-storage, feat/google-neon-auth-native]
+    branches: [main, chore/edunivora-phase0-execution, chore/phase0-baseline-ci-hardening, feat/durable-attachment-storage, feat/google-neon-auth-native]
   push:
     branches: [main]
   workflow_dispatch:
