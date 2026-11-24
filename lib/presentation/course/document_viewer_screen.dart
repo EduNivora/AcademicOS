@@ -70,10 +70,7 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
   }
 
   void _onDocumentLoaded(PdfDocument document) {
-    if (_isDisposing || !mounted) {
-      unawaited(_closeDocument(document));
-      return;
-    }
+    if (_isDisposing || !mounted) return;
     _loadedDocument = document;
     setState(() {
       _isLoading = false;
@@ -82,13 +79,6 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
     });
   }
 
-  Future<void> _closeDocument(PdfDocument document) async {
-    try {
-      if (!document.isClosed) await document.close();
-    } catch (_) {
-      // Native resource cleanup is best-effort during route teardown.
-    }
-  }
 
   void _onDocumentError(Object error) {
     if (!mounted || _isDisposing) return;

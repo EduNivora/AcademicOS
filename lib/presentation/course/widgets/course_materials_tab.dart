@@ -102,11 +102,12 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
     PreparedMaterialFile? preparedPdf;
     try {
       final extension = material.fileType.toLowerCase().replaceFirst('.', '');
-      final bytes = await _fileService.loadMaterialBytes(materialId);
+      var bytes = await _fileService.loadMaterialBytes(materialId);
       if (!mounted) return;
 
       if (extension == 'txt') {
         final text = utf8.decode(bytes, allowMalformed: true);
+        bytes = null;
         await showDialog<void>(
           context: context,
           builder: (dialogContext) => AlertDialog(
@@ -134,6 +135,7 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
           fileType: material.fileType,
           bytes: bytes,
         );
+        bytes = null;
         if (!mounted) {
           await preparedPdf.delete();
           preparedPdf = null;
@@ -166,6 +168,7 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
           fileType: material.fileType,
           bytes: bytes,
         );
+        bytes = null;
         if (!mounted) return;
         final message = switch (status) {
           ExternalMaterialOpenStatus.opened =>

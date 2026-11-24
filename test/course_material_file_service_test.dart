@@ -95,6 +95,21 @@ void main() {
     expect(await File(openedPath!).exists(), isTrue);
   });
 
+  test('surfaces temporary-directory creation failures instead of opening an unsafe path', () async {
+    final fileService = CourseMaterialFileService(
+      loadBytes: (_) async => pdfBytes,
+      temporaryDirectory: () async => throw const FileSystemException('cache unavailable'),
+    );
+    await expectLater(
+      fileService.preparePdfForViewing(
+        materialId: 12,
+        title: 'lecture.pdf',
+        fileType: 'pdf',
+      ),
+      throwsA(isA<FileSystemException>()),
+    );
+  });
+
   test('removes a temporary Office file when no compatible application exists', () async {
     String? openedPath;
     final fileService = service(

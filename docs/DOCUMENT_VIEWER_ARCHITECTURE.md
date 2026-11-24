@@ -28,7 +28,7 @@ This document defines the Release 1 document path. AcademicOS stores course atta
 
 The first release intentionally does not ship an Office rendering engine. The supported extensions are .doc, .docx, .ppt, and .pptx. open_filex maps them to platform MIME types and Android VIEW intents. The Android manifest exposes only the four corresponding MIME types through package-visibility queries; it does not request broad filesystem access. noAppToOpen, missing-file, and permission/error results are translated into a user-facing status.
 
-The temporary file is app-owned and created under the application temporary directory. It is not deleted immediately after a successful intent handoff because Android may open it asynchronously. It is eligible for cleanup after seven days.
+The temporary file is app-owned and created under the application cache directory. The Android FileProvider path configuration is restricted to the edunivora_materials cache subdirectory. It is not deleted immediately after a successful intent handoff because Android may open it asynchronously. It is eligible for cleanup after seven days.
 
 ## Lazy loading and memory limits
 

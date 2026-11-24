@@ -953,7 +953,7 @@ class DatabaseHelper {
     if (rows.isEmpty) return null;
     final value = rows.single['file_bytes'];
     if (value == null) return null;
-    if (value is Uint8List) return Uint8List.fromList(value);
+    if (value is Uint8List) return value;
     if (value is List<int>) return Uint8List.fromList(value);
     return null;
   }
