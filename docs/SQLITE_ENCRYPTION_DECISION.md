@@ -68,13 +68,13 @@ Before production adoption, the actual AcademicOS schema and database helper mus
 4. Verify the exact `sqlite3mc.wasm` asset and worker integration, IndexedDB persistence, reload/reopen, offline and multi-tab behavior before any Web encryption claim.
 5. Generate one cryptographically random key per database and persist it using the target platform's secure-storage mechanism. A missing key for an existing encrypted database must fail closed; never generate a replacement and create an empty database.
 6. Apply the key before schema access. Verify wrong-key rejection at `sqlite_master`, on-disk ciphertext/canary absence, `PRAGMA integrity_check`, and `PRAGMA foreign_key_check`.
-7. Define key loss, rotation, export/recovery and cross-device restore. Do not place the raw database key in a plaintext backup.
-8. Migrate only a verified copy: close handles, checkpoint/resolve WAL safely, preserve a recoverable original, build an encrypted staging database using a documented engine-supported backup/export mechanism, compare schema and row counts, run integrity/foreign-key checks, reopen with the correct key and reject a wrong key.
+7. Define key loss, rotation and secure key recovery. AcademicOS does not provide archive export or cross-device restore; never expose the raw database key.
+8. Migrate through a verified staging database: close handles, checkpoint/resolve WAL safely, preserve the original file until the staged database passes verification, compare schema and row counts, run integrity/foreign-key checks, reopen with the correct key and reject a wrong key.
 9. Switch only after verification using a durable migration marker and atomic file transition. Keep the original recoverable until a successful post-migration launch.
 10. Inject failures before and after every migration state transition, close, checkpoint, write and rename. Prove restart recovery selects either the intact original or the verified encrypted copy; never leave the user with neither.
 11. Test concurrent access, WAL recovery, process termination, corruption and insufficient disk space.
 
-Do not use a raw file copy of an active WAL database as the migration mechanism. Do not treat `PRAGMA key` success by itself as evidence of encryption.
+Do not use a raw file copy of an active WAL database as the migration mechanism. This is an internal migration-safety procedure, not a user-facing data export or restore feature. Do not treat `PRAGMA key` success by itself as evidence of encryption.
 
 ## Isolated proof required before production selection
 
@@ -92,10 +92,10 @@ Minimum proof assertions:
 
 A passing proof is still not production approval. Production work additionally requires:
 
-- A documented key lifecycle (generation, secure storage, backup, rotation, loss and recovery).
-- A crash-safe plaintext-to-encrypted migration with a verified backup, staged encrypted copy, integrity and row-count checks, atomic switch, restart recovery, and rollback.
+- A documented key lifecycle (generation, secure storage, rotation, loss and recovery).
+- A crash-safe plaintext-to-encrypted migration with a verified staging database, integrity and row-count checks, atomic switch, restart recovery, and rollback.
 - Failure-injection tests proving the original database remains recoverable after interruption at each migration stage.
-- Validation of WAL/journal sidecars, database close/reopen, concurrency, corruption and backup behavior.
+- Validation of WAL/journal sidecars, database close/reopen, concurrency and corruption.
 - A separate Web decision covering the exact `sqlite3mc.wasm` asset, worker setup, IndexedDB persistence, reload/reopen, multi-tab behavior and wrong-key rejection.
 - Platform-specific secure-storage and physical-device tests for every platform actually claimed as supported.
 
