@@ -100,7 +100,11 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
 
   Future<void> _openMaterial(CourseMaterialModel material) async {
     final materialId = material.id;
-    if (materialId == null || _openingMaterialIds.contains(materialId)) return;
+    if (materialId == null ||
+        _openingMaterialIds.contains(materialId) ||
+        _summarizingMaterialIds.contains(materialId)) {
+      return;
+    }
     setState(() => _openingMaterialIds.add(materialId));
 
     PreparedMaterialFile? preparedPdf;
@@ -221,8 +225,11 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
 
   Future<void> _summarizeMaterial(CourseMaterialModel material) async {
     final materialId = material.id;
-    if (materialId == null || _summarizingMaterialIds.contains(materialId))
+    if (materialId == null ||
+        _summarizingMaterialIds.contains(materialId) ||
+        _openingMaterialIds.contains(materialId)) {
       return;
+    }
     final extension = material.fileType.toLowerCase().replaceFirst('.', '');
     if (extension != 'pdf') {
       ScaffoldMessenger.of(context).showSnackBar(
