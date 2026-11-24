@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:academic_os/core/academic/academic_report_service.dart';
 import 'package:academic_os/presentation/reports/academic_reports_screen.dart';
 
 void main() {
