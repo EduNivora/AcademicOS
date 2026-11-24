@@ -62,7 +62,10 @@ jobs:
           ls "$ANDROID_HOME/ndk" || true
 
       - name: Resolve dependencies
-        run: flutter pub get 2>&1 | tee pub-get.log
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter pub get 2>&1 | tee pub-get.log
 
       - name: Generate Android and iOS launcher icons from approved brand asset
         run: dart run flutter_launcher_icons
@@ -268,10 +271,16 @@ jobs:
           df -h /
 
       - name: Build Android debug APK
-        run: flutter build apk --debug --no-pub 2>&1 | tee android-build.log
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter build apk --debug --no-pub 2>&1 | tee android-build.log
 
       - name: Build Web release
-        run: flutter build web --release --no-pub 2>&1 | tee web-build.log
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter build web --release --no-pub 2>&1 | tee web-build.log
 
       - name: Verify Android APK package and launcher icon
         shell: bash
