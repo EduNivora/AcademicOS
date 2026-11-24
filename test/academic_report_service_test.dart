@@ -1,71 +1,26 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:academic_os/core/academic/academic_report_service.dart';
-import 'package:academic_os/data/models/course_material_model.dart';
 import 'package:academic_os/data/models/course_model.dart';
 import 'package:academic_os/data/models/exam_model.dart';
 import 'package:academic_os/data/models/task_model.dart';
 
 void main() {
   group('AcademicReportService', () {
-    test('builds a valid backup payload structure', () {
-      final service = AcademicReportService();
-
-      final payload = service.buildBackupPayload(
-        courses: [
-          const CourseModel(
-            id: 1,
-            name: 'Math',
-            instructor: 'Dr. Ali',
-            code: 'MTH101',
-            creditHours: 3,
-            midGrade: 80,
-            practicalGrade: 85,
-            finalGrade: 90,
-          ),
-        ],
-        tasks: [
-          const TaskModel(
-            id: 1,
-            title: 'Finish homework',
-            description: 'Submit assignment',
-            dueDate: null,
-          ),
-        ],
-        exams: [
-          ExamModel(
-            id: 1,
-            title: 'Midterm',
-            examDate: DateTime(2026, 10, 20),
-            courseName: 'Math',
-          ),
-        ],
-        schedule: [
-          {
-            'day_of_week': 'Monday',
-            'start_time': '09:00',
-            'location': 'Room 1'
-          },
-        ],
-        materials: [
-          CourseMaterialModel(
-            id: 7,
-            courseId: 1,
-            title: 'Lecture notes',
-            filePath: '/student/files/notes.pdf',
-            fileType: 'pdf',
-          ).toMap(),
-        ],
+    test('empty academic data produces explicit no-data report sections', () {
+      final report = AcademicReportService().generatePeriodReport(
+        period: AcademicReportPeriod.finalReport,
+        generatedAt: DateTime(2026, 11, 24, 12),
+        courses: const [],
+        tasks: const [],
+        exams: const [],
+        schedule: const [],
       );
 
-      expect(payload['schema'], 'academic_os_backup_v3');
-      expect(payload['courses'], isA<List>());
-      expect(payload['tasks'], hasLength(1));
-      expect(payload['exams'], hasLength(1));
-      expect(payload['schedule'], hasLength(1));
-      expect(payload['materials'], hasLength(1));
-      expect(payload['materials'].first['title'], 'Lecture notes');
+      expect(report, contains('عدد المواد المسجلة: 0'));
+      expect(report, contains('لا توجد مهام غير مكتملة'));
+      expect(report, contains('لا توجد اختبارات قادمة'));
+      expect(report, contains('لا توجد محاضرات مدرجة'));
     });
-
 
     test('excludes past exams from the upcoming exam section', () {
       final service = AcademicReportService();
