@@ -19,7 +19,10 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.ensureVisible(find.text('حفظ التقرير ومشاركته'));
+    await tester.drag(
+      find.byType(ListView),
+      const Offset(0, -600),
+    );
     await tester.pumpAndSettle();
     expect(find.text('حفظ التقرير ومشاركته'), findsOneWidget);
   });
