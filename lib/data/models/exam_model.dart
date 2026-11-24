@@ -14,12 +14,12 @@ class ExamModel extends ExamEntity {
 
   factory ExamModel.fromMap(Map<String, dynamic> map) {
     if (map['title'] is! String || (map['title'] as String).trim().isEmpty) {
-      throw const FormatException('Invalid exam backup: title is required.');
+      throw const FormatException('Invalid exam data: title is required.');
     }
     final rawDate = map['exam_date'];
     final examDate = rawDate is String ? DateTime.tryParse(rawDate) : null;
     if (examDate == null) {
-      throw const FormatException('Invalid exam backup: exam_date is missing or invalid.');
+      throw const FormatException('Invalid exam data: exam_date is missing or invalid.');
     }
 
     final idValue = map['id'];

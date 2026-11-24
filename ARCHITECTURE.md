@@ -13,7 +13,7 @@ The codebase uses a pragmatic Clean Architecture separation:
 - `lib/presentation/`: screens, forms, navigation, and user interaction.
 - `lib/providers/`: Riverpod state wiring.
 - `lib/domain/`: academic entities, repository contracts, AI intent/action logic, and use cases.
-- `lib/data/`: persistence models, local data sources, repository implementations, database access, and backup validation.
+- `lib/data/`: persistence models, local data sources, repository implementations, and database access.
 - `lib/core/`: application initialization, platform decisions, security, notifications, themes, and cross-cutting academic services.
 - `lib/features/`: feature-specific modules where present.
 
@@ -51,7 +51,7 @@ The local academic database currently stores core student records including:
 
 Persistence models live in `lib/data/models/`. Database operations and transactions are centralized in `DatabaseHelper`. Academic workflows should validate relationships (for example, course references) at the boundary and preserve referential integrity in storage.
 
-A successful local write means data was written to the configured local database; it does not imply remote replication or backup.
+A successful local write means data was written to the configured local database; it does not imply remote replication.
 
 ## 5. Authentication and application lock
 
@@ -73,30 +73,21 @@ Release 1 continues to use the existing sqflite/FFI database implementation. The
 
 Do not introduce an encrypted SQLite driver or plaintext-to-encrypted migration into Release 1. Reassess platform-specific database encryption as part of Release 2.
 
-## 7. Backup and restore
+## 7. Academic reports
 
-Backup UI and serialization live in `lib/presentation/settings/backup_export_screen.dart`; validation lives in `lib/data/services/backup_payload_validator.dart`.
+Academic reporting is a standalone local feature:
 
-Current flow:
+- UI: `lib/presentation/reports/academic_reports_screen.dart`.
+- Service: `lib/core/academic/academic_report_service.dart`.
+- Entry point: the home screen opens `AcademicReportsScreen`.
+- Inputs are read from the existing local database through `DatabaseHelper`: courses, tasks, exams and weekly schedule.
+- The service generates daily, weekly, monthly and final text reports. It does not infer attendance, grades or GPA from missing source data.
+- The screen previews the generated text and supports saving a TXT file and copying the report to the clipboard.
+- Report generation is independent of database mutation and whole-workspace replacement.
 
-1. Read academic records from the local database.
-2. Serialize a versioned JSON payload.
-3. Save or select a backup through `file_picker`.
-4. Validate the payload schema, row types, identifiers, dates, supported enums, schedule ranges, and course references before mutation.
-5. Replace academic records through a database transaction.
+**Product boundary:** AcademicOS has no backup, restore, archive, cloud-drive transfer, or whole-database replacement capability. Report export is a text-report output only and must never be described as a backup.
 
-Current limitations and security boundaries:
-
-- The current implementation branch adds a SQLite `file_bytes BLOB` column and stores imported attachment bytes in the local database, which is persistent on the configured SQLite backend and also accepts bytes-only picker results.
-- Existing native records are migrated on database open only when their canonical source path remains inside the legacy `systemTemp/academic_os_materials` directory; symlink escapes and unrelated absolute paths are rejected. Failed/missing legacy files remain metadata-only and are not silently treated as backed up.
-- New JSON backup schema v3 serializes attachment bytes as base64 and validates/decodes them before the database transaction. Export refuses to label a backup complete when any legacy attachment has no stored bytes.
-- PDF preview currently materializes a short-lived temporary copy from the persisted database bytes for the native viewer; that temporary preview is not the source of truth. Web document preview remains unsupported.
-- The Release 1 integration branch passed its Flutter quality gate on exact head `8904bf0af783c7f01d24bbbd70922a69af680e15` (run `43753940254`): dependency resolution, Dart analysis, Flutter tests, Android Debug APK build, and artifact upload all succeeded. This CI result does not validate backup workflows or platform runtime behavior. Google Drive folder creation/upload, password-based archive encryption, checksums/manifest, encrypted restore staging/rollback, and end-to-end platform/failure-injection coverage remain Release 2 work.
-- Cross-device and real-browser file picker behavior still require platform validation.
-
-A JSON export must not be represented as a complete device backup until its referenced attachment files are included and verified.
-
-**Release boundary:** Google Drive backup, password-protected backup archives and their upload/restore integrations are deferred to Release 2. Backup feature branches are parked and must not be merged into the Release 1 integration branch. Any existing backup UI must remain hidden/disabled in Release 1; do not claim that the current JSON export or in-progress integrations constitute a complete backup solution. The Release 1 team must still preserve durable local attachment storage because it is core local data persistence, not a backup feature.\n\n## 8. Quality and verification
+## 8. Quality and verification
 
 The GitHub Actions workflow `.github/workflows/flutter-quality.yml` runs:
 
@@ -113,7 +104,6 @@ Every result applies only to the exact commit SHA shown in the workflow run. Pas
 The following are explicit engineering work items, not implemented capabilities:
 
 - Release 2: evaluate local SQLite encryption and a safe migration strategy; it is intentionally out of Release 1 scope.
-- Portable attachment-aware backup/restore with checksums and rollback.
 - Platform-by-platform build and runtime verification.
 - Real-device Argon2id performance measurements.
 - Release signing and distribution configuration.
@@ -127,12 +117,12 @@ The following are explicit engineering work items, not implemented capabilities:
 - Validate imported data before mutation; use transactions for multi-record replacement.
 - Keep secrets out of logs and source control.
 - Do not claim encryption, synchronization, platform support, or release readiness without reproducible evidence.
-- Add regression tests with every persistence, authentication, migration, or backup change.
+- Add regression tests with every persistence, authentication, or migration change.
 
 
 ## 11. Approved product scope — Local-first student application
 
-The Release 1 product direction is **Local-First + Optional Account + Public Notices**. Personal Google Drive backup is deferred to Release 2. The application must open and remain useful without authentication or network access.
+The product direction is **Local-First + Optional Account + Public Notices**. Backup and restore are excluded from AcademicOS. The application must open and remain useful without authentication or network access.
 
 ### Guest and account flows
 - A student may enter the application immediately as a guest; account creation is optional.
@@ -143,17 +133,6 @@ The Release 1 product direction is **Local-First + Optional Account + Public Not
 
 ### Local academic data
 Courses, terms, schedules, tasks, exams, notes, materials, attachments, preferences, and derived academic reports are local-only. Store attachments in durable app-owned storage, never a temporary directory. All routine academic CRUD must work offline.
-
-### Release 2 — personal Google Drive backup (deferred; not part of Release 1)
-- Backup destination: a normal, user-visible folder named `EduNivora` in the student's own Google Drive.
-- Each student authorizes their own Google account; do not use a shared organization Drive or an application-owned pooled storage account.
-- Backup is explicitly initiated by the student. Automatic/scheduled backup is not approved as a required behavior in this scope.
-- A complete backup includes the local database, attachment bytes, and required app settings/metadata, with a versioned manifest and integrity checks.
-- Encrypt the archive before upload. Use a student-chosen backup password and additional key protection (envelope/key-wrapping design); never store the password or plaintext encryption keys on the server or inside the backup.
-- Derive a key-encryption key using a memory-hard password KDF (Argon2id with versioned parameters), generate a random data-encryption key, and wrap that key. Encrypt backup content using an authenticated encryption mode such as AES-256-GCM. Record only non-secret KDF/encryption parameters, salts, nonces, wrapped key material, version, and checksums needed for restore.
-- A forgotten backup password means the encrypted backup cannot be recovered; explain this clearly before the first backup.
-- Restore must validate the manifest, authentication tag, checksums, schema version, attachment paths, and all payload data before committing. Stage files first and use a recoverable/atomic database-and-file replacement strategy. Never overwrite current data silently.
-- Google Drive is a personal backup destination only; it is not a live sync engine or a source of routine application reads/writes.
 
 ### Public notices and minimal operator console
 - Notices are centrally authored and published to all application installations, including guests and registered accounts.
@@ -167,7 +146,7 @@ Courses, terms, schedules, tasks, exams, notes, materials, attachments, preferen
 No institutional portal, lecturer portal, student administration, official university attendance integration, institutional messaging/email, tuition/fees/payments, university dashboards, academic cloud sync, or server-side storage of student academic records/files.
 
 ### Security distinction
-Encrypted Google Drive backups (Release 2) are a separate feature from local SQLite-at-rest encryption (also deferred to Release 2). Neither is part of Release 1.
+Backup and restore are excluded from AcademicOS. Local SQLite-at-rest encryption remains a separate security decision.
 
 
 ## 12. Release 1 cloud metadata backend — Neon
@@ -204,5 +183,5 @@ trusted origins, admin bootstrap, guest-metric abuse controls, and receipt
 retention policy remain open release gates. Guest academic use remains available
 offline.
 
-Google Drive backup remains deferred to Release 2. No academic cloud sync is
+Backup and restore are excluded from AcademicOS. No academic cloud sync is
 introduced by this backend.
