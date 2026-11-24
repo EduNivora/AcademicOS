@@ -372,6 +372,9 @@ void main() {
         'file_type': 'pdf',
         'file_bytes': bytes,
       });
+      // Close the database before reading to simulate a process restart.
+      // The next query must reopen SQLite and recover the exact persisted BLOB.
+      await helper.close();
       final row = await helper.getMaterialById(materialId);
       expect(row, isNotNull);
       expect(row!['file_bytes'], isA<Uint8List>());
