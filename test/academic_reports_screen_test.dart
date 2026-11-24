@@ -19,10 +19,7 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.scrollUntilVisible(
-      find.text('حفظ التقرير ومشاركته'),
-      300,
-    );
+    await tester.scrollUntilVisible(find.text('حفظ التقرير ومشاركته'), 300);
     expect(find.text('حفظ التقرير ومشاركته'), findsOneWidget);
   });
 
