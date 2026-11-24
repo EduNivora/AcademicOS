@@ -74,6 +74,31 @@ void main() {
       );
     });
 
+    test('preserves the server quota response and retry message', () async {
+      final source = AcademicAiRemoteDataSource(
+        request: (_, {
+          required method,
+          required headers,
+          body,
+          required withCredentials,
+        }) async => const PlatformHttpResponse(
+          statusCode: 429,
+          body: '{"error":{"code":"ai_quota_exceeded","message":"وصلت إلى الحد اليومي لاستخدام المساعد. حاول غدًا."}}',
+        ),
+      );
+
+      await expectLater(
+        source.sendMessage(accessToken: 'neon-session-jwt', message: 'سؤال'),
+        throwsA(
+          isA<AcademicAiRemoteException>()
+              .having((error) => error.statusCode, 'statusCode', 429)
+              .having((error) => error.code, 'code', 'ai_quota_exceeded')
+              .having((error) => error.message, 'message',
+                  'وصلت إلى الحد اليومي لاستخدام المساعد. حاول غدًا.'),
+        ),
+      );
+    });
+
     test('rejects an empty access token without making a request', () async {
       var requestCalled = false;
       final source = AcademicAiRemoteDataSource(

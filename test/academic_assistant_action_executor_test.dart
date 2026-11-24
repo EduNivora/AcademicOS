@@ -175,6 +175,10 @@ void main() {
           title: 'عنوان مختلف',
         );
         expect(await executor.verifyPostcondition(createTaskCall, result), isFalse);
+        final retry = await executor.execute(createTaskCall);
+        expect(retry.succeeded, isTrue);
+        expect(retry.changedData, isFalse);
+        expect(taskRepository.tasks, hasLength(1));
         expect(
           taskRepository.tasks.single.startDateTime!.isBefore(before),
           isFalse,
@@ -289,6 +293,9 @@ void main() {
         expect(result.changedData, isTrue);
         expect(materialId, isNotNull);
         expect(await executor.verifyPostcondition(call, result), isTrue);
+        final duplicate = await executor.execute(call);
+        expect(duplicate.succeeded, isTrue);
+        expect(duplicate.changedData, isFalse);
 
         final db = await database.database;
         await db.update(
