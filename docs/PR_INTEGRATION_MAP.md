@@ -33,3 +33,26 @@
 ## Repository-wide inventory
 
 The repository API snapshot contained 53 PRs (36 open, 17 closed, 12 merged). The active PRs and branches that directly affect the current integration sequence are enumerated above. The remaining active PRs are separate release, authentication, web-runtime, database, UI, and historical phase0 stacks; their base branches are not interchangeable with main. Do not mass-merge them as a batch.
+
+
+## Execution update — after Phase 0 / Phase 1 PR creation
+
+The comparisons below use the then-current main SHA `989ad5212971097df868dabab557c1c076d91720`:
+
+| PR | Compare to current main | Updated decision |
+|---|---|---|
+| #47 | Diverged; 27 commits ahead, 3 behind | Rebase required. Backend CI passed, Flutter run cancelled. Keep separate and do not deploy migration 0003 without explicit approval. |
+| #50 | Diverged; 77 ahead, 3 behind; GitHub mergeable=false | Resolve conflicts/rebase before considering merge. |
+| #53 | Diverged; 41 ahead, 3 behind | Rebase required even though exact-head CI passed; deployment remains separately gated. |
+| #54 | Diverged; 3 ahead, 3 behind; exact-head Flutter run cancelled | Compare its Android storage persistence test with #58 before selecting one or both. |
+| #57 | 2 commits ahead, not behind | Its test-failure propagation is superseded by PR #60's broader strict-pipefail coverage. Do not merge both workflow variants. |
+| #58 | 1 commit ahead, not behind | Keep as a focused database close/reopen assertion; its exact-head emulator run failed at runtime after Flutter tests passed. |
+| #59 | QA-stack comparison: 78 commits ahead, 3 behind main | Remains based on QA #50; not main-ready. |
+
+### Backup PR disposition
+
+- #18 encrypted archive, #19 encrypted archive integration, and #20 Google Drive backup were closed with explicit comments because backup/restore are excluded from AcademicOS. Their branches remain only as Git history and must not be merged.
+- #61, #62 and #63 were superseded and closed as Phase 1 was rebased to the final Phase 0 CI baseline. No code was merged from those superseded PRs.
+- Current execution PRs: #60 (Phase 0) and #64 (Phase 1, stacked on #60).
+
+The comparison is a point-in-time integration snapshot. Refresh the base/head SHAs and CI before merging either current PR.
