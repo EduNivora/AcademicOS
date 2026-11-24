@@ -34,12 +34,14 @@ class AcademicAssistantToolCall {
 class AcademicAssistantToolResult {
   final String message;
   final bool changedData;
+  final bool succeeded;
   final bool requiresConfirmation;
   final String? confirmationPrompt;
 
   const AcademicAssistantToolResult({
     required this.message,
     this.changedData = false,
+    this.succeeded = false,
     this.requiresConfirmation = false,
     this.confirmationPrompt,
   });
@@ -235,6 +237,389 @@ class AcademicAssistantActionExecutor {
     };
   }
 
+  /// Performs a read-only validation pass over every action before the plan
+  /// is allowed to mutate local academic data.
+  Future<AcademicAssistantToolResult> preflightPlan(
+    List<AcademicAssistantToolCall> calls,
+  ) async {
+    if (calls.isEmpty) {
+      return const AcademicAssistantToolResult(
+        message: 'لا تحتوي الخطة على إجراءات قابلة للتنفيذ.',
+        succeeded: false,
+      );
+    }
+
+    try {
+      final courses = await courseUseCases.getCourses();
+      final tasks = await taskUseCases.getTasks();
+      final schedules = (await database.getSchedules())
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+      final exams = await database.getExams();
+      final simulatedSchedules = schedules
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+      final plannedCourseNames = <String>{};
+      final usedCourseIds = <int>{};
+      final deletedCourseIds = <int>{};
+      final touchedTargets = <String>{};
+      var virtualScheduleId = -1;
+
+      const validDays = {
+        'السبت',
+        'الأحد',
+        'الاثنين',
+        'الثلاثاء',
+        'الأربعاء',
+        'الخميس',
+        'الجمعة',
+      };
+      const validFileTypes = {'pdf', 'doc', 'docx', 'ppt', 'pptx', 'txt'};
+
+      CourseEntity? resolveCourse(
+        Map<String, dynamic> args, {
+        bool required = false,
+        bool allowPlanned = false,
+      }) {
+        final id = _integer(args['course_id']);
+        final name = _string(args, 'course_name');
+        if (args.containsKey('course_id') && id == null) {
+          throw StateError('معرّف المادة يجب أن يكون عدداً صحيحاً موجباً.');
+        }
+        if (id == null && name.isEmpty) {
+          if (required) throw StateError('حدد المادة المرتبطة بهذه العملية.');
+          return null;
+        }
+        if (id != null) {
+          final match = courses.where((item) => item.id == id).firstOrNull;
+          if (match == null) throw StateError('لم أجد المادة المطلوبة بالمعرّف $id.');
+          if (name.isNotEmpty && _normalize(match.name) != _normalize(name)) {
+            throw StateError('معرّف المادة $id لا يطابق الاسم «$name».');
+          }
+          return match;
+        }
+        final matches = courses
+            .where((item) => _normalize(item.name) == _normalize(name))
+            .toList();
+        if (matches.length == 1) return matches.single;
+        if (matches.length > 1) throw StateError('اسم المادة «$name» غير فريد؛ حدد معرّفها.');
+        if (allowPlanned && plannedCourseNames.contains(_normalize(name))) {
+          return null;
+        }
+        throw StateError('المادة «$name» غير موجودة قبل بدء تنفيذ الخطة.');
+      }
+
+      TaskEntity resolveTask(Map<String, dynamic> args) {
+        final id = _integer(args['task_id']);
+        final title = _string(args, 'task_title');
+        if (args.containsKey('task_id') && id == null) {
+          throw StateError('معرّف المهمة يجب أن يكون عدداً صحيحاً موجباً.');
+        }
+        if (id != null) {
+          final match = tasks.where((item) => item.id == id).firstOrNull;
+          if (match == null) throw StateError('لم أجد المهمة المطلوبة بالمعرّف $id.');
+          if (title.isNotEmpty && _normalize(match.title) != _normalize(title)) {
+            throw StateError('معرّف المهمة $id لا يطابق العنوان «$title».');
+          }
+          return match;
+        }
+        if (title.isEmpty) throw StateError('حدد عنوان المهمة أو معرّفها.');
+        final matches = tasks
+            .where((item) => _normalize(item.title) == _normalize(title))
+            .toList();
+        if (matches.length == 1) return matches.single;
+        if (matches.length > 1) throw StateError('اسم المهمة «$title» غير فريد؛ حدد معرّفها.');
+        throw StateError('المهمة «$title» غير موجودة قبل بدء تنفيذ الخطة.');
+      }
+
+      void touch(String key) {
+        if (!touchedTargets.add(key)) {
+          throw StateError('تتضمن الخطة أكثر من تعديل على السجل نفسه ($key). قسّم هذه العمليات إلى طلبين.');
+        }
+      }
+
+      for (var index = 0; index < calls.length; index++) {
+        final call = calls[index];
+        final args = call.arguments;
+        try {
+          switch (call.name) {
+            case 'update_profile':
+              if (![
+                'full_name', 'university', 'major', 'department', 'semester',
+                'academic_level',
+              ].any((key) => _string(args, key).isNotEmpty)) {
+                throw StateError('لم تحدد أي حقل لتحديث الملف الأكاديمي.');
+              }
+              break;
+
+            case 'create_material':
+              final name = _string(args, 'name');
+              if (name.isEmpty) throw StateError('اسم المادة الجديدة مطلوب.');
+              if (courses.any((item) => _normalize(item.name) == _normalize(name)) ||
+                  plannedCourseNames.contains(_normalize(name))) {
+                throw StateError('المادة «$name» موجودة أو مكررة داخل الخطة.');
+              }
+              plannedCourseNames.add(_normalize(name));
+              break;
+
+            case 'update_material':
+              final course = resolveCourse(args, required: true)!;
+              touch('course:${course.id}');
+              usedCourseIds.add(course.id!);
+              final newName = _string(args, 'name');
+              if ([
+                newName,
+                _string(args, 'instructor'),
+                _string(args, 'code'),
+                _string(args, 'credits'),
+              ].every((value) => value.isEmpty)) {
+                throw StateError('لم تحدد حقلاً لتعديل المادة «${course.name}».');
+              }
+              if (newName.isNotEmpty && courses.any((item) =>
+                  item.id != course.id &&
+                  _normalize(item.name) == _normalize(newName))) {
+                throw StateError('يوجد مقرر آخر بالاسم الجديد «$newName».');
+              }
+              break;
+
+            case 'delete_material':
+              final course = resolveCourse(args, required: true)!;
+              touch('course:${course.id}');
+              deletedCourseIds.add(course.id!);
+              simulatedSchedules.removeWhere(
+                (item) => _integer(item['course_id']) == course.id,
+              );
+              break;
+
+            case 'add_material_file':
+              final course = resolveCourse(args, required: true, allowPlanned: true);
+              if (course?.id != null) usedCourseIds.add(course!.id!);
+              final rawBytes = args['file_bytes'];
+              if (rawBytes is! List || rawBytes.isEmpty ||
+                  rawBytes.length > 50 * 1024 * 1024 ||
+                  !rawBytes.every((byte) => byte is int && byte >= 0 && byte <= 255)) {
+                throw StateError('محتوى الملف غير صالح أو يتجاوز 50 MB.');
+              }
+              final type = _string(args, 'file_type').toLowerCase().replaceFirst('.', '');
+              if (_string(args, 'file_name').isEmpty || !validFileTypes.contains(type)) {
+                throw StateError('اسم الملف أو صيغته غير مدعوم.');
+              }
+              break;
+
+            case 'create_task':
+              if (_string(args, 'title').isEmpty) throw StateError('عنوان المهمة مطلوب.');
+              final course = resolveCourse(args, allowPlanned: true);
+              if (course?.id != null) usedCourseIds.add(course!.id!);
+              final due = args['end_date_time'] == null
+                  ? null
+                  : _date(args['end_date_time']);
+              if (args['end_date_time'] != null &&
+                  (due == null || !due.isAfter(DateTime.now()))) {
+                throw StateError('وقت انتهاء المهمة غير صالح أو ليس في المستقبل.');
+              }
+              final reminderEnabled = due != null && args['reminder_enabled'] != false;
+              final reminderOffset = (_integer(args['reminder_offset_minutes']) ?? 15)
+                  .clamp(0, 1440)
+                  .toInt();
+              if (reminderEnabled &&
+                  !due.subtract(Duration(minutes: reminderOffset)).isAfter(DateTime.now())) {
+                throw StateError('موعد المهمة قريب جداً لإنشاء التنبيه المحدد.');
+              }
+              break;
+
+            case 'complete_task':
+            case 'update_task':
+            case 'delete_task':
+              final task = resolveTask(args);
+              touch('task:${task.id}');
+              if (task.courseId != null) usedCourseIds.add(task.courseId!);
+              if (call.name == 'update_task') {
+                final due = args['end_date_time'] == null
+                    ? task.endDateTime
+                    : _date(args['end_date_time']);
+                if (args['end_date_time'] != null &&
+                    (due == null || !due.isAfter(task.startDateTime ?? DateTime.now()))) {
+                  throw StateError('وقت انتهاء المهمة الجديدة غير صالح.');
+                }
+                final reminderEnabled = args['reminder_enabled'] is bool
+                    ? args['reminder_enabled'] as bool
+                    : task.reminderEnabled;
+                final reminderOffset = (_integer(args['reminder_offset_minutes']) ??
+                        task.reminderOffsetMinutes)
+                    .clamp(0, 1440)
+                    .toInt();
+                if (reminderEnabled &&
+                    (due == null ||
+                        !due.subtract(Duration(minutes: reminderOffset)).isAfter(DateTime.now()))) {
+                  throw StateError('موعد التنبيه الجديد غير صالح أو أصبح في الماضي.');
+                }
+              }
+              break;
+
+            case 'add_lecture':
+              final course = resolveCourse(args, required: true, allowPlanned: true);
+              if (course?.id != null) usedCourseIds.add(course!.id!);
+              final day = _string(args, 'day');
+              final start = _string(args, 'start_time');
+              final end = _string(args, 'end_time');
+              if (!validDays.contains(day)) throw StateError('يوم المحاضرة غير صحيح.');
+              if (args.containsKey('reminder_enabled') &&
+                  args['reminder_enabled'] is! bool) {
+                throw StateError('قيمة تفعيل تذكير المحاضرة يجب أن تكون true أو false.');
+              }
+              if (args.containsKey('reminder_offset_minutes') &&
+                  _integer(args['reminder_offset_minutes']) == null) {
+                throw StateError('مدة التنبيه يجب أن تكون عدداً صحيحاً بالدقائق.');
+              }
+              final validation = ScheduleConflictValidator.validate(
+                day: day,
+                startTime: start,
+                endTime: end,
+                existingSchedules: simulatedSchedules,
+              );
+              if (!validation.isValid) {
+                throw StateError('يوجد تعارض أو توقيت غير صالح للمحاضرة الجديدة.');
+              }
+              simulatedSchedules.add({
+                'id': virtualScheduleId--,
+                'course_id': course?.id ?? -1,
+                'day_of_week': day,
+                'start_time': start,
+                'end_time': end,
+              });
+              break;
+
+            case 'update_lecture':
+            case 'delete_lecture':
+              final id = _integer(args['schedule_id']);
+              if (id == null) throw StateError('معرّف المحاضرة غير صالح.');
+              final scheduleIndex = simulatedSchedules.indexWhere((item) => _integer(item['id']) == id);
+              if (scheduleIndex < 0) throw StateError('المحاضرة $id غير موجودة.');
+              touch('schedule:$id');
+              final existing = simulatedSchedules[scheduleIndex];
+              final rawCourseId = _integer(existing['course_id']);
+              if (rawCourseId != null) usedCourseIds.add(rawCourseId);
+              if (call.name == 'delete_lecture') {
+                simulatedSchedules.removeAt(scheduleIndex);
+                break;
+              }
+              final course = resolveCourse(args, allowPlanned: true);
+              final existingCourse = rawCourseId == null
+                  ? null
+                  : courses.where((item) => item.id == rawCourseId).firstOrNull;
+              if (course == null && existingCourse == null) {
+                throw StateError('المادة المرتبطة بالمحاضرة $id غير موجودة؛ حدد مادة صحيحة لتصحيح الربط.');
+              }
+              if (course?.id != null) usedCourseIds.add(course!.id!);
+              final day = _string(args, 'day').isEmpty
+                  ? existing['day_of_week']?.toString() ?? ''
+                  : _string(args, 'day');
+              final start = _string(args, 'start_time').isEmpty
+                  ? existing['start_time']?.toString() ?? ''
+                  : _string(args, 'start_time');
+              final end = _string(args, 'end_time').isEmpty
+                  ? existing['end_time']?.toString() ?? ''
+                  : _string(args, 'end_time');
+              if (!validDays.contains(day)) throw StateError('يوم المحاضرة غير صحيح.');
+              final validation = ScheduleConflictValidator.validate(
+                day: day,
+                startTime: start,
+                endTime: end,
+                existingSchedules: simulatedSchedules,
+                excludingScheduleId: id,
+              );
+              if (!validation.isValid) throw StateError('تعديل المحاضرة $id يسبب تعارضاً زمنياً.');
+              simulatedSchedules[scheduleIndex] = {
+                ...existing,
+                'course_id': course?.id ?? rawCourseId,
+                'day_of_week': day,
+                'start_time': start,
+                'end_time': end,
+              };
+              break;
+
+            case 'create_exam':
+              if (_string(args, 'title').isEmpty || _date(args['exam_date']) == null) {
+                throw StateError('عنوان الاختبار وتاريخه مطلوبان بصيغة صحيحة.');
+              }
+              final course = resolveCourse(args, allowPlanned: true);
+              if (course?.id != null) usedCourseIds.add(course!.id!);
+              break;
+
+            case 'update_exam':
+            case 'delete_exam':
+              final id = _integer(args['exam_id']);
+              if (id == null) throw StateError('معرّف الاختبار غير صالح.');
+              final exam = exams.where((item) => item.id == id).firstOrNull;
+              if (exam == null) throw StateError('الاختبار $id غير موجود.');
+              touch('exam:$id');
+              if (exam.courseId != null) usedCourseIds.add(exam.courseId!);
+              final course = resolveCourse(args, allowPlanned: true);
+              if (course?.id != null) usedCourseIds.add(course!.id!);
+              if (call.name == 'update_exam' && args.containsKey('exam_date') &&
+                  _date(args['exam_date']) == null) {
+                throw StateError('تاريخ الاختبار الجديد غير صالح.');
+              }
+              break;
+
+            case 'generate_report':
+              if (!{'daily', 'weekly', 'monthly', 'final'}.contains(args['period'])) {
+                throw StateError('فترة التقرير غير معروفة.');
+              }
+              break;
+
+            default:
+              throw StateError('العملية «${call.name}» غير مدعومة.');
+          }
+        } catch (error) {
+          return AcademicAssistantToolResult(
+            message: 'فشل الفحص المسبق للخطوة ${index + 1} «${call.name}»: $error لم تُنفذ أي خطوة من الخطة.',
+            succeeded: false,
+          );
+        }
+      }
+
+      for (final courseId in deletedCourseIds) {
+        if (usedCourseIds.contains(courseId)) {
+          return AcademicAssistantToolResult(
+            message: 'الخطة تحذف المادة $courseId وتستخدم بيانات مرتبطة بها في خطوة أخرى. لم تُنفذ أي خطوة.',
+            succeeded: false,
+          );
+        }
+        final dependentTaskIds = tasks
+            .where((item) => item.courseId == courseId)
+            .map((item) => item.id)
+            .whereType<int>();
+        final dependentScheduleIds = schedules
+            .where((item) => _integer(item['course_id']) == courseId)
+            .map((item) => _integer(item['id']))
+            .whereType<int>();
+        final dependentExamIds = exams
+            .where((item) => item.courseId == courseId)
+            .map((item) => item.id)
+            .whereType<int>();
+        if (dependentTaskIds.any((id) => touchedTargets.contains('task:$id')) ||
+            dependentScheduleIds.any((id) => touchedTargets.contains('schedule:$id')) ||
+            dependentExamIds.any((id) => touchedTargets.contains('exam:$id'))) {
+          return AcademicAssistantToolResult(
+            message: 'الخطة تحذف المادة $courseId وتعدّل أو تحذف سجلاً تابعاً لها. قسّم الطلب لتجنب تعارض العمليات. لم تُنفذ أي خطوة.',
+            succeeded: false,
+          );
+        }
+      }
+
+      return const AcademicAssistantToolResult(
+        message: 'اكتمل الفحص المسبق لجميع خطوات الخطة.',
+        succeeded: true,
+      );
+    } catch (error) {
+      return AcademicAssistantToolResult(
+        message: 'تعذر إكمال الفحص المسبق للخطة: $error. لم تُنفذ أي خطوة.',
+        succeeded: false,
+      );
+    }
+  }
+
   Future<AcademicAssistantToolResult> _updateProfile(
     Map<String, dynamic> args,
   ) async {
@@ -269,6 +654,7 @@ class AcademicAssistantActionExecutor {
     await StudentProfile.save(updated);
     return const AcademicAssistantToolResult(
       message: 'تم تحديث الملف الأكاديمي وحفظ البيانات.',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -306,6 +692,7 @@ class AcademicAssistantActionExecutor {
     );
     return AcademicAssistantToolResult(
       message: 'تمت إضافة المادة «$name» بنجاح. رقمها الداخلي: $id.',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -361,6 +748,7 @@ class AcademicAssistantActionExecutor {
     return AcademicAssistantToolResult(
       message:
           'تم حفظ «$fileName» داخل مادة «${course.name}» وربطه بمعرّف المادة.',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -403,6 +791,7 @@ class AcademicAssistantActionExecutor {
     await courseUseCases.updateCourse(updated);
     return AcademicAssistantToolResult(
       message: 'تم تحديث بيانات المادة «${updated.name}».',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -445,6 +834,7 @@ class AcademicAssistantActionExecutor {
     return AcademicAssistantToolResult(
       message:
           'تم حذف المادة «${course.name}» والبيانات التابعة لها بعد تأكيدك.',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -515,6 +905,7 @@ class AcademicAssistantActionExecutor {
         : ' وربطتها بمادة ${courseResult.course!.name}';
     return AcademicAssistantToolResult(
       message: 'تم إنشاء المهمة «$title»$materialText وحفظها في النظام.',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -530,6 +921,7 @@ class AcademicAssistantActionExecutor {
     if (task.isCompleted) {
       return AcademicAssistantToolResult(
         message: 'المهمة «${task.title}» مكتملة بالفعل.',
+        succeeded: true,
       );
     }
     await taskUseCases.updateTask(
@@ -538,6 +930,7 @@ class AcademicAssistantActionExecutor {
     await NotificationService.instance.cancelTaskReminder(task.id!);
     return AcademicAssistantToolResult(
       message: 'تم تسجيل إنجاز المهمة «${task.title}» مع وقت الإنجاز الفعلي.',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -608,6 +1001,7 @@ class AcademicAssistantActionExecutor {
     }
     return AcademicAssistantToolResult(
       message: 'تم تحديث المهمة «${updated.title}».',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -632,6 +1026,7 @@ class AcademicAssistantActionExecutor {
     await NotificationService.instance.cancelTaskReminder(task.id!);
     return AcademicAssistantToolResult(
       message: 'تم حذف المهمة «${task.title}».',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -683,6 +1078,12 @@ class AcademicAssistantActionExecutor {
       );
     }
     final location = _string(args, 'location');
+    final reminderEnabled = args['reminder_enabled'] is bool
+        ? args['reminder_enabled'] as bool
+        : true;
+    final reminderOffset = (_integer(args['reminder_offset_minutes']) ?? 15)
+        .clamp(0, 1440)
+        .toInt();
     final id = await database.insertSchedule({
       'course_id': course.id,
       'course_name': course.name,
@@ -690,21 +1091,22 @@ class AcademicAssistantActionExecutor {
       'start_time': startTime,
       'end_time': endTime,
       'location': location,
-      'reminder_enabled': 1,
-      'reminder_offset_minutes': 15,
+      'reminder_enabled': reminderEnabled ? 1 : 0,
+      'reminder_offset_minutes': reminderOffset,
     });
     await NotificationService.instance.scheduleLectureReminder(
       id: id,
       title: course.name,
       weekdayName: day,
       startTime: startTime,
-      reminderEnabled: true,
+      reminderEnabled: reminderEnabled,
       location: location,
-      reminderOffsetMinutes: 15,
+      reminderOffsetMinutes: reminderOffset,
     );
     return AcademicAssistantToolResult(
       message:
           'تمت إضافة محاضرة ${course.name} يوم $day من $startTime إلى $endTime وربطها بمعرّف المادة.',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -801,6 +1203,7 @@ class AcademicAssistantActionExecutor {
     );
     return AcademicAssistantToolResult(
       message: 'تم تحديث محاضرة ${course.name} في الجدول الأسبوعي.',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -837,6 +1240,7 @@ class AcademicAssistantActionExecutor {
     await NotificationService.instance.cancelLectureReminder(scheduleId);
     return AcademicAssistantToolResult(
       message: 'تم حذف المحاضرة من الجدول وإلغاء تنبيهها.',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -867,6 +1271,7 @@ class AcademicAssistantActionExecutor {
     return AcademicAssistantToolResult(
       message: 'تم إنشاء الاختبار «$title» بتاريخ ${examDate.toLocal()}'
           '${courseResult.course == null ? '' : ' وربطه بمادة ${courseResult.course!.name}'} (رقم $id).',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -905,6 +1310,7 @@ class AcademicAssistantActionExecutor {
     await database.updateExam(updated);
     return AcademicAssistantToolResult(
       message: 'تم تحديث الاختبار «${updated.title}».',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -931,6 +1337,7 @@ class AcademicAssistantActionExecutor {
     await database.deleteExam(id);
     return AcademicAssistantToolResult(
       message: 'تم حذف الاختبار «${exam.title}» بعد تأكيدك.',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -961,7 +1368,7 @@ class AcademicAssistantActionExecutor {
       title: 'تم تجهيز التقرير ${period.arabicLabel}',
       body: 'التقرير جاهز داخل AcademicOS.',
     );
-    return AcademicAssistantToolResult(message: report);
+    return AcademicAssistantToolResult(message: report, succeeded: true);
   }
 
   Future<_ResolvedCourse> _resolveCourse(Map<String, dynamic> args) async {
