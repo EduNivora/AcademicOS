@@ -67,6 +67,12 @@ jobs:
           set -euo pipefail
           flutter pub get 2>&1 | tee pub-get.log
 
+      - name: Verify Dart formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          dart format --output=none --set-exit-if-changed .
+
       - name: Generate Android and iOS launcher icons from approved brand asset
         run: dart run flutter_launcher_icons
 
