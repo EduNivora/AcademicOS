@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import '../../data/models/course_model.dart';
 import '../../data/models/exam_model.dart';
 import '../../data/models/task_model.dart';
@@ -17,31 +15,6 @@ extension AcademicReportPeriodX on AcademicReportPeriod {
 
 class AcademicReportService {
   const AcademicReportService();
-
-  Map<String, dynamic> buildBackupPayload({
-    required List<CourseModel> courses,
-    required List<TaskModel> tasks,
-    required List<ExamModel> exams,
-    required List<Map<String, dynamic>> schedule,
-    List<Map<String, dynamic>> materials = const [],
-    String schema = 'academic_os_backup_v3',
-  }) {
-    final payload = <String, dynamic>{
-      'schema': schema,
-      'exportedAt': DateTime.now().toUtc().toIso8601String(),
-      'courses': courses.map((course) => course.toMap()).toList(),
-      'tasks': tasks.map((task) => task.toMap()).toList(),
-      'exams': exams.map((exam) => exam.toMap()).toList(),
-      'schedule': schedule,
-      'materials': materials,
-    };
-    return payload;
-  }
-
-  String encodeBackupJson(Map<String, dynamic> payload) {
-    final compactJson = const JsonEncoder.withIndent('  ').convert(payload);
-    return base64.encode(utf8.encode(compactJson));
-  }
 
   String generatePeriodReport({
     required AcademicReportPeriod period,
