@@ -10,7 +10,6 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart'
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart'
     show databaseFactoryFfiWeb;
 import '../models/academic_term_model.dart';
-import '../models/course_material_model.dart';
 import '../models/course_model.dart';
 import '../models/exam_model.dart';
 import '../models/task_model.dart';
@@ -521,109 +520,6 @@ class DatabaseHelper {
     await _ensureColumn(db, _courseTable, 'practical_grade', 'REAL DEFAULT 0');
     await _ensureColumn(db, _courseTable, 'final_grade', 'REAL DEFAULT 0');
     await _ensureColumn(db, _courseTable, 'credit_hours', 'INTEGER DEFAULT 3');
-  }
-
-  /// Replaces all student academic records as one atomic database operation.
-  ///
-  /// Every model is parsed before this method is called. If any delete or
-  /// insert fails, SQLite rolls the whole transaction back and the previous
-  /// academic data remains intact.
-  Future<void> replaceAcademicData({
-    required List<CourseModel> courses,
-    required List<TaskModel> tasks,
-    required List<ExamModel> exams,
-    required List<Map<String, dynamic>> schedules,
-    List<CourseMaterialModel>? materials,
-  }) async {
-    final db = await database;
-    await db.transaction((txn) async {
-      // A legacy v1 backup has no material metadata. Preserve current
-      // materials only when their course references remain valid.
-      if (materials == null) {
-        final currentMaterials = await txn.query(_materialsTable);
-        final incomingCourseIds = courses
-            .map((course) => course.id)
-            .whereType<int>()
-            .toSet();
-        final hasOrphanedMaterial = currentMaterials.any((material) {
-          final courseId = material['course_id'];
-          return courseId is! int || !incomingCourseIds.contains(courseId);
-        });
-        if (hasOrphanedMaterial) {
-          throw StateError(
-            'This legacy backup omits course materials and would orphan '
-            'existing attachments. Restore a v2 backup instead.',
-          );
-        }
-      }
-
-      if (materials != null &&
-          materials.any((material) => material.fileBytes == null)) {
-        final existingRows = await txn.query(
-          _materialsTable,
-          columns: ['file_bytes'],
-        );
-        final wouldDiscardStoredBytes = existingRows.any(
-          (row) =>
-              row['file_bytes'] is List<int> &&
-              (row['file_bytes'] as List<int>).isNotEmpty,
-        );
-        if (wouldDiscardStoredBytes) {
-          throw StateError(
-            'This metadata-only backup does not contain attachment bytes and '
-            'cannot replace the current workspace without losing stored files. '
-            'Use a complete v3 backup.',
-          );
-        }
-      }
-
-      // Delete dependent records before their parent courses.
-      if (materials != null) {
-        await txn.delete(_materialsTable);
-      }
-      await txn.delete(scheduleTable);
-      await txn.delete(_examTable);
-      await txn.delete(_taskTable);
-      await txn.delete(_courseTable);
-
-      for (final course in courses) {
-        await txn.insert(
-          _courseTable,
-          course.toMap(),
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-      }
-      for (final task in tasks) {
-        await txn.insert(
-          _taskTable,
-          task.toMap(),
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-      }
-      for (final exam in exams) {
-        await txn.insert(
-          _examTable,
-          exam.toMap(),
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-      }
-      for (final schedule in schedules) {
-        await txn.insert(
-          scheduleTable,
-          schedule,
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-      }
-      if (materials != null) {
-        for (final material in materials) {
-          await txn.insert(
-            _materialsTable,
-            material.toMap(),
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
-        }
-      }
-    });
   }
 
   Future<List<Map<String, dynamic>>> getAllMaterials() async {
