@@ -308,10 +308,10 @@ Academic terms, courses, schedules, tasks, exams, notes, materials, attachments,
 - Registered students may be identified by account name in delivery/read reports; guest metrics must remain anonymous aggregates only.
 - A minimal protected operator interface is limited to notice publishing and notice reports. Actual delivery, receipt and read behavior remains subject to end-to-end acceptance.
 
-### Personal backup — Release 2 (deferred)
-- Google Drive backup, encrypted archives, upload, download and restore are excluded from Release 1 and must not be exposed as available functionality.
-- The approved future target is a normal, visible `EduNivora` folder in each student's own Google Drive, with student-initiated encrypted backup and validated restore.
-- Backup-related code retained in the repository is unaccepted work-in-progress; it is not a completed or available backup service.
+### Data portability boundary
+- AcademicOS does not provide backup, restore, archive export, cloud-drive backup, or database replacement functionality.
+- Academic reports remain available as a separate local feature; report export is not a database backup.
+- Academic records and attachments remain in the local workspace. No backup or restore UI, service, route, or API is shipped.
 
 Institutional portals, lecturer/student administration, official university attendance integration, institutional messaging, fees/payments, university dashboards, and academic cloud synchronization are outside the current product scope. See [docs/PRODUCT_SCOPE.md](docs/PRODUCT_SCOPE.md) for the authoritative product specification and [ARCHITECTURE.md](ARCHITECTURE.md) for technical boundaries.
 
@@ -349,4 +349,4 @@ announcements feed is available to guests through the Flutter Announcements
 screen and is cached locally for offline reading; academic records and files
 are never uploaded to Neon.
 
-> **Release 1 delivery scope:** EduNivora ships as an Android application only. The Web application, Web administration, and Cloudflare Pages deployment are deferred to a future release. Google Drive backup/restore and production SQLite encryption are also deferred to Release 2. Do not treat the existing Web or backup source files as supported Release 1 delivery features.
+> **Release 1 delivery scope:** EduNivora ships as an Android application only. The Web application, Web administration, and Cloudflare Pages deployment are deferred to a future release. Backup and restore are excluded from AcademicOS. Production SQLite encryption remains a separate product decision. Do not treat the existing Web or backup source files as supported Release 1 delivery features.
