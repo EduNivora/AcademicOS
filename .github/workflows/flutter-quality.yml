@@ -174,7 +174,7 @@ jobs:
           # Wait for Android package services, then run one bounded integration attempt.
           # Reinstalling the app on a degraded emulator caused repeated long stalls.
           script: >-
-            set -eu; test_file=integration_test/database_android_integration_test.dart; adb wait-for-device; package_ready=0; for probe in $(seq 1 60); do if adb shell cmd package list packages >/dev/null 2>&1; then package_ready=1; break; fi; sleep 5; done; if [ "$package_ready" -ne 1 ]; then echo "Android package manager did not become ready."; adb devices -l || true; adb logcat -d -t 2000 || true; exit 1; fi; timeout 900 flutter test "$test_file" --no-pub; test_status=$?; if [ "$test_status" -ne 0 ]; then echo "Android SQLite integration test failed with exit $test_status."; adb devices -l || true; adb logcat -d -t 2000 || true; exit "$test_status"; fi
+            set -eu; test_file=integration_test/database_android_integration_test.dart; adb wait-for-device; package_ready=0; for probe in $(seq 1 60); do if adb shell cmd package list packages >/dev/null 2>&1; then package_ready=1; break; fi; sleep 5; done; if [ "$package_ready" -ne 1 ]; then echo "Android package manager did not become ready."; adb devices -l || true; adb logcat -d -t 2000 || true; exit 1; fi; if timeout 900 flutter test "$test_file" --no-pub; then exit 0; else test_status=$?; echo "Android SQLite integration test failed with exit $test_status."; adb devices -l || true; adb logcat -d -t 2000 || true; exit "$test_status"; fi
 
       - name: Prepare optional production signing
         shell: bash
