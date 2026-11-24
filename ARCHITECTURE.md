@@ -83,7 +83,7 @@ Academic reporting is a standalone local feature:
 - Inputs are read from the existing local database through `DatabaseHelper`: courses, tasks, exams and weekly schedule.
 - The service generates daily, weekly, monthly and final text reports. It does not infer attendance, grades or GPA from missing source data.
 - The screen previews the generated text and supports saving a TXT file and copying the report to the clipboard.
-- Report generation is independent of persistence replacement, archive serialization and restore validation.
+- Report generation is independent of database mutation and whole-workspace replacement.
 
 **Product boundary:** AcademicOS has no backup, restore, archive, cloud-drive transfer, or whole-database replacement capability. Report export is a text-report output only and must never be described as a backup.
 
@@ -183,5 +183,5 @@ trusted origins, admin bootstrap, guest-metric abuse controls, and receipt
 retention policy remain open release gates. Guest academic use remains available
 offline.
 
-Google Drive backup remains deferred to Release 2. No academic cloud sync is
+Backup and restore are excluded from AcademicOS. No academic cloud sync is
 introduced by this backend.
