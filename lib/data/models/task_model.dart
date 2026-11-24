@@ -23,10 +23,10 @@ class TaskModel extends TaskEntity {
 
   factory TaskModel.fromMap(Map<String, dynamic> map) {
     if (map['title'] is! String || (map['title'] as String).trim().isEmpty) {
-      throw const FormatException('Invalid task backup: title is required.');
+      throw const FormatException('Invalid task data: title is required.');
     }
     if (map['description'] is! String) {
-      throw const FormatException('Invalid task backup: description must be a string.');
+      throw const FormatException('Invalid task data: description must be a string.');
     }
 
     DateTime? parseOptionalDate(String key) {
@@ -34,7 +34,7 @@ class TaskModel extends TaskEntity {
       if (value == null) return null;
       final parsed = DateTime.tryParse(value.toString());
       if (parsed == null) {
-        throw FormatException('Invalid task backup: "$key" is not a valid date.');
+        throw FormatException('Invalid task data: "$key" is not a valid date.');
       }
       return parsed;
     }
@@ -44,7 +44,7 @@ class TaskModel extends TaskEntity {
     if (startDateTime != null &&
         endDateTime != null &&
         endDateTime.isBefore(startDateTime)) {
-      throw const FormatException('Invalid task backup: end_date_time precedes start_date_time.');
+      throw const FormatException('Invalid task data: end_date_time precedes start_date_time.');
     }
 
     final idValue = map['id'];

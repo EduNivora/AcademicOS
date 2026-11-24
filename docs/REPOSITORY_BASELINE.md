@@ -12,7 +12,7 @@
 - The live `refs/heads/main` API returned the baseline SHA above. It matches the supplied reference SHA.
 - The default branch is `main`; no changes were made directly to it.
 - The repository PR inventory endpoint returned 53 PRs: 36 open, 17 closed, 12 merged.
-- The branch search returned 60 branch names on its first page and a continuation cursor; therefore this is not a complete branch count.
+- At the initial baseline snapshot, branch search returned 60 names on its first page and a continuation cursor. A later full branches API snapshot is recorded below.
 - Mainline Flutter quality run [#45433357599](https://github.com/EduNivora/AcademicOS/actions/runs/45433357599) completed successfully on the exact baseline SHA. It covered dependency resolution, Dart analysis, Flutter tests, Android emulator SQLite integration, Android Debug APK and Web Release build. It did not produce a signed production ARM64 APK.
 
 ## Exact-head PR evidence
@@ -39,3 +39,18 @@ Combined commit statuses returned no legacy status contexts for the seven querie
 ## Limits of this snapshot
 
 GitHub API inventory and file reads were available. A local Git clone could not be established in this execution environment because outbound DNS/network access to github.com was unavailable. Consequently, no local Flutter/Dart command is claimed as executed here. CI must validate the new branch before this phase is accepted.
+
+
+## Execution update — current GitHub state
+
+**Verified after PR creation and backup PR closure (2026-11-24):**
+
+- `main` remains unchanged at `989ad5212971097df868dabab557c1c076d91720`.
+- GitHub returned 61 pull requests: 35 open, 26 closed, 12 merged.
+- GitHub returned 68 branch refs. This includes the active Phase 0 and Phase 1 branches and six superseded Phase 1 branches retained for audit traceability.
+- PR #60 is the active Phase 0 PR: `chore/phase0-baseline-ci-hardening` at `a73f8a87657c09dc9be7178d9c72d8936028a1df`, based directly on the baseline `main` SHA.
+- PR #67 is the active Phase 1 PR: `feat/phase1-remove-backup-separate-reports-v7` at `e7afd7ea03e4534cdda847abcda56eab2462b5d2`, based on Phase 0 branch head `a73f8a87657c09dc9be7178d9c72d8936028a1df`.
+- PRs #61–#66 were superseded and closed without merging. PRs #18–#20 were closed because backup/restore is excluded from AcademicOS.
+- No PR was merged and no production branch, database, secret or user data was changed.
+
+The PR inventory and branch count above are a current execution snapshot; refresh them again before merging.

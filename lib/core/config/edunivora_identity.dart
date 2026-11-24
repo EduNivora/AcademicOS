@@ -396,10 +396,6 @@ class EdunivoraIdentity {
       en: 'Full at-rest encryption for the local SQLite database (SQLCipher).',
     ),
     LocalizedCopy(
-      ar: 'تفعيل واجهة النسخ الاحتياطي والاستعادة الكاملة للبيانات في الإصدار الثاني (Release 2).',
-      en: 'Full backup & restore workflow in Release 2.',
-    ),
-    LocalizedCopy(
       ar: 'توسيع المزامنة السحابية الاختيارية وتكامل التقويمات الأكاديمية في إصدارات قادمة.',
       en: 'Expanded optional cloud sync and calendar integrations in future releases.',
     ),

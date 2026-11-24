@@ -18,7 +18,7 @@
 | #55 assistant postconditions (older) | QA → `feat/assistant-postcondition-verification-current-qa` | Same assistant files as #59 | Closed unmerged; historical source only. #59 is the current rebased candidate. |
 | #56 QA pipefail | QA → `fix/qa-flutter-test-pipefail` | Flutter workflow | Merged into QA only; not main. Do not treat as mainline fix. |
 | #17 attachment storage | historical phase0 branch → durable attachment branch | DB helper, BLOB persistence, backup serialization | Already merged into the phase0 integration line; BLOB implementation is current persistence evidence, not a final architecture decision. |
-| #18–#20 backup archive / Drive | phase0 / encrypted archive stack | Backup archive, crypto and Drive integration | Open Release 2 work; excluded from current Release 1 scope. Do not merge. |
+| #18–#20 backup archive / Drive | phase0 / encrypted archive stack | Backup archive, crypto and Drive integration | Closed after the product owner excluded backup/restore from AcademicOS. Branches remain as Git history only; do not merge. |
 | #13 attachment path guard | phase0 integration line | Material path and PDF viewer | Historical mitigation. Its stale base and backup-era references must not be pulled into the current mainline without re-review. |
 
 ## Suggested integration order
@@ -33,3 +33,26 @@
 ## Repository-wide inventory
 
 The repository API snapshot contained 53 PRs (36 open, 17 closed, 12 merged). The active PRs and branches that directly affect the current integration sequence are enumerated above. The remaining active PRs are separate release, authentication, web-runtime, database, UI, and historical phase0 stacks; their base branches are not interchangeable with main. Do not mass-merge them as a batch.
+
+
+## Execution update — after Phase 0 / Phase 1 PR creation
+
+The comparisons below use the then-current main SHA `989ad5212971097df868dabab557c1c076d91720`:
+
+| PR | Compare to current main | Updated decision |
+|---|---|---|
+| #47 | Diverged; 27 commits ahead, 3 behind | Rebase required. Backend CI passed, Flutter run cancelled. Keep separate and do not deploy migration 0003 without explicit approval. |
+| #50 | Diverged; 77 ahead, 3 behind; GitHub mergeable=false | Resolve conflicts/rebase before considering merge. |
+| #53 | Diverged; 41 ahead, 3 behind | Rebase required even though exact-head CI passed; deployment remains separately gated. |
+| #54 | Diverged; 3 ahead, 3 behind; exact-head Flutter run cancelled | Compare its Android storage persistence test with #58 before selecting one or both. |
+| #57 | 2 commits ahead, not behind | Its test-failure propagation is superseded by PR #60's broader strict-pipefail coverage. Do not merge both workflow variants. |
+| #58 | 1 commit ahead, not behind | Keep as a focused database close/reopen assertion; its exact-head emulator run failed at runtime after Flutter tests passed. |
+| #59 | QA-stack comparison: 78 commits ahead, 3 behind main | Remains based on QA #50; not main-ready. |
+
+### Backup PR disposition
+
+- #18 encrypted archive, #19 encrypted archive integration, and #20 Google Drive backup were closed with explicit comments because backup/restore are excluded from AcademicOS. Their branches remain only as Git history and must not be merged.
+- #61–#66 were superseded and closed as Phase 1 was rebased to the final Phase 0 CI baseline. No code was merged from those superseded PRs.
+- Current execution PRs: #60 (Phase 0) and #67 (Phase 1, stacked on #60). PRs #64–#66 were superseded and closed without merging.
+
+The comparison is a point-in-time integration snapshot. Refresh the base/head SHAs and CI before merging either current PR.
