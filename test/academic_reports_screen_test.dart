@@ -14,15 +14,16 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('إنشاء التقرير اليومي'), findsOneWidget);
+    expect(
+      find.text('اختر نوع التقرير ثم اضغط «إنشاء التقرير». '),
+      findsOneWidget,
+    );
+
     await tester.scrollUntilVisible(
       find.text('حفظ التقرير ومشاركته'),
       300,
     );
     expect(find.text('حفظ التقرير ومشاركته'), findsOneWidget);
-    expect(
-      find.text('اختر نوع التقرير ثم اضغط «إنشاء التقرير». '),
-      findsOneWidget,
-    );
   });
 
   testWidgets('changes the selected report period without leaving the screen', (
