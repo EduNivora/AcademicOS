@@ -18,7 +18,7 @@ Release scope: local attachments only; no backup/restore and no cloud document u
 | Missing external app | Typed noAppToOpen result and clear Arabic message | Service unit test; emulator result |
 | Safe file path | Generated cache filename; no untrusted path passed to the opener | Unit tests |
 | Lazy attachment reads | Metadata queries omit file_bytes; dedicated BLOB read by ID | Database test |
-| Local PDF summary | Separate extractor and local summarizer; explicit user action | Unit tests + Android extraction integration |
+| Local PDF summary | Separate extractor and local summarizer; explicit user action from the course-material list or viewer; no viewer route is required | Unit tests + Android extraction integration |
 | Scanned PDF behavior | Empty extracted text maps to noExtractableText; no OCR claim | Unit tests |
 | No external document transmission | Summary pipeline has no network dependency | Code review and dependency inspection |
 
@@ -27,7 +27,8 @@ Release scope: local attachments only; no backup/restore and no cloud document u
 - Replaced the all-format viewer dependency with a focused PDF renderer and platform Office handoff.
 - Moved attachment BLOB retrieval out of course-material list queries.
 - Added an app-private temporary-file service with strict extension allowlists and bounded size checks.
-- Separated PDF text extraction and local summary generation from the viewer.
+- Separated PDF text extraction and local summary generation from the viewer; the course-material list can summarize the selected PDF without navigating to the viewer.
+- Deferred native PDF document/controller creation until the viewer route's first rendered frame, and made error-state file inspection asynchronous.
 - Added unit, widget, database, and Android integration coverage.
 - Extended the existing Android emulator quality gate to run both SQLite and document integration tests.
 
