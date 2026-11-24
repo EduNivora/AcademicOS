@@ -5,9 +5,7 @@ import 'package:academic_os/presentation/reports/academic_reports_screen.dart';
 
 void main() {
   testWidgets('shows the standalone academic reports screen', (tester) async {
-    await tester.pumpWidget(
-      const MaterialApp(home: AcademicReportsScreen()),
-    );
+    await tester.pumpWidget(const MaterialApp(home: AcademicReportsScreen()));
 
     expect(find.text('التقارير الأكاديمية'), findsOneWidget);
     expect(
@@ -25,9 +23,7 @@ void main() {
   testWidgets(
     'changes the selected report period without leaving the screen',
     (tester) async {
-      await tester.pumpWidget(
-        const MaterialApp(home: AcademicReportsScreen()),
-      );
+      await tester.pumpWidget(const MaterialApp(home: AcademicReportsScreen()));
 
       await tester.tap(
         find.byType(DropdownButtonFormField<AcademicReportPeriod>),
