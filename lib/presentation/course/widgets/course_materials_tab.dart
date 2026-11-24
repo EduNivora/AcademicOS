@@ -70,7 +70,9 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
           if (length > maxFileBytes) {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('حجم الملف يتجاوز الحد المسموح (50 MB).')),
+                const SnackBar(
+                  content: Text('حجم الملف يتجاوز الحد المسموح (50 MB).'),
+                ),
               );
             }
             return;
