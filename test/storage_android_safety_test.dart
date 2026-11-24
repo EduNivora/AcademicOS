@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -260,6 +261,54 @@ void main() {
         if (termId != null) {
           await helper.deleteAcademicTerm(termId);
         }
+        await helper.close();
+      }
+    });
+
+    test('course attachment bytes persist in SQLite across close and reopen', () async {
+      final helper = DatabaseHelper.instance;
+      await helper.close();
+
+      const courseId = 995505;
+      int? materialId;
+      await helper.deleteCourse(courseId);
+
+      try {
+        await helper.insertCourse(
+          const CourseModel(
+            id: courseId,
+            name: 'Attachment Persistence',
+            instructor: 'Dr. Test',
+            code: 'ATT-505',
+            credits: 2,
+            semester: '2026-Fall',
+          ),
+        );
+
+        const expectedBytes = <int>[0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37];
+        materialId = await helper.insertMaterial(<String, Object?>{
+          'course_id': courseId,
+          'title': 'persistent-attachment.pdf',
+          'file_path': 'dbblob://test-attachment',
+          'file_type': 'pdf',
+          'created_at': DateTime.utc(2026, 11, 23).toIso8601String(),
+          'file_bytes': Uint8List.fromList(expectedBytes),
+        });
+
+        // Simulate an application restart; the bytes must live in persistent
+        // SQLite storage, not in a temporary file or an in-memory cache.
+        await helper.close();
+
+        final restored = await helper.getMaterialById(materialId);
+        expect(restored, isNotNull);
+        expect(restored!['file_path'], 'dbblob://test-attachment');
+        expect(
+          List<int>.from(restored['file_bytes'] as List),
+          expectedBytes,
+        );
+      } finally {
+        if (materialId != null) await helper.deleteMaterial(materialId);
+        await helper.deleteCourse(courseId);
         await helper.close();
       }
     });
