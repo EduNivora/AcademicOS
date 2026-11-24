@@ -18,6 +18,7 @@ This document defines the Release 1 document path. AcademicOS stores course atta
 ## PDF viewer
 
 - The PDF engine is not initialized on unrelated screens. The viewer route is only constructed after an explicit open action.
+- Native PDF document/controller initialization is deferred until the viewer route's first rendered frame; the route's `initState` does not synchronously start native document work.
 - PdfDocument.openFile lets the native renderer read the app-cache file instead of copying the complete BLOB into a second Dart byte buffer.
 - PdfViewPinch provides progressive page rendering and pinch zoom. The application adds page navigation, a current-page/page-count indicator, and bounded zoom controls.
 - Document errors are converted into Arabic messages for missing, empty, corrupt, or unsupported files.
@@ -45,7 +46,8 @@ Presentation and extraction are separate:
 
 DocumentViewerScreen → DocumentSummaryService → PdfTextExtractionService → LocalSummarizerService
 
-- Summary is only started when the student explicitly requests it.
+- Summary is available as a separate action from the course-material list and can run without opening the PDF viewer; it is only started when the student explicitly requests it.
+- The viewer's own summary action remains optional convenience UI; it does not own extraction or summarization logic.
 - The extractor creates a separate temporary copy for flutter_pdf_text, reads page text lazily, and deletes the copy in a finally block.
 - Extracted text is passed only to the existing local extractive summarizer. The PDF bytes and extracted text are not sent to Gemini, Cloudflare, Neon, or another network service.
 - Image-only/scanned PDFs return noExtractableText. OCR is not claimed or silently attempted.
@@ -74,6 +76,7 @@ Package references:
 - No compatible Office application: remove the unconsumed temporary file and tell the student no compatible app is installed.
 - Successful Office handoff: retain the cache file for the seven-day safety window.
 - Screen disposed during PDF loading: close any document that completes late and remove the viewer-owned cache file.
+- Summary requested from the material list: prepare only the selected PDF, extract text through the independent summary pipeline, and delete the temporary copy in `finally`; the viewer is never pushed.
 - Temporary cleanup failure: preserve the original SQLite BLOB and retry cleanup later.
 
 ## Test strategy

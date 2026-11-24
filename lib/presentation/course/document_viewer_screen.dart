@@ -24,8 +24,8 @@ class DocumentViewerScreen extends StatefulWidget {
 }
 
 class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
-  late final Future<PdfDocument> _documentFuture;
-  late final PdfControllerPinch _controller;
+  Future<PdfDocument>? _documentFuture;
+  PdfControllerPinch? _controller;
   final DocumentSummaryService _summaryService = DocumentSummaryService();
 
   PdfDocument? _loadedDocument;
@@ -39,22 +39,45 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
   @override
   void initState() {
     super.initState();
-    _documentFuture = PdfDocument.openFile(widget.filePath);
-    _controller = PdfControllerPinch(document: _documentFuture);
+    // Defer native PDF initialization until this route has entered the frame.
+    // Other screens never construct this route or initialize the PDF engine.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_initializeDocument());
+    });
+  }
+
+  Future<void> _initializeDocument() async {
+    try {
+      final future = PdfDocument.openFile(widget.filePath);
+      _documentFuture = future;
+      final controller = PdfControllerPinch(document: future);
+      if (!mounted || _isDisposing) {
+        controller.dispose();
+        final document = await future;
+        if (!document.isClosed) await document.close();
+        return;
+      }
+      setState(() => _controller = controller);
+    } catch (error) {
+      await _onDocumentError(error);
+    }
   }
 
   @override
   void dispose() {
     _isDisposing = true;
-    _controller.dispose();
+    _controller?.dispose();
     unawaited(_releaseDocumentAndFile());
     super.dispose();
   }
 
   Future<void> _releaseDocumentAndFile() async {
     try {
-      final document = _loadedDocument ?? await _documentFuture;
-      if (!document.isClosed) await document.close();
+      final future = _documentFuture;
+      if (future != null) {
+        final document = _loadedDocument ?? await future;
+        if (!document.isClosed) await document.close();
+      }
     } catch (_) {
       // A failed or cancelled document open has no live native handle to close.
     }
@@ -75,24 +98,25 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
     setState(() {
       _isLoading = false;
       _pageCount = document.pagesCount;
-      _currentPage = _controller.page;
+      _currentPage = _controller?.page ?? 1;
     });
   }
 
 
-  void _onDocumentError(Object error) {
+  Future<void> _onDocumentError(Object error) async {
     if (!mounted || _isDisposing) return;
-    String message = 'تعذر فتح ملف PDF. قد يكون الملف تالفاً أو غير مدعوم.';
+    var message = 'تعذر فتح ملف PDF. قد يكون الملف تالفاً أو غير مدعوم.';
     try {
       final file = File(widget.filePath);
-      if (!file.existsSync()) {
+      if (!await file.exists()) {
         message = 'ملف PDF غير موجود في مساحة التخزين المؤقتة.';
-      } else if (file.lengthSync() == 0) {
+      } else if (await file.length() == 0) {
         message = 'ملف PDF فارغ ولا يحتوي على صفحات.';
       }
     } catch (_) {
       // Keep the generic recovery message.
     }
+    if (!mounted || _isDisposing) return;
     setState(() {
       _isLoading = false;
       _loadError = message;
@@ -101,7 +125,9 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
 
   Future<void> _goToPreviousPage() async {
     if (_isLoading || _currentPage <= 1) return;
-    await _controller.previousPage(
+    final controller = _controller;
+    if (controller == null) return;
+    await controller.previousPage(
       duration: const Duration(milliseconds: 220),
       curve: Curves.easeOut,
     );
@@ -110,7 +136,9 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
   Future<void> _goToNextPage() async {
     final count = _pageCount;
     if (_isLoading || count == null || _currentPage >= count) return;
-    await _controller.nextPage(
+    final controller = _controller;
+    if (controller == null) return;
+    await controller.nextPage(
       duration: const Duration(milliseconds: 220),
       curve: Curves.easeOut,
     );
@@ -118,11 +146,13 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
 
   void _changeZoom(double multiplier) {
     if (_isLoading) return;
-    final current = _controller.zoomRatio;
+    final controller = _controller;
+    if (controller == null) return;
+    final current = controller.zoomRatio;
     if (current <= 0) return;
     final target = (current * multiplier).clamp(1.0, 5.0);
     final factor = target / current;
-    _controller.value = _controller.value.clone()..scale(factor);
+    controller.value = controller.value.clone()..scale(factor);
   }
 
   Future<void> _summarizePdf() async {
@@ -268,19 +298,22 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
                   Expanded(
                     child: Stack(
                       children: [
-                        PdfViewPinch(
-                          controller: _controller,
-                          minScale: 1,
-                          maxScale: 5,
-                          padding: 8,
-                          onDocumentLoaded: _onDocumentLoaded,
-                          onDocumentError: _onDocumentError,
-                          onPageChanged: (page) {
-                            if (mounted && !_isDisposing) {
-                              setState(() => _currentPage = page);
-                            }
-                          },
-                        ),
+                        if (_controller != null)
+                          PdfViewPinch(
+                            controller: _controller!,
+                            minScale: 1,
+                            maxScale: 5,
+                            padding: 8,
+                            onDocumentLoaded: _onDocumentLoaded,
+                            onDocumentError: (error) => unawaited(_onDocumentError(error)),
+                            onPageChanged: (page) {
+                              if (mounted && !_isDisposing) {
+                                setState(() => _currentPage = page);
+                              }
+                            },
+                          )
+                        else
+                          const Center(child: CircularProgressIndicator()),
                         if (_isLoading)
                           const Positioned.fill(
                             child: IgnorePointer(
