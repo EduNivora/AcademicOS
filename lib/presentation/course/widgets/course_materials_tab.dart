@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
@@ -47,21 +49,42 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
     final FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'txt'],
-      withData: true,
+      withData: kIsWeb,
     );
     if (result == null || !mounted) return;
     final file = result.files.first;
-    final bytes = file.bytes;
-    if (bytes == null || bytes.isEmpty) {
+    const maxFileBytes = 50 * 1024 * 1024;
+    if (file.size > maxFileBytes) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذر قراءة محتوى الملف المحدد.')),
+        const SnackBar(content: Text('حجم الملف يتجاوز الحد المسموح (50 MB).')),
       );
       return;
     }
 
-    if (bytes.length > 50 * 1024 * 1024) {
+    Uint8List? bytes = file.bytes;
+    if (bytes == null && file.path != null) {
+      try {
+        final source = File(file.path!);
+        if (await source.exists()) {
+          final length = await source.length();
+          if (length > maxFileBytes) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('حجم الملف يتجاوز الحد المسموح (50 MB).')),
+              );
+            }
+            return;
+          }
+          if (length > 0) bytes = await source.readAsBytes();
+        }
+      } on FileSystemException {
+        // Fall through to the common unavailable-file message.
+      }
+    }
+    if (!mounted) return;
+    if (bytes == null || bytes.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('حجم الملف يتجاوز الحد المسموح (50 MB).')),
+        const SnackBar(content: Text('تعذر قراءة محتوى الملف المحدد.')),
       );
       return;
     }
