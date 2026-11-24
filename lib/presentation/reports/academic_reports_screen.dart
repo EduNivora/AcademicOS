@@ -8,8 +8,7 @@ import '../../core/academic/academic_report_service.dart';
 import '../../core/notifications/notification_service.dart';
 import '../../data/database/database_helper.dart';
 
-/// Release 1 academic reporting; backup export and restore are deliberately
-/// kept out of the student-facing application until Release 2.
+/// Release 1 academic reporting backed by the student's local academic records.
 class AcademicReportsScreen extends StatefulWidget {
   const AcademicReportsScreen({super.key});
 
