@@ -120,3 +120,11 @@ Parallel work is limited to read-only reviews and independent test authoring. Do
 The branch has a successful automated baseline, but it is not release-ready. The next blocking work is Gemini activation and authenticated end-to-end assistant verification, followed by data-lifecycle and uncovered notification/document tests. Production signing and physical-device acceptance remain later release gates.
 
 No claim is made that all UI, notifications, documents, AI actions, database upgrade paths, or performance have been verified end-to-end.
+
+
+## Phase 1 implementation addendum — 2026-11-24
+
+- A dedicated academic reports screen already exists at `lib/presentation/reports/academic_reports_screen.dart` and is opened from the home screen. It is preserved rather than recreated.
+- The report service's backup payload serialization was separated from report generation by removing only backup-specific APIs.
+- Restore-only `replaceAcademicData`, backup payload validation, and the combined backup/report screen are being removed. Ordinary academic CRUD, SQLite attachment BLOB persistence and report TXT export are retained.
+- Acceptance remains pending until exact-head Flutter CI, analyzer and regression tests pass.
