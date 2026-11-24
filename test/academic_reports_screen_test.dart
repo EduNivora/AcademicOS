@@ -20,9 +20,9 @@ void main() {
     );
   });
 
-  testWidgets(
-    'changes the selected report period without leaving the screen',
-    (tester) async {
+  testWidgets('changes the selected report period without leaving the screen', (
+    tester,
+  ) async {
       await tester.pumpWidget(const MaterialApp(home: AcademicReportsScreen()));
 
       await tester.tap(
