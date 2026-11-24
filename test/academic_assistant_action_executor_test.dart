@@ -65,12 +65,14 @@ void main() {
           }),
         });
 
-        final result = await executor.execute(
-          const AcademicAssistantToolCall(
-            name: 'update_profile',
-            arguments: {'semester': 'الثاني', 'department': 'الأمن السيبراني'},
-          ),
+        const updateCall = AcademicAssistantToolCall(
+          name: 'update_profile',
+          arguments: {'semester': 'الثاني', 'department': 'الأمن السيبراني'},
         );
+        final pending = await executor.execute(updateCall);
+        expect(pending.requiresConfirmation, isTrue);
+        final result = await executor.execute(updateCall, confirmed: true);
+        expect(await executor.verifyPostcondition(updateCall, result), isTrue);
         final profile = await StudentProfile.load();
 
         expect(result.changedData, isTrue);
@@ -217,16 +219,18 @@ void main() {
           code: 'NET-31',
         ),
       );
-      final result = await executor.execute(
-        const AcademicAssistantToolCall(
-          name: 'update_material',
-          arguments: {
-            'course_id': 31,
-            'name': 'أمن الشبكات المتقدم',
-            'credits': 3,
-          },
-        ),
+      const updateCall = AcademicAssistantToolCall(
+        name: 'update_material',
+        arguments: {
+          'course_id': 31,
+          'name': 'أمن الشبكات المتقدم',
+          'credits': 3,
+        },
       );
+      final pending = await executor.execute(updateCall);
+      expect(pending.requiresConfirmation, isTrue);
+      final result = await executor.execute(updateCall, confirmed: true);
+      expect(await executor.verifyPostcondition(updateCall, result), isTrue);
 
       expect(result.changedData, isTrue);
       expect(courseRepository.courses.single.name, 'أمن الشبكات المتقدم');
@@ -334,16 +338,18 @@ void main() {
         createdExamId = saved.id;
         expect(saved.courseId, 77);
 
-        final updated = await executor.execute(
-          AcademicAssistantToolCall(
-            name: 'update_exam',
-            arguments: {
-              'exam_id': saved.id,
-              'title': 'اختبار الشبكات النهائي',
-              'exam_date': '2027-02-16T10:00:00.000',
-            },
-          ),
+        final updateExamCall = AcademicAssistantToolCall(
+          name: 'update_exam',
+          arguments: {
+            'exam_id': saved.id,
+            'title': 'اختبار الشبكات النهائي',
+            'exam_date': '2027-02-16T10:00:00.000',
+          },
         );
+        final updateConfirmation = await executor.execute(updateExamCall);
+        expect(updateConfirmation.requiresConfirmation, isTrue);
+        final updated = await executor.execute(updateExamCall, confirmed: true);
+        expect(await executor.verifyPostcondition(updateExamCall, updated), isTrue);
         expect(updated.changedData, isTrue);
         expect(
           (await database.getExamById(saved.id!))?.title,

@@ -197,6 +197,14 @@ class AcademicAssistantCommandParser {
 }
 
 class AcademicAssistantActionExecutor {
+  static const Set<String> _confirmationRequiredActions = {
+    'update_profile',
+    'update_material',
+    'update_task',
+    'update_lecture',
+    'update_exam',
+  };
+
   static const Map<String, Set<String>> _allowedArgumentKeys = {
     'create_material': {'name', 'instructor', 'code', 'credits'},
     'add_material_file': {'course_id', 'course_name', 'file_bytes', 'file_name', 'file_type'},
@@ -274,6 +282,21 @@ class AcademicAssistantActionExecutor {
           message: 'إحدى القيم النصية غير صالحة أو تتجاوز الحد المسموح.',
         );
       }
+    }
+    if (_confirmationRequiredActions.contains(call.name) && !confirmed) {
+      final target = switch (call.name) {
+        'update_profile' => 'ملفك الأكاديمي',
+        'update_material' => 'المادة «${_string(call.arguments, 'course_name').isNotEmpty ? _string(call.arguments, 'course_name') : _string(call.arguments, 'course_id')}»',
+        'update_task' => 'المهمة «${_string(call.arguments, 'task_title').isNotEmpty ? _string(call.arguments, 'task_title') : _string(call.arguments, 'task_id')}»',
+        'update_lecture' => 'المحاضرة رقم ${_string(call.arguments, 'schedule_id')}',
+        'update_exam' => 'الاختبار رقم ${_string(call.arguments, 'exam_id')}',
+        _ => 'السجل الأكاديمي',
+      };
+      return AcademicAssistantToolResult(
+        message: 'تعديل البيانات يتطلب تأكيدك.',
+        requiresConfirmation: true,
+        confirmationPrompt: 'سيتم تعديل $target بالقيم التي حددتها. هل تؤكد تنفيذ التعديل؟',
+      );
     }
     return switch (call.name) {
       'create_material' => _createMaterial(call.arguments),

@@ -388,7 +388,7 @@ $userMessage''';
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('تأكيد الحذف'),
+                child: const Text('تأكيد العملية'),
               ),
             ],
           ),
