@@ -102,7 +102,6 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
     });
   }
 
-
   Future<void> _onDocumentError(Object error) async {
     if (!mounted || _isDisposing) return;
     var message = 'تعذر فتح ملف PDF. قد يكون الملف تالفاً أو غير مدعوم.';
@@ -165,15 +164,19 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
         final message = switch (result.status) {
           DocumentSummaryStatus.fileMissing => 'تعذر العثور على ملف PDF.',
           DocumentSummaryStatus.emptyFile => 'ملف PDF فارغ.',
-          DocumentSummaryStatus.unsupportedFormat => 'صيغة المستند غير مدعومة للتلخيص.',
-          DocumentSummaryStatus.tooLarge => 'الملف كبير جداً لاستخراج النص منه.',
+          DocumentSummaryStatus.unsupportedFormat =>
+            'صيغة المستند غير مدعومة للتلخيص.',
+          DocumentSummaryStatus.tooLarge =>
+            'الملف كبير جداً لاستخراج النص منه.',
           DocumentSummaryStatus.noExtractableText =>
             'لم يُعثر على نص قابل للاستخراج. قد يكون الملف ممسوحاً ضوئياً؛ OCR غير متاح حالياً.',
           DocumentSummaryStatus.failed =>
             'فشل استخراج النص من المستند. لم يتم إرسال الملف إلى أي خدمة خارجية.',
           DocumentSummaryStatus.success => 'تعذر تجهيز الملخص.',
         };
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
         return;
       }
 
@@ -194,13 +197,19 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
                       const Expanded(
                         child: Text(
                           'ملخص المستند محلياً',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 17,
+                          ),
                         ),
                       ),
                       IconButton(
                         tooltip: 'نسخ الملخص',
                         onPressed: () async {
-                          final value = summary.quickSummary + '\n\n' + summary.keyPoints.join('\n');
+                          final value =
+                              summary.quickSummary +
+                              '\n\n' +
+                              summary.keyPoints.join('\n');
                           await Clipboard.setData(ClipboardData(text: value));
                           if (sheetContext.mounted) Navigator.pop(sheetContext);
                           if (mounted) {
@@ -217,7 +226,10 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
                   Text(summary.quickSummary),
                   if (summary.keyPoints.isNotEmpty) ...[
                     const SizedBox(height: 16),
-                    const Text('النقاط الأساسية', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const Text(
+                      'النقاط الأساسية',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     const SizedBox(height: 8),
                     ...summary.keyPoints.map(
                       (point) => Padding(
@@ -228,12 +240,17 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
                   ],
                   if (summary.coreConcepts.isNotEmpty) ...[
                     const SizedBox(height: 12),
-                    const Text('المفاهيم الأساسية', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const Text(
+                      'المفاهيم الأساسية',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
                       runSpacing: 6,
-                      children: summary.coreConcepts.map((item) => Chip(label: Text(item))).toList(),
+                      children: summary.coreConcepts
+                          .map((item) => Chip(label: Text(item)))
+                          .toList(),
                     ),
                   ],
                 ],
@@ -305,7 +322,8 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
                             maxScale: 5,
                             padding: 8,
                             onDocumentLoaded: _onDocumentLoaded,
-                            onDocumentError: (error) => unawaited(_onDocumentError(error)),
+                            onDocumentError: (error) =>
+                                unawaited(_onDocumentError(error)),
                             onPageChanged: (page) {
                               if (mounted && !_isDisposing) {
                                 setState(() => _currentPage = page);
@@ -372,7 +390,9 @@ class DocumentViewerControls extends StatelessWidget {
             IconButton(
               key: const Key('pdf-next-page'),
               tooltip: 'الصفحة التالية',
-              onPressed: enabled && count != null && currentPage < count ? onNext : null,
+              onPressed: enabled && count != null && currentPage < count
+                  ? onNext
+                  : null,
               icon: const Icon(Icons.chevron_left),
             ),
             const Spacer(),

@@ -41,7 +41,8 @@ class PreparedMaterialFile {
 
 typedef MaterialBytesLoader = Future<Uint8List?> Function(int materialId);
 typedef TemporaryDirectoryProvider = Future<Directory> Function();
-typedef ExternalMaterialOpener = Future<ExternalMaterialOpenStatus> Function(String path);
+typedef ExternalMaterialOpener =
+    Future<ExternalMaterialOpenStatus> Function(String path);
 
 class CourseMaterialFileService {
   static const int defaultMaxFileBytes = 50 * 1024 * 1024;
@@ -59,12 +60,13 @@ class CourseMaterialFileService {
     ExternalMaterialOpener? openExternal,
     this.maxFileBytes = defaultMaxFileBytes,
     DateTime Function()? now,
-  })  : _loadBytes = loadBytes ?? DatabaseHelper.instance.getMaterialFileBytes,
-        _temporaryDirectory = temporaryDirectory ?? _defaultTemporaryDirectory,
-        _openExternal = openExternal ?? _openWithPlatform,
-        _now = now ?? DateTime.now;
+  }) : _loadBytes = loadBytes ?? DatabaseHelper.instance.getMaterialFileBytes,
+       _temporaryDirectory = temporaryDirectory ?? _defaultTemporaryDirectory,
+       _openExternal = openExternal ?? _openWithPlatform,
+       _now = now ?? DateTime.now;
 
-  static Future<Directory> _defaultTemporaryDirectory() async => Directory.systemTemp;
+  static Future<Directory> _defaultTemporaryDirectory() async =>
+      Directory.systemTemp;
 
   Future<Uint8List> loadMaterialBytes(int materialId) async {
     if (materialId <= 0) {
@@ -72,10 +74,14 @@ class CourseMaterialFileService {
     }
     final bytes = await _loadBytes(materialId);
     if (bytes == null || bytes.isEmpty) {
-      throw const MaterialFileUnavailableException('محتوى الملف غير موجود في التخزين المحلي.');
+      throw const MaterialFileUnavailableException(
+        'محتوى الملف غير موجود في التخزين المحلي.',
+      );
     }
     if (bytes.length > maxFileBytes) {
-      throw const MaterialFileUnavailableException('حجم الملف يتجاوز الحد المسموح (50 MB).');
+      throw const MaterialFileUnavailableException(
+        'حجم الملف يتجاوز الحد المسموح (50 MB).',
+      );
     }
     return bytes;
   }
@@ -90,7 +96,9 @@ class CourseMaterialFileService {
     final payload = bytes ?? await loadMaterialBytes(materialId);
     _validatePayload(payload);
     if (!_containsPdfHeader(payload)) {
-      throw const MaterialFileUnavailableException('الملف لا يحتوي على ترويسة PDF صالحة أو أنه تالف.');
+      throw const MaterialFileUnavailableException(
+        'الملف لا يحتوي على ترويسة PDF صالحة أو أنه تالف.',
+      );
     }
     final file = await _writePrivateTemporaryFile(
       materialId: materialId,
@@ -107,7 +115,12 @@ class CourseMaterialFileService {
     required String fileType,
     Uint8List? bytes,
   }) async {
-    final extension = _validatedExtension(title, fileType, const {'doc', 'docx', 'ppt', 'pptx'});
+    final extension = _validatedExtension(title, fileType, const {
+      'doc',
+      'docx',
+      'ppt',
+      'pptx',
+    });
     final payload = bytes ?? await loadMaterialBytes(materialId);
     _validatePayload(payload);
     final file = await _writePrivateTemporaryFile(
@@ -127,19 +140,30 @@ class CourseMaterialFileService {
     }
   }
 
-  String _validatedExtension(String title, String fileType, Set<String> allowed) {
+  String _validatedExtension(
+    String title,
+    String fileType,
+    Set<String> allowed,
+  ) {
     final extension = p.extension(title).replaceFirst('.', '').toLowerCase();
     final declared = fileType.replaceFirst(RegExp(r'^\.'), '').toLowerCase();
-    if (extension.isEmpty || extension != declared || !allowed.contains(extension)) {
-      throw const UnsupportedMaterialFormatException('صيغة الملف غير مدعومة أو لا تطابق نوع المرفق المسجل.');
+    if (extension.isEmpty ||
+        extension != declared ||
+        !allowed.contains(extension)) {
+      throw const UnsupportedMaterialFormatException(
+        'صيغة الملف غير مدعومة أو لا تطابق نوع المرفق المسجل.',
+      );
     }
     return extension;
   }
 
   void _validatePayload(Uint8List bytes) {
-    if (bytes.isEmpty) throw const MaterialFileUnavailableException('الملف فارغ.');
+    if (bytes.isEmpty)
+      throw const MaterialFileUnavailableException('الملف فارغ.');
     if (bytes.length > maxFileBytes) {
-      throw const MaterialFileUnavailableException('حجم الملف يتجاوز الحد المسموح (50 MB).');
+      throw const MaterialFileUnavailableException(
+        'حجم الملف يتجاوز الحد المسموح (50 MB).',
+      );
     }
   }
 
@@ -159,12 +183,18 @@ class CourseMaterialFileService {
     await directory.create(recursive: true);
     await _cleanupExpiredExternalFiles(directory);
 
-    final safeName = p.basename(title)
+    final safeName = p
+        .basename(title)
         .replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_')
         .replaceAll(RegExp(r'_+'), '_');
     final timestamp = _now().microsecondsSinceEpoch;
-    final fileName = 'material_' + materialId.toString() + '_' +
-        timestamp.toString() + '_' + safeName;
+    final fileName =
+        'material_' +
+        materialId.toString() +
+        '_' +
+        timestamp.toString() +
+        '_' +
+        safeName;
     final file = File(p.join(directory.path, fileName));
     await file.writeAsBytes(bytes, flush: true);
     return file;
@@ -174,9 +204,11 @@ class CourseMaterialFileService {
     final cutoff = _now().subtract(externalFileRetention);
     try {
       await for (final entity in directory.list(followLinks: false)) {
-        if (entity is! File || !p.basename(entity.path).startsWith('material_')) continue;
+        if (entity is! File || !p.basename(entity.path).startsWith('material_'))
+          continue;
         try {
-          if ((await entity.lastModified()).isBefore(cutoff)) await entity.delete();
+          if ((await entity.lastModified()).isBefore(cutoff))
+            await entity.delete();
         } on FileSystemException {
           // External applications may still hold a file open.
         }
@@ -186,7 +218,9 @@ class CourseMaterialFileService {
     }
   }
 
-  static Future<ExternalMaterialOpenStatus> _openWithPlatform(String path) async {
+  static Future<ExternalMaterialOpenStatus> _openWithPlatform(
+    String path,
+  ) async {
     if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) {
       return ExternalMaterialOpenStatus.unsupportedPlatform;
     }
