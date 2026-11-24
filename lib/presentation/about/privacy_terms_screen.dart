@@ -162,8 +162,8 @@ class _TermsTab extends StatelessWidget {
           icon: Icons.shield_outlined,
           iconColor: AppTheme.warning,
           title: isArabic
-              ? '4. حدود المسؤولية والنسخ الاحتياطي'
-              : '4. Limitation of Liability & Backups',
+              ? '4. حدود المسؤولية وفقدان البيانات'
+              : '4. Limitation of Liability & Data Loss',
           body: isArabic
               ? 'يُقدَّم التطبيق "كما هو" لدعم التنظيم الدراسي. نظراً لاعتماد التخزين المحلي في الإصدار v${EdunivoraIdentity.versionDisplay}، لا يتحمل المؤسسون مسؤولية فقدان البيانات عند حذف التطبيق أو تلف الجهاز.'
               : 'The app is provided "as is" for academic productivity. Because v${EdunivoraIdentity.versionDisplay} relies primarily on local device storage, the founders are not liable for data loss caused by app removal or device failure.',
