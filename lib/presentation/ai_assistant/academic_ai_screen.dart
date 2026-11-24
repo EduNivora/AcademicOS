@@ -269,7 +269,7 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
   }
 
   bool _looksLikeActionRequest(String value) => RegExp(
-    r'(أضف|اضف|أنشئ|انشئ|احذف|حذف|عدّل|عدل|حدّث|حدث|أكمل|اكمل|ضع|أدرج|تقرير)',
+    r'(أضف|اضف|إضافة|اضافة|أنشئ|انشئ|إنشاء|انشاء|احذف|حذف|عدّل|عدل|تعديل|حدّث|حدث|تحديث|أكمل|اكمل|ضع|أدرج|ادرج|تقرير|ذكرني|ذكّرني|تذكير|رتّب|رتب|نظّم|نظم|اعرض|أعرض|عرض|استعرض|ابحث|بحث|غيّر|غير|تغيير)',
   ).hasMatch(value);
 
   String _buildActionPlanningPrompt(String userMessage) {
