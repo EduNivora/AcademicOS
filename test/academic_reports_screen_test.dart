@@ -19,22 +19,17 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.drag(
-      find.byType(ListView),
-      const Offset(0, -600),
-    );
+    await tester.drag(find.byType(ListView), const Offset(0, -600));
     await tester.pumpAndSettle();
     expect(find.text('حفظ التقرير ومشاركته'), findsOneWidget);
   });
 
-  testWidgets('changes the selected report period without leaving the screen', (
-    tester,
-  ) async {
+  testWidgets(
+    'changes the selected report period without leaving the screen',
+    (tester) async {
     await tester.pumpWidget(const MaterialApp(home: AcademicReportsScreen()));
 
-    await tester.tap(
-      find.byType(DropdownButtonFormField<AcademicReportPeriod>),
-    );
+    await tester.tap(find.byType(DropdownButtonFormField<AcademicReportPeriod>));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('التقرير الأسبوعي').last);
@@ -42,5 +37,6 @@ void main() {
 
     expect(find.text('التقارير الأكاديمية'), findsOneWidget);
     expect(find.text('إنشاء التقرير الأسبوعي'), findsOneWidget);
-  });
+    },
+  );
 }
