@@ -169,3 +169,19 @@ Baseline SHA: `989ad5212971097df868dabab557c1c076d91720`.
 | Academic report preservation | Dedicated report screen is already launched from home; report service and unit tests exist | COMPLETED for current implementation | Keep independent in Phase 1 |
 
 The Phase 0 branch is not accepted until exact-head CI passes. The Phase 1 acceptance matrix will be updated in its own PR.
+
+
+## Phase 1 — backup/restore removal and report separation
+
+| Feature | Implementation evidence | Acceptance state | Remaining |
+|---|---|---|---|
+| Dedicated academic reports screen | Existing `AcademicReportsScreen` remains the home-screen destination | COMPLETED for preserved UI | Widget and exact-head CI evidence |
+| Academic report generation | Daily/weekly/monthly/final reports remain in `AcademicReportService` using local courses, tasks, exams and schedules | IMPLEMENTED — NOT VERIFIED | Unit tests and Flutter CI on this PR |
+| Report export | TXT save and clipboard copy remain in the standalone report screen | IMPLEMENTED — NOT VERIFIED | Platform-specific widget/CI evidence |
+| Combined backup/report screen | Removed; it was not the home-screen report destination | IMPLEMENTED — NOT VERIFIED | Search regression and CI |
+| Backup payload validator and tests | Removed with its only application consumer | IMPLEMENTED — NOT VERIFIED | Confirm no remaining code references |
+| Whole-workspace replacement API | Removed after reference audit showed only restore screen/tests consumed it | IMPLEMENTED — NOT VERIFIED | Confirm CRUD and attachment persistence tests pass |
+| Academic CRUD and SQLite BLOB persistence | Ordinary insert/update/delete and material BLOB methods retained | IMPLEMENTED — NOT VERIFIED | Full regression suite |
+| Backup/restore product capability | Explicitly excluded in product scope and architecture | IMPLEMENTED — NOT VERIFIED | Final search and exact-head CI |
+
+Report export is a TXT report only. It must not be treated as backup/export of the academic database.
