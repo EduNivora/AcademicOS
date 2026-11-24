@@ -105,6 +105,34 @@ void main() {
       },
     );
 
+    test('rejects model-supplied identity and unknown fields before any write', () async {
+      final result = await executor.execute(
+        const AcademicAssistantToolCall(
+          name: 'create_material',
+          arguments: {'name': 'مادة غير مصرح بها', 'user_id': 'another-account'},
+        ),
+      );
+      expect(result.changedData, isFalse);
+      expect(result.message, contains('حقول غير مسموح بها'));
+      expect(courseRepository.courses, isEmpty);
+    });
+
+    test('verifies a created course by re-reading it and detects later drift', () async {
+      const call = AcademicAssistantToolCall(
+        name: 'create_material',
+        arguments: {'name': 'أمن الشبكات', 'instructor': 'د. علي'},
+      );
+      final result = await executor.execute(call);
+      expect(result.changedData, isTrue);
+      expect(result.affectedRecordId, isNotNull);
+      expect(await executor.verifyPostcondition(call, result), isTrue);
+
+      courseRepository.courses[0] = courseRepository.courses.single.copyWith(
+        name: 'قيمة مختلفة',
+      );
+      expect(await executor.verifyPostcondition(call, result), isFalse);
+    });
+
     test(
       'creates a task linked to the material and records automatic start time',
       () async {
@@ -132,6 +160,19 @@ void main() {
         expect(taskRepository.tasks.single.courseId, 7);
         expect(taskRepository.tasks.single.courseName, 'أمن الشبكات');
         expect(taskRepository.tasks.single.startDateTime, isNotNull);
+        const createTaskCall = AcademicAssistantToolCall(
+          name: 'create_task',
+          arguments: {
+            'title': 'مراجعة المحاضرة الأولى',
+            'course_name': 'أمن الشبكات',
+          },
+        );
+        expect(result.affectedRecordId, taskRepository.tasks.single.id);
+        expect(await executor.verifyPostcondition(createTaskCall, result), isTrue);
+        taskRepository.tasks[0] = taskRepository.tasks.single.copyWith(
+          title: 'عنوان مختلف',
+        );
+        expect(await executor.verifyPostcondition(createTaskCall, result), isFalse);
         expect(
           taskRepository.tasks.single.startDateTime!.isBefore(before),
           isFalse,
@@ -215,6 +256,53 @@ void main() {
         expect(courseRepository.courses, hasLength(1));
       },
     );
+
+    test('verifies the persisted attachment row and exact BLOB bytes', () async {
+      final database = DatabaseHelper.instance;
+      await database.close();
+      int? materialId;
+      try {
+        courseRepository.courses.add(
+          const CourseEntity(
+            id: 55,
+            name: 'أمن الشبكات',
+            instructor: 'محاضر',
+            code: 'SEC-55',
+          ),
+        );
+        final bytes = Uint8List.fromList([37, 80, 68, 70, 1, 2, 3]);
+        final call = AcademicAssistantToolCall(
+          name: 'add_material_file',
+          arguments: {
+            'course_name': 'أمن الشبكات',
+            'file_name': 'lecture.pdf',
+            'file_type': 'pdf',
+            'file_bytes': bytes,
+          },
+        );
+        final result = await executor.execute(call);
+        materialId = result.affectedRecordId;
+        expect(result.changedData, isTrue);
+        expect(materialId, isNotNull);
+        expect(await executor.verifyPostcondition(call, result), isTrue);
+
+        final db = await database.database;
+        await db.update(
+          'course_materials',
+          {'file_bytes': Uint8List.fromList([37, 80, 68, 70, 1, 2, 4])},
+          where: 'id = ?',
+          whereArgs: [materialId],
+        );
+        expect(await executor.verifyPostcondition(call, result), isFalse);
+
+        await database.deleteMaterial(materialId!);
+        expect(await executor.verifyPostcondition(call, result), isFalse);
+        materialId = null;
+      } finally {
+        if (materialId != null) await database.deleteMaterial(materialId);
+        await database.close();
+      }
+    });
 
     test('manages exams in the database and confirms deletion', () async {
       final database = DatabaseHelper.instance;
@@ -303,6 +391,23 @@ void main() {
       expect(result.requiresConfirmation, isTrue);
       expect(result.confirmationPrompt, contains('مراجعة التشفير'));
       expect(taskRepository.tasks, hasLength(1));
+
+      final deleted = await executor.execute(
+        const AcademicAssistantToolCall(
+          name: 'delete_task',
+          arguments: {'task_id': 12},
+        ),
+        confirmed: true,
+      );
+      expect(deleted.changedData, isTrue);
+      expect(deleted.affectedRecordId, 12);
+      expect(await executor.verifyPostcondition(
+        const AcademicAssistantToolCall(
+          name: 'delete_task',
+          arguments: {'task_id': 12},
+        ),
+        deleted,
+      ), isTrue);
     });
   });
 }
