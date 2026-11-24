@@ -33,6 +33,7 @@ class AcademicAssistantToolCall {
 
 class AcademicAssistantToolResult {
   final String message;
+  final bool succeeded;
   final bool changedData;
   final bool requiresConfirmation;
   final String? confirmationPrompt;
@@ -40,6 +41,7 @@ class AcademicAssistantToolResult {
 
   const AcademicAssistantToolResult({
     required this.message,
+    this.succeeded = false,
     this.changedData = false,
     this.requiresConfirmation = false,
     this.confirmationPrompt,
@@ -580,6 +582,7 @@ class AcademicAssistantActionExecutor {
     await StudentProfile.save(updated);
     return const AcademicAssistantToolResult(
       message: 'تم تحديث الملف الأكاديمي وحفظ البيانات.',
+      succeeded: true,
       changedData: true,
     );
   }
@@ -601,6 +604,7 @@ class AcademicAssistantActionExecutor {
       return AcademicAssistantToolResult(
         message:
             'المادة «${existing.first.name}» موجودة مسبقاً، ولم أضف نسخة مكررة.',
+        succeeded: true,
       );
     }
     final id = await courseUseCases.addCourse(
@@ -617,6 +621,7 @@ class AcademicAssistantActionExecutor {
     );
     return AcademicAssistantToolResult(
       message: 'تمت إضافة المادة «$name» بنجاح. رقمها الداخلي: $id.',
+      succeeded: true,
       changedData: true,
       affectedRecordId: id,
     );
@@ -662,6 +667,28 @@ class AcademicAssistantActionExecutor {
         message: 'اسم الملف أو صيغته غير مدعوم.',
       );
     }
+    final db = await database.database;
+    final possibleDuplicates = await db.query(
+      'course_materials',
+      columns: ['file_bytes'],
+      where: 'course_id = ? AND title = ? AND file_type = ?',
+      whereArgs: [course.id, fileName, fileType],
+    );
+    for (final row in possibleDuplicates) {
+      final stored = row['file_bytes'];
+      if (stored is List &&
+          stored.length == bytes.length &&
+          List<int>.generate(bytes.length, (index) => stored[index] as int)
+              .asMap()
+              .entries
+              .every((entry) => entry.value == bytes[entry.key])) {
+        return AcademicAssistantToolResult(
+          message: 'الملف «$fileName» محفوظ بالفعل في هذه المادة؛ لم أضف نسخة مكررة.',
+          succeeded: true,
+        );
+      }
+    }
+
     final material = CourseMaterialModel(
       courseId: course.id!,
       title: fileName,
@@ -673,6 +700,7 @@ class AcademicAssistantActionExecutor {
     return AcademicAssistantToolResult(
       message:
           'تم حفظ «$fileName» داخل مادة «${course.name}» وربطه بمعرّف المادة.',
+      succeeded: true,
       changedData: true,
       affectedRecordId: materialId,
     );
@@ -716,6 +744,7 @@ class AcademicAssistantActionExecutor {
     await courseUseCases.updateCourse(updated);
     return AcademicAssistantToolResult(
       message: 'تم تحديث بيانات المادة «${updated.name}».',
+      succeeded: true,
       changedData: true,
       affectedRecordId: updated.id,
     );
@@ -759,6 +788,7 @@ class AcademicAssistantActionExecutor {
     return AcademicAssistantToolResult(
       message:
           'تم حذف المادة «${course.name}» والبيانات التابعة لها بعد تأكيدك.',
+      succeeded: true,
       changedData: true,
       affectedRecordId: course.id,
     );
@@ -806,6 +836,22 @@ class AcademicAssistantActionExecutor {
             'موعد الانتهاء قريب جداً لإنشاء تنبيه قبل الموعد. اختر وقتاً أبعد أو عطّل التنبيه.',
       );
     }
+    final existingTasks = await taskUseCases.getTasks();
+    final duplicateTask = existingTasks.where((existing) =>
+      _normalize(existing.title) == _normalize(title) &&
+      existing.courseId == courseResult.course?.id &&
+      (existing.endDateTime == null
+          ? endDateTime == null
+          : endDateTime != null &&
+              existing.endDateTime!.isAtSameMomentAs(endDateTime))
+    ).firstOrNull;
+    if (duplicateTask != null) {
+      return AcademicAssistantToolResult(
+        message: 'المهمة «$title» موجودة مسبقاً بنفس المادة والموعد؛ لم أكررها.',
+        succeeded: true,
+      );
+    }
+
     final task = TaskEntity(
       title: title,
       description: _string(args, 'description'),
@@ -830,6 +876,7 @@ class AcademicAssistantActionExecutor {
         : ' وربطتها بمادة ${courseResult.course!.name}';
     return AcademicAssistantToolResult(
       message: 'تم إنشاء المهمة «$title»$materialText وحفظها في النظام.',
+      succeeded: true,
       changedData: true,
       affectedRecordId: id,
     );
@@ -846,6 +893,7 @@ class AcademicAssistantActionExecutor {
     if (task.isCompleted) {
       return AcademicAssistantToolResult(
         message: 'المهمة «${task.title}» مكتملة بالفعل.',
+        succeeded: true,
       );
     }
     await taskUseCases.updateTask(
@@ -854,6 +902,7 @@ class AcademicAssistantActionExecutor {
     await NotificationService.instance.cancelTaskReminder(task.id!);
     return AcademicAssistantToolResult(
       message: 'تم تسجيل إنجاز المهمة «${task.title}» مع وقت الإنجاز الفعلي.',
+      succeeded: true,
       changedData: true,
       affectedRecordId: task.id,
     );
@@ -925,6 +974,7 @@ class AcademicAssistantActionExecutor {
     }
     return AcademicAssistantToolResult(
       message: 'تم تحديث المهمة «${updated.title}».',
+      succeeded: true,
       changedData: true,
       affectedRecordId: updated.id,
     );
@@ -950,6 +1000,7 @@ class AcademicAssistantActionExecutor {
     await NotificationService.instance.cancelTaskReminder(task.id!);
     return AcademicAssistantToolResult(
       message: 'تم حذف المهمة «${task.title}».',
+      succeeded: true,
       changedData: true,
       affectedRecordId: task.id,
     );
@@ -1002,6 +1053,19 @@ class AcademicAssistantActionExecutor {
       );
     }
     final location = _string(args, 'location');
+    final existingSchedules = await database.getSchedules();
+    final duplicateSchedule = existingSchedules.any((row) =>
+      row['course_id'] == course.id &&
+      row['day_of_week'] == day &&
+      row['start_time'] == startTime &&
+      row['end_time'] == endTime
+    );
+    if (duplicateSchedule) {
+      return AcademicAssistantToolResult(
+        message: 'هذه المحاضرة موجودة بالفعل في الجدول؛ لم أكررها.',
+        succeeded: true,
+      );
+    }
     final id = await database.insertSchedule({
       'course_id': course.id,
       'day_of_week': day,
@@ -1023,6 +1087,7 @@ class AcademicAssistantActionExecutor {
     return AcademicAssistantToolResult(
       message:
           'تمت إضافة محاضرة ${course.name} يوم $day من $startTime إلى $endTime وربطها بمعرّف المادة.',
+      succeeded: true,
       changedData: true,
       affectedRecordId: id,
     );
@@ -1119,6 +1184,7 @@ class AcademicAssistantActionExecutor {
     );
     return AcademicAssistantToolResult(
       message: 'تم تحديث محاضرة ${course.name} في الجدول الأسبوعي.',
+      succeeded: true,
       changedData: true,
       affectedRecordId: scheduleId,
     );
@@ -1164,6 +1230,7 @@ class AcademicAssistantActionExecutor {
     await NotificationService.instance.cancelLectureReminder(scheduleId);
     return AcademicAssistantToolResult(
       message: 'تم حذف المحاضرة من الجدول وإلغاء تنبيهها.',
+      succeeded: true,
       changedData: true,
       affectedRecordId: scheduleId,
     );
@@ -1183,6 +1250,18 @@ class AcademicAssistantActionExecutor {
     if (courseResult.error != null) {
       return AcademicAssistantToolResult(message: courseResult.error!);
     }
+    final existingExams = await database.getExams();
+    final duplicateExam = existingExams.where((existing) =>
+      _normalize(existing.title) == _normalize(title) &&
+      existing.courseId == courseResult.course?.id &&
+      existing.examDate.isAtSameMomentAs(examDate)
+    ).firstOrNull;
+    if (duplicateExam != null) {
+      return AcademicAssistantToolResult(
+        message: 'الاختبار «$title» مسجل بالفعل في المادة والموعد نفسيهما؛ لم أكرر السجل.',
+        succeeded: true,
+      );
+    }
     final exam = ExamModel(
       courseId: courseResult.course?.id,
       courseName: courseResult.course?.name,
@@ -1195,6 +1274,7 @@ class AcademicAssistantActionExecutor {
     return AcademicAssistantToolResult(
       message: 'تم إنشاء الاختبار «$title» بتاريخ ${examDate.toLocal()}'
           '${courseResult.course == null ? '' : ' وربطه بمادة ${courseResult.course!.name}'} (رقم $id).',
+      succeeded: true,
       changedData: true,
       affectedRecordId: id,
     );
@@ -1234,6 +1314,7 @@ class AcademicAssistantActionExecutor {
     await database.updateExam(updated);
     return AcademicAssistantToolResult(
       message: 'تم تحديث الاختبار «${updated.title}».',
+      succeeded: true,
       changedData: true,
       affectedRecordId: id,
     );
@@ -1261,6 +1342,7 @@ class AcademicAssistantActionExecutor {
     await database.deleteExam(id);
     return AcademicAssistantToolResult(
       message: 'تم حذف الاختبار «${exam.title}» بعد تأكيدك.',
+      succeeded: true,
       changedData: true,
       affectedRecordId: id,
     );
@@ -1292,7 +1374,7 @@ class AcademicAssistantActionExecutor {
       title: 'تم تجهيز التقرير ${period.arabicLabel}',
       body: 'التقرير جاهز داخل AcademicOS.',
     );
-    return AcademicAssistantToolResult(message: report);
+    return AcademicAssistantToolResult(message: report, succeeded: true);
   }
 
   Future<_ResolvedCourse> _resolveCourse(Map<String, dynamic> args) async {

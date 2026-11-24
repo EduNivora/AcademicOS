@@ -154,6 +154,7 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
         },
       ),
     );
+    if (!result.succeeded) return result.message;
     if (result.changedData) {
       final verified = await _actionExecutor.verifyPostcondition(
         AcademicAssistantToolCall(
@@ -398,6 +399,10 @@ $userMessage''';
           return 'تم إلغاء العملية بناءً على اختيارك.';
         }
         result = await _actionExecutor.execute(call, confirmed: true);
+      }
+      if (!result.succeeded) {
+        _lastToolExecutionVerified = false;
+        return result.message;
       }
       if (result.changedData) {
         final verified = await _actionExecutor.verifyPostcondition(call, result);
