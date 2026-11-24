@@ -76,6 +76,10 @@ test("valid request calls Gemini Interactions API", async () => {
   assert.equal(sent.url, "https://generativelanguage.googleapis.com/v1beta/interactions");
   assert.equal(JSON.parse(sent.options.body).model, "gemini-3.8-flash");
   assert.equal(JSON.parse(sent.options.body).store, false);
+  assert.match(
+    JSON.parse(sent.options.body).system_instruction,
+    /لا تدّع أنك أضفت أو عدّلت أو حذفت أو حفظت سجلاً/,
+  );
 });
 test("academic context is bounded and forwarded separately", async () => {
   let payload;
