@@ -405,7 +405,10 @@ $userMessage''';
         return result.message;
       }
       if (result.changedData) {
-        final verified = await _actionExecutor.verifyPostcondition(call, result);
+        final verified = await _actionExecutor.verifyPostcondition(
+          call,
+          result,
+        );
         await widget.onDataChanged?.call();
         if (!verified) {
           _lastToolExecutionVerified = false;
@@ -478,12 +481,17 @@ $userMessage''';
           )
           .toList(),
       'weeklySchedule': schedules.take(100).toList(),
-      'materials': materials.take(100).map((item) => {
-        'id': item['id'],
-        'courseId': item['course_id'],
-        'title': item['title'],
-        'fileType': item['file_type'],
-      }).toList(),
+      'materials': materials
+          .take(100)
+          .map(
+            (item) => {
+              'id': item['id'],
+              'courseId': item['course_id'],
+              'title': item['title'],
+              'fileType': item['file_type'],
+            },
+          )
+          .toList(),
       'exams': exams
           .take(30)
           .map(
