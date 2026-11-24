@@ -14,6 +14,10 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('إنشاء التقرير اليومي'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('حفظ التقرير ومشاركته'),
+      300,
+    );
     expect(find.text('حفظ التقرير ومشاركته'), findsOneWidget);
     expect(
       find.text('اختر نوع التقرير ثم اضغط «إنشاء التقرير». '),
