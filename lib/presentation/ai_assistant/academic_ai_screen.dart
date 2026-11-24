@@ -63,6 +63,7 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
   bool _isCheckingSession = true;
   bool _hasCloudSession = false;
   bool _isGeminiReady = false;
+  bool _lastToolExecutionVerified = true;
 
   @override
   void initState() {
@@ -154,8 +155,23 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
       ),
     );
     if (result.changedData) {
-      setState(() => _pendingAttachment = null);
+      final verified = await _actionExecutor.verifyPostcondition(
+        AcademicAssistantToolCall(
+          name: 'add_material_file',
+          arguments: {
+            'course_name': courseName,
+            'file_name': file.name,
+            'file_type': extension,
+            'file_bytes': file.bytes!,
+          },
+        ),
+        result,
+      );
+      if (mounted) setState(() => _pendingAttachment = null);
       await widget.onDataChanged?.call();
+      if (!verified) {
+        return 'تمت محاولة حفظ الملف، لكن تعذر تأكيد مطابقته في قاعدة البيانات بعد إعادة القراءة. لم أبلغ عن نجاح الحفظ؛ راجع المرفقات قبل إعادة المحاولة لتجنب التكرار.';
+      }
     }
     return result.message;
   }
@@ -341,6 +357,7 @@ $userMessage''';
         Map<String, dynamic>.from(raw),
       );
       messages.add(await _executeTool(call));
+      if (_lastToolExecutionVerified == false) break;
     }
     return messages.isEmpty
         ? 'لم ينتج عن الطلب إجراء واضح. وضّح ما تريد تنفيذه.'
@@ -354,6 +371,7 @@ $userMessage''';
   }
 
   Future<String> _executeTool(AcademicAssistantToolCall call) async {
+    _lastToolExecutionVerified = true;
     try {
       var result = await _actionExecutor.execute(call);
       if (result.requiresConfirmation) {
@@ -375,14 +393,23 @@ $userMessage''';
             ],
           ),
         );
-        if (confirmed != true) return 'تم إلغاء العملية بناءً على اختيارك.';
+        if (confirmed != true) {
+          _lastToolExecutionVerified = false;
+          return 'تم إلغاء العملية بناءً على اختيارك.';
+        }
         result = await _actionExecutor.execute(call, confirmed: true);
       }
       if (result.changedData) {
+        final verified = await _actionExecutor.verifyPostcondition(call, result);
         await widget.onDataChanged?.call();
+        if (!verified) {
+          _lastToolExecutionVerified = false;
+          return 'تم تنفيذ طلب التغيير، لكن تعذر تأكيد النتيجة بعد إعادة قراءة البيانات المحفوظة. لم أعتبر العملية ناجحة، وأوقفت متابعة أي إجراء تابع. راجع السجل قبل إعادة المحاولة لتجنب التكرار.';
+        }
       }
       return result.message;
     } catch (error) {
+      _lastToolExecutionVerified = false;
       return 'لم يتم تنفيذ «${call.name}»: $error';
     }
   }

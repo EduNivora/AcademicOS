@@ -36,12 +36,14 @@ class AcademicAssistantToolResult {
   final bool changedData;
   final bool requiresConfirmation;
   final String? confirmationPrompt;
+  final int? affectedRecordId;
 
   const AcademicAssistantToolResult({
     required this.message,
     this.changedData = false,
     this.requiresConfirmation = false,
     this.confirmationPrompt,
+    this.affectedRecordId,
   });
 }
 
@@ -195,6 +197,25 @@ class AcademicAssistantCommandParser {
 }
 
 class AcademicAssistantActionExecutor {
+  static const Map<String, Set<String>> _allowedArgumentKeys = {
+    'create_material': {'name', 'instructor', 'code', 'credits'},
+    'add_material_file': {'course_id', 'course_name', 'file_bytes', 'file_name', 'file_type'},
+    'update_profile': {'full_name', 'university', 'major', 'department', 'semester', 'academic_level'},
+    'update_material': {'course_id', 'course_name', 'name', 'instructor', 'code', 'credits'},
+    'delete_material': {'course_id', 'course_name'},
+    'create_task': {'title', 'description', 'type', 'priority', 'course_id', 'course_name', 'end_date_time', 'reminder_enabled', 'reminder_offset_minutes'},
+    'complete_task': {'task_id', 'task_title'},
+    'update_task': {'task_id', 'task_title', 'title', 'description', 'type', 'priority', 'course_id', 'course_name', 'end_date_time', 'reminder_enabled', 'reminder_offset_minutes'},
+    'delete_task': {'task_id', 'task_title'},
+    'add_lecture': {'course_id', 'course_name', 'day', 'start_time', 'end_time', 'location', 'reminder_enabled', 'reminder_offset_minutes'},
+    'update_lecture': {'schedule_id', 'course_id', 'course_name', 'day', 'start_time', 'end_time', 'location', 'reminder_enabled', 'reminder_offset_minutes'},
+    'delete_lecture': {'schedule_id'},
+    'create_exam': {'title', 'exam_date', 'course_id', 'course_name', 'location', 'notes'},
+    'update_exam': {'exam_id', 'title', 'exam_date', 'course_id', 'course_name', 'location', 'notes'},
+    'delete_exam': {'exam_id'},
+    'generate_report': {'period'},
+  };
+
   final CourseUseCases courseUseCases;
   final TaskUseCases taskUseCases;
   final DatabaseHelper database;
@@ -209,6 +230,51 @@ class AcademicAssistantActionExecutor {
     AcademicAssistantToolCall call, {
     bool confirmed = false,
   }) async {
+    final allowedKeys = _allowedArgumentKeys[call.name];
+    if (allowedKeys == null) {
+      return const AcademicAssistantToolResult(
+        message: 'هذه العملية غير متاحة للمساعد حالياً.',
+      );
+    }
+    final unexpectedKeys = call.arguments.keys
+        .where((key) => !allowedKeys.contains(key))
+        .toList(growable: false);
+    if (unexpectedKeys.isNotEmpty) {
+      return const AcademicAssistantToolResult(
+        message: 'تحتوي العملية على حقول غير مسموح بها. لم يتم تنفيذ أي تغيير.',
+      );
+    }
+    for (final entry in call.arguments.entries) {
+      final key = entry.key;
+      final value = entry.value;
+      if (key == 'file_bytes') {
+        if (value is! List || value.isEmpty || value.length > 50 * 1024 * 1024 ||
+            value.any((byte) => byte is! int || byte < 0 || byte > 255)) {
+          return const AcademicAssistantToolResult(
+            message: 'محتوى الملف غير صالح أو يتجاوز الحد المسموح.',
+          );
+        }
+      } else if (key == 'reminder_enabled') {
+        if (value is! bool) {
+          return const AcademicAssistantToolResult(message: 'قيمة التذكير غير صالحة.');
+        }
+      } else if ({'credits', 'course_id', 'task_id', 'schedule_id', 'exam_id', 'reminder_offset_minutes'}.contains(key)) {
+        if (value is! int && int.tryParse(value.toString()) == null) {
+          return const AcademicAssistantToolResult(message: 'إحدى القيم الرقمية غير صالحة.');
+        }
+      } else if ({'end_date_time', 'exam_date'}.contains(key)) {
+        if (value is! String && value is! DateTime) {
+          return const AcademicAssistantToolResult(message: 'صيغة التاريخ أو الوقت غير صالحة.');
+        }
+        if (_date(value) == null) {
+          return const AcademicAssistantToolResult(message: 'صيغة التاريخ أو الوقت غير صالحة.');
+        }
+      } else if (value is! String || value.length > 2000) {
+        return const AcademicAssistantToolResult(
+          message: 'إحدى القيم النصية غير صالحة أو تتجاوز الحد المسموح.',
+        );
+      }
+    }
     return switch (call.name) {
       'create_material' => _createMaterial(call.arguments),
       'add_material_file' => _addMaterialFile(call.arguments),
@@ -233,6 +299,228 @@ class AcademicAssistantActionExecutor {
         message: 'هذه العملية غير متاحة للمساعد حالياً.',
       ),
     };
+  }
+
+  /// Re-reads the affected record after a write before reporting success.
+  /// A successful SQL call alone is not treated as proof of persisted state.
+  Future<bool> verifyPostcondition(
+    AcademicAssistantToolCall call,
+    AcademicAssistantToolResult result,
+  ) async {
+    if (!result.changedData) return true;
+    final id = result.affectedRecordId;
+    try {
+      switch (call.name) {
+        case 'create_material':
+        case 'update_material':
+          if (id == null) return false;
+          final courses = await courseUseCases.getCourses();
+          final course = courses.where((item) => item.id == id).firstOrNull;
+          if (course == null) return false;
+          final name = _string(call.arguments, 'name');
+          final instructor = _string(call.arguments, 'instructor');
+          final code = _string(call.arguments, 'code');
+          final credits = _integer(call.arguments['credits']);
+          return (name.isEmpty || _normalize(course.name) == _normalize(name)) &&
+              (instructor.isEmpty || course.instructor == instructor) &&
+              (code.isEmpty || course.code == code) &&
+              (credits == null || course.credits == credits.clamp(0, 30).toInt());
+        case 'delete_material':
+          if (id == null) return false;
+          final courses = await courseUseCases.getCourses();
+          if (courses.any((item) => item.id == id)) return false;
+          final db = await database.database;
+          for (final table in ['tasks', 'schedule', 'exams', 'course_materials']) {
+            final rows = await db.query(
+              table,
+              columns: ['id'],
+              where: 'course_id = ?',
+              whereArgs: [id],
+              limit: 1,
+            );
+            if (rows.isNotEmpty) return false;
+          }
+          return true;
+        case 'add_material_file':
+          if (id == null) return false;
+          final row = await database.getMaterialById(id);
+          final rawBytes = call.arguments['file_bytes'];
+          final expectedBytes = rawBytes is List ? rawBytes : const <int>[];
+          final storedBytes = row?['file_bytes'];
+          final bytesMatch = storedBytes is List &&
+              expectedBytes.isNotEmpty &&
+              storedBytes.length == expectedBytes.length &&
+              List<int>.generate(
+                expectedBytes.length,
+                (index) => storedBytes[index] as int,
+              ).asMap().entries.every(
+                (entry) => entry.value == expectedBytes[entry.key],
+              );
+          final courseResult = await _resolveCourse(call.arguments);
+          return row != null &&
+              courseResult.course?.id == row['course_id'] &&
+              row['title'] == _string(call.arguments, 'file_name') &&
+              bytesMatch;
+        case 'create_task':
+        case 'complete_task':
+        case 'update_task':
+          if (id == null) return false;
+          final tasks = await taskUseCases.getTasks();
+          final task = tasks.where((item) => item.id == id).firstOrNull;
+          if (task == null) return false;
+          if (call.name == 'complete_task') {
+            return task.isCompleted && task.completedAt != null;
+          }
+
+          final args = call.arguments;
+          final isCreate = call.name == 'create_task';
+          final title = _string(args, 'title');
+          final description = _string(args, 'description');
+          final priority = _string(args, 'priority');
+          final type = _string(args, 'type');
+          final endDate = _date(args['end_date_time']);
+          final rawReminderOffset = _integer(args['reminder_offset_minutes']);
+          final expectedReminderOffset = rawReminderOffset == null
+              ? (isCreate ? 15 : task.reminderOffsetMinutes)
+              : rawReminderOffset.clamp(0, 1440).toInt();
+          final courseSpecified =
+              args.containsKey('course_id') || _string(args, 'course_name').isNotEmpty;
+          if (courseSpecified) {
+            final courseResult = await _resolveCourse(args);
+            if (courseResult.error != null || courseResult.course == null) {
+              return false;
+            }
+            if (task.courseId != courseResult.course!.id ||
+                task.courseName != courseResult.course!.name) {
+              return false;
+            }
+          }
+          final expectedReminderEnabled = isCreate
+              ? endDate != null && args['reminder_enabled'] != false
+              : args['reminder_enabled'] is bool
+                  ? args['reminder_enabled'] as bool
+                  : task.reminderEnabled;
+          final effectiveEndDate = isCreate ? endDate : endDate ?? task.endDateTime;
+          final expectedReminderDate = expectedReminderEnabled &&
+                  effectiveEndDate != null
+              ? effectiveEndDate.subtract(
+                  Duration(minutes: expectedReminderOffset),
+                )
+              : null;
+
+          return (isCreate ? task.title == title : title.isEmpty || task.title == title) &&
+              (isCreate
+                  ? task.description == description
+                  : description.isEmpty || task.description == description) &&
+              (!(isCreate || priority.isNotEmpty) ||
+                  task.priority == TaskPriorityX.fromName(priority)) &&
+              (!isCreate || task.type == TaskTypeX.fromName(type)) &&
+              (!isCreate || task.startDateTime != null) &&
+              (isCreate
+                  ? endDate == null
+                      ? task.endDateTime == null
+                      : task.endDateTime?.isAtSameMomentAs(endDate) == true
+                  : endDate == null ||
+                      task.endDateTime?.isAtSameMomentAs(endDate) == true) &&
+              task.reminderOffsetMinutes == expectedReminderOffset &&
+              task.reminderEnabled == expectedReminderEnabled &&
+              task.reminderDate == expectedReminderDate;
+        case 'delete_task':
+          if (id == null) return false;
+          final tasks = await taskUseCases.getTasks();
+          return !tasks.any((item) => item.id == id);
+        case 'add_lecture':
+        case 'update_lecture':
+          if (id == null) return false;
+          final args = call.arguments;
+          final isCreate = call.name == 'add_lecture';
+          final schedules = await database.getSchedules();
+          final row = schedules.where((item) => item['id'] == id).firstOrNull;
+          if (row == null) return false;
+          final day = _string(args, 'day');
+          final start = _string(args, 'start_time');
+          final end = _string(args, 'end_time');
+          final location = _string(args, 'location');
+          final rawReminderOffset = _integer(args['reminder_offset_minutes']);
+          final reminderOffset = rawReminderOffset == null
+              ? (isCreate ? 15 : null)
+              : rawReminderOffset.clamp(0, 1440).toInt();
+          final courseSpecified =
+              args.containsKey('course_id') || _string(args, 'course_name').isNotEmpty;
+          final courseResult = courseSpecified ? await _resolveCourse(args) : null;
+          if (courseSpecified &&
+              (courseResult!.error != null || courseResult.course == null)) {
+            return false;
+          }
+          final reminderValue = row['reminder_enabled'];
+          final reminderEnabled = reminderValue == 1 || reminderValue == true;
+          final expectedReminderEnabled = isCreate
+              ? args['reminder_enabled'] is bool
+                  ? args['reminder_enabled'] as bool
+                  : true
+              : args['reminder_enabled'] is bool
+                  ? args['reminder_enabled'] as bool
+                  : null;
+          return (isCreate
+                  ? row['day_of_week'] == day
+                  : day.isEmpty || row['day_of_week'] == day) &&
+              (isCreate
+                  ? row['start_time'] == start
+                  : start.isEmpty || row['start_time'] == start) &&
+              (isCreate
+                  ? row['end_time'] == end
+                  : end.isEmpty || row['end_time'] == end) &&
+              (isCreate || location.isEmpty || row['location'] == location) &&
+              (!isCreate || row['location'] == location) &&
+              (!courseSpecified ||
+                  row['course_id'] == courseResult!.course!.id) &&
+              (expectedReminderEnabled == null ||
+                  reminderEnabled == expectedReminderEnabled) &&
+              (reminderOffset == null ||
+                  row['reminder_offset_minutes'] == reminderOffset);
+        case 'delete_lecture':
+          if (id == null) return false;
+          final schedules = await database.getSchedules();
+          return !schedules.any((item) => item['id'] == id);
+        case 'create_exam':
+        case 'update_exam':
+          if (id == null) return false;
+          final exam = await database.getExamById(id);
+          if (exam == null) return false;
+          final title = _string(call.arguments, 'title');
+          final date = _date(call.arguments['exam_date']);
+          final location = _string(call.arguments, 'location');
+          final notes = _string(call.arguments, 'notes');
+          final courseResult = await _resolveCourse(call.arguments);
+          return (title.isEmpty || exam.title == title) &&
+              (date == null || exam.examDate.isAtSameMomentAs(date)) &&
+              (location.isEmpty || exam.location == location) &&
+              (notes.isEmpty || exam.notes == notes) &&
+              (courseResult.course == null || exam.courseId == courseResult.course!.id);
+        case 'delete_exam':
+          if (id == null) return false;
+          return await database.getExamById(id) == null;
+        case 'update_profile':
+          final profile = await StudentProfile.load();
+          final args = call.arguments;
+          return (_string(args, 'full_name').isEmpty ||
+                  profile.fullName == _string(args, 'full_name')) &&
+              (_string(args, 'university').isEmpty ||
+                  profile.university == _string(args, 'university')) &&
+              (_string(args, 'major').isEmpty ||
+                  profile.major == _string(args, 'major')) &&
+              (_string(args, 'department').isEmpty ||
+                  profile.department == _string(args, 'department')) &&
+              (_string(args, 'semester').isEmpty ||
+                  profile.semester == _string(args, 'semester')) &&
+              (_string(args, 'academic_level').isEmpty ||
+                  profile.academicLevel == _string(args, 'academic_level'));
+        default:
+          return false;
+      }
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<AcademicAssistantToolResult> _updateProfile(
@@ -307,6 +595,7 @@ class AcademicAssistantActionExecutor {
     return AcademicAssistantToolResult(
       message: 'تمت إضافة المادة «$name» بنجاح. رقمها الداخلي: $id.',
       changedData: true,
+      affectedRecordId: id,
     );
   }
 
@@ -357,11 +646,12 @@ class AcademicAssistantActionExecutor {
       fileType: fileType,
       fileBytes: bytes,
     );
-    await database.insertMaterial(material.toMap());
+    final materialId = await database.insertMaterial(material.toMap());
     return AcademicAssistantToolResult(
       message:
           'تم حفظ «$fileName» داخل مادة «${course.name}» وربطه بمعرّف المادة.',
       changedData: true,
+      affectedRecordId: materialId,
     );
   }
 
@@ -404,6 +694,7 @@ class AcademicAssistantActionExecutor {
     return AcademicAssistantToolResult(
       message: 'تم تحديث بيانات المادة «${updated.name}».',
       changedData: true,
+      affectedRecordId: updated.id,
     );
   }
 
@@ -446,6 +737,7 @@ class AcademicAssistantActionExecutor {
       message:
           'تم حذف المادة «${course.name}» والبيانات التابعة لها بعد تأكيدك.',
       changedData: true,
+      affectedRecordId: course.id,
     );
   }
 
@@ -516,6 +808,7 @@ class AcademicAssistantActionExecutor {
     return AcademicAssistantToolResult(
       message: 'تم إنشاء المهمة «$title»$materialText وحفظها في النظام.',
       changedData: true,
+      affectedRecordId: id,
     );
   }
 
@@ -539,6 +832,7 @@ class AcademicAssistantActionExecutor {
     return AcademicAssistantToolResult(
       message: 'تم تسجيل إنجاز المهمة «${task.title}» مع وقت الإنجاز الفعلي.',
       changedData: true,
+      affectedRecordId: task.id,
     );
   }
 
@@ -609,6 +903,7 @@ class AcademicAssistantActionExecutor {
     return AcademicAssistantToolResult(
       message: 'تم تحديث المهمة «${updated.title}».',
       changedData: true,
+      affectedRecordId: updated.id,
     );
   }
 
@@ -633,6 +928,7 @@ class AcademicAssistantActionExecutor {
     return AcademicAssistantToolResult(
       message: 'تم حذف المهمة «${task.title}».',
       changedData: true,
+      affectedRecordId: task.id,
     );
   }
 
@@ -685,7 +981,6 @@ class AcademicAssistantActionExecutor {
     final location = _string(args, 'location');
     final id = await database.insertSchedule({
       'course_id': course.id,
-      'course_name': course.name,
       'day_of_week': day,
       'start_time': startTime,
       'end_time': endTime,
@@ -706,6 +1001,7 @@ class AcademicAssistantActionExecutor {
       message:
           'تمت إضافة محاضرة ${course.name} يوم $day من $startTime إلى $endTime وربطها بمعرّف المادة.',
       changedData: true,
+      affectedRecordId: id,
     );
   }
 
@@ -782,7 +1078,6 @@ class AcademicAssistantActionExecutor {
     await database.updateSchedule({
       'id': scheduleId,
       'course_id': course.id,
-      'course_name': course.name,
       'day_of_week': day,
       'start_time': startTime,
       'end_time': endTime,
@@ -802,6 +1097,7 @@ class AcademicAssistantActionExecutor {
     return AcademicAssistantToolResult(
       message: 'تم تحديث محاضرة ${course.name} في الجدول الأسبوعي.',
       changedData: true,
+      affectedRecordId: scheduleId,
     );
   }
 
@@ -824,7 +1120,15 @@ class AcademicAssistantActionExecutor {
         message: 'المحاضرة غير موجودة في الجدول.',
       );
     }
-    final courseName = existing['course_name']?.toString() ?? 'المادة';
+    final rawCourseId = existing['course_id'];
+    final courseId = rawCourseId is int
+        ? rawCourseId
+        : int.tryParse(rawCourseId?.toString() ?? '');
+    final courses = await courseUseCases.getCourses();
+    final courseName = courseId == null
+        ? 'المادة'
+        : courses.where((course) => course.id == courseId).firstOrNull?.name ??
+            'المادة';
     if (!confirmed) {
       return AcademicAssistantToolResult(
         message: 'حذف المحاضرة يحتاج إلى تأكيدك.',
@@ -838,6 +1142,7 @@ class AcademicAssistantActionExecutor {
     return AcademicAssistantToolResult(
       message: 'تم حذف المحاضرة من الجدول وإلغاء تنبيهها.',
       changedData: true,
+      affectedRecordId: scheduleId,
     );
   }
 
@@ -868,6 +1173,7 @@ class AcademicAssistantActionExecutor {
       message: 'تم إنشاء الاختبار «$title» بتاريخ ${examDate.toLocal()}'
           '${courseResult.course == null ? '' : ' وربطه بمادة ${courseResult.course!.name}'} (رقم $id).',
       changedData: true,
+      affectedRecordId: id,
     );
   }
 
@@ -906,6 +1212,7 @@ class AcademicAssistantActionExecutor {
     return AcademicAssistantToolResult(
       message: 'تم تحديث الاختبار «${updated.title}».',
       changedData: true,
+      affectedRecordId: id,
     );
   }
 
@@ -932,6 +1239,7 @@ class AcademicAssistantActionExecutor {
     return AcademicAssistantToolResult(
       message: 'تم حذف الاختبار «${exam.title}» بعد تأكيدك.',
       changedData: true,
+      affectedRecordId: id,
     );
   }
 
