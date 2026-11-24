@@ -27,32 +27,7 @@ class AcademicAssistantActionPlanParser {
     try {
       final cleaned = response
           .replaceFirst(RegExp(r'^```(?:json)?\s*', caseSensitive: false), '')
-          .replaceFirst(RegExp(r'\s*```), '')
-          .trim();
-      final decoded = jsonDecode(cleaned);
-      if (decoded is! Map<String, dynamic> || decoded['actions'] is! List) {
-        return null;
-      }
-      final rawActions = decoded['actions'] as List;
-      if (rawActions.length > 10) return null;
-      final actions = <Map<String, dynamic>>[];
-      for (final raw in rawActions) {
-        if (raw is! Map) return null;
-        final action = Map<String, dynamic>.from(raw);
-        if (action['name'] is! String ||
-            !allowedActions.contains(action['name']) ||
-            action['arguments'] is! Map) {
-          return null;
-        }
-        actions.add(action);
-      }
-      return {'reply': decoded['reply']?.toString() ?? '', 'actions': actions};
-    } catch (_) {
-      return null;
-    }
-  }
-}
-), '')
+          .replaceFirst(RegExp(r'\s*```$'), '')
           .trim();
       final decoded = jsonDecode(cleaned);
       if (decoded is! Map<String, dynamic> || decoded['actions'] is! List) {
