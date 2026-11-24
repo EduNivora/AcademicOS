@@ -201,6 +201,41 @@ void main() {
     }
   });
 
+
+  test('material lists load metadata only and fetch attachment bytes on demand', () async {
+    final helper = DatabaseHelper.instance;
+    await helper.close();
+    final courseId = await helper.insertCourse(
+      CourseModel(
+        name: 'Lazy attachment test',
+        instructor: 'Instructor',
+        code: 'LAZY-' + DateTime.now().microsecondsSinceEpoch.toString(),
+      ),
+    );
+    final bytes = Uint8List.fromList([37, 80, 68, 70, 45, 49, 46, 55]);
+    final materialId = await helper.insertMaterial({
+      'course_id': courseId,
+      'title': 'lazy.pdf',
+      'file_path': 'dbblob://lazy',
+      'file_type': 'pdf',
+      'file_bytes': bytes,
+      'created_at': DateTime.now().toIso8601String(),
+    });
+    try {
+      final courseRows = await helper.getMaterialsByCourseId(courseId);
+      final allRows = await helper.getAllMaterials();
+      final courseRow = courseRows.singleWhere((row) => row['id'] == materialId);
+      final allRow = allRows.singleWhere((row) => row['id'] == materialId);
+      expect(courseRow.containsKey('file_bytes'), isFalse);
+      expect(allRow.containsKey('file_bytes'), isFalse);
+      expect(await helper.getMaterialFileBytes(materialId), orderedEquals(bytes));
+    } finally {
+      await helper.deleteMaterial(materialId);
+      await helper.deleteCourse(courseId);
+      await helper.close();
+    }
+  });
+
   test(
     'academic terms enforce uniqueness, active selection, rename links and delete protection',
     () async {

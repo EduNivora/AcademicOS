@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
+import '../../../core/documents/course_material_file_service.dart';
 import '../../../data/database/database_helper.dart';
 import '../../../data/models/course_material_model.dart';
 import '../document_viewer_screen.dart';
@@ -18,6 +19,8 @@ class CourseMaterialsTab extends StatefulWidget {
 class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
   List<CourseMaterialModel> _materials = [];
   bool _isLoading = true;
+  final Set<int> _openingMaterialIds = <int>{};
+  final CourseMaterialFileService _fileService = CourseMaterialFileService();
 
   @override
   void initState() {
@@ -92,44 +95,112 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
   }
 
   Future<void> _openMaterial(CourseMaterialModel material) async {
-    if (material.fileBytes == null || material.fileBytes!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('محتوى هذا المرفق غير متاح أو لم تتم استعادته. أعد إرفاق الملف الأصلي.')),
-      );
-      return;
-    }
-    if (material.fileType == 'txt') {
-      final text = utf8.decode(material.fileBytes!, allowMalformed: true);
-      await showDialog<void>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: Text(material.title),
-          content: SizedBox(
-            width: 520,
-            height: 420,
-            child: SingleChildScrollView(child: SelectableText(text)),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('إغلاق'),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
+    final materialId = material.id;
+    if (materialId == null || _openingMaterialIds.contains(materialId)) return;
+    setState(() => _openingMaterialIds.add(materialId));
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => DocumentViewerScreen(
-          filePath: material.filePath,
+    PreparedMaterialFile? preparedPdf;
+    try {
+      final extension = material.fileType.toLowerCase().replaceFirst('.', '');
+      final bytes = await _fileService.loadMaterialBytes(materialId);
+      if (!mounted) return;
+
+      if (extension == 'txt') {
+        final text = utf8.decode(bytes, allowMalformed: true);
+        await showDialog<void>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: Text(material.title),
+            content: SizedBox(
+              width: 520,
+              height: 420,
+              child: SingleChildScrollView(child: SelectableText(text)),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('إغلاق'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
+      if (extension == 'pdf') {
+        preparedPdf = await _fileService.preparePdfForViewing(
+          materialId: materialId,
           title: material.title,
-          fileBytes: material.fileBytes,
-        ),
-      ),
-    );
+          fileType: material.fileType,
+          bytes: bytes,
+        );
+        if (!mounted) {
+          await preparedPdf.delete();
+          preparedPdf = null;
+          return;
+        }
+        try {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => DocumentViewerScreen(
+                filePath: preparedPdf!.file.path,
+                title: material.title,
+              ),
+            ),
+          );
+          // The viewer owns cleanup after the PDF native handle is closed.
+          preparedPdf = null;
+        } catch (_) {
+          await preparedPdf?.delete();
+          preparedPdf = null;
+          rethrow;
+        }
+        return;
+      }
+
+      if (const {'doc', 'docx', 'ppt', 'pptx'}.contains(extension)) {
+        final status = await _fileService.openOfficeExternally(
+          materialId: materialId,
+          title: material.title,
+          fileType: material.fileType,
+          bytes: bytes,
+        );
+        if (!mounted) return;
+        final message = switch (status) {
+          ExternalMaterialOpenStatus.opened =>
+            'تم إرسال الملف إلى التطبيق الخارجي. سيبقى الملف المؤقت متاحاً لفترة آمنة.',
+          ExternalMaterialOpenStatus.noApp =>
+            'لا يوجد تطبيق مثبت يستطيع فتح هذا النوع من الملفات.',
+          ExternalMaterialOpenStatus.unsupportedPlatform =>
+            'فتح ملفات Office خارجياً غير متاح على هذه المنصة.',
+          ExternalMaterialOpenStatus.failed =>
+            'تعذر فتح الملف خارجياً. تحقق من صلاحيات التطبيق وحاول مجدداً.',
+        };
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('نوع الملف غير مدعوم للعرض.')),
+      );
+    } on MaterialFileUnavailableException catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    } on UnsupportedMaterialFormatException catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    } catch (error) {
+      debugPrint('Opening course material failed: $error');
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذر تجهيز الملف للعرض. لم يتم تعديل المرفق الأصلي.')),
+      );
+    } finally {
+      await preparedPdf?.delete();
+      if (mounted) setState(() => _openingMaterialIds.remove(materialId));
+    }
   }
 
   Future<void> _deleteMaterial(int id) async {
@@ -218,9 +289,16 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
                           leading: _fileBadge(m.fileType),
                           title: Text(m.title),
                           subtitle: Text(m.fileType.toUpperCase()),
-                          trailing: IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () => _deleteMaterial(m.id!)),
+                          trailing: _openingMaterialIds.contains(m.id)
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : IconButton(
+                                  icon: const Icon(Icons.delete, color: Colors.red),
+                                  onPressed: () => _deleteMaterial(m.id!),
+                                ),
                           onTap: () => _openMaterial(m),
                         );
                       },

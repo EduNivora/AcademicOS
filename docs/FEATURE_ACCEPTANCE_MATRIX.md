@@ -185,3 +185,11 @@ The Phase 0 branch is not accepted until exact-head CI passes. The Phase 1 accep
 | Backup/restore product capability | Explicitly excluded in product scope and architecture | IMPLEMENTED — NOT VERIFIED | Final search and exact-head CI |
 
 Report export is a TXT report only. It must not be treated as backup/export of the academic database.
+
+
+## Phase 3 — document viewer and lazy attachment loading
+
+- PDF is opened in-app through pdfx; Office files are handed to installed platform apps through open_filex.
+- Course-material list queries return metadata only. The selected attachment BLOB is fetched only after an explicit open action.
+- PDF summary is a separate local pipeline. Scanned/image-only PDFs are reported as non-extractable; OCR and remote document processing are not implied.
+- Exact acceptance evidence is tracked in docs/PHASE_3_ACCEPTANCE.md and docs/DOCUMENT_VIEWER_ARCHITECTURE.md.
