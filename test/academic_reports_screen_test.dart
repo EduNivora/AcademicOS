@@ -37,7 +37,6 @@ void main() {
 
       expect(find.text('التقارير الأكاديمية'), findsOneWidget);
       expect(find.text('إنشاء التقرير الأسبوعي'), findsOneWidget);
-
     },
   );
 }
