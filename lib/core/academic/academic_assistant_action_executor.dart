@@ -549,7 +549,9 @@ class AcademicAssistantActionExecutor {
                   : description.isEmpty || task.description == description) &&
               (!(isCreate || priority.isNotEmpty) ||
                   task.priority == TaskPriorityX.fromName(priority)) &&
-              (!isCreate || task.type == TaskTypeX.fromName(type)) &&
+              (isCreate
+                  ? task.type == TaskTypeX.fromName(type)
+                  : type.isEmpty || task.type == TaskTypeX.fromName(type)) &&
               (!isCreate || task.startDateTime != null) &&
               (isCreate
                   ? endDate == null
@@ -1073,12 +1075,24 @@ class AcademicAssistantActionExecutor {
             'موعد التنبيه المحسوب أصبح في الماضي. اختر وقت انتهاء أبعد أو عطّل التنبيه.',
       );
     }
+    final type = _string(args, 'type');
+    final courseSpecified =
+        args.containsKey('course_id') || _string(args, 'course_name').isNotEmpty;
+    final courseResult = courseSpecified ? await _resolveCourse(args) : null;
+    if (courseResult?.error != null || (courseSpecified && courseResult?.course == null)) {
+      return AcademicAssistantToolResult(
+        message: courseResult?.error ?? 'لم أتمكن من تحديد المادة المطلوبة.',
+      );
+    }
     final updated = task.copyWith(
       title: title.isEmpty ? null : title,
       description: description.isEmpty ? null : description,
+      type: type.isEmpty ? null : TaskTypeX.fromName(type),
       priority: _string(args, 'priority').isEmpty
           ? null
           : TaskPriorityX.fromName(_string(args, 'priority')),
+      courseId: courseResult?.course?.id,
+      courseName: courseResult?.course?.name,
       endDateTime: newEndDateTime,
       reminderEnabled: reminderEnabled,
       reminderOffsetMinutes: reminderOffset,
