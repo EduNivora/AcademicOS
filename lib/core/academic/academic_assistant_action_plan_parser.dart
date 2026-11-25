@@ -8,6 +8,7 @@ class AcademicAssistantActionPlanParser {
   static const Set<String> allowedActions = {
     'update_profile',
     'create_material',
+    'add_material_file',
     'update_material',
     'delete_material',
     'create_task',
