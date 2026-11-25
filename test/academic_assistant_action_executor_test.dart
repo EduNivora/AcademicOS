@@ -251,6 +251,53 @@ void main() {
     );
 
     test(
+      'updates a task type and course link and verifies persisted values',
+      () async {
+        courseRepository.courses.addAll([
+          const CourseEntity(
+            id: 7,
+            name: 'المادة القديمة',
+            instructor: 'محاضر',
+            code: 'OLD-7',
+          ),
+          const CourseEntity(
+            id: 8,
+            name: 'المادة الجديدة',
+            instructor: 'محاضر',
+            code: 'NEW-8',
+          ),
+        ]);
+        taskRepository.tasks.add(
+          const TaskEntity(
+            id: 31,
+            title: 'مشروع الفصل',
+            description: 'وصف المشروع',
+            type: TaskType.homework,
+            courseId: 7,
+            courseName: 'المادة القديمة',
+          ),
+        );
+        const call = AcademicAssistantToolCall(
+          name: 'update_task',
+          arguments: {
+            'task_id': 31,
+            'type': 'project',
+            'course_name': 'المادة الجديدة',
+          },
+        );
+        final pending = await executor.execute(call);
+        expect(pending.requiresConfirmation, isTrue);
+        final result = await executor.execute(call, confirmed: true);
+
+        expect(result.changedData, isTrue);
+        expect(taskRepository.tasks.single.type, TaskType.project);
+        expect(taskRepository.tasks.single.courseId, 8);
+        expect(taskRepository.tasks.single.courseName, 'المادة الجديدة');
+        expect(await executor.verifyPostcondition(call, result), isTrue);
+      },
+    );
+
+    test(
       'rejects unsupported file types before saving to a material',
       () async {
         courseRepository.courses.add(
