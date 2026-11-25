@@ -313,7 +313,6 @@ $userMessage''';
   Future<String> _executeActionPlan(Map<String, dynamic> plan) async {
     final messages = <String>[];
     final lead = plan['reply']?.toString().trim() ?? '';
-    if (lead.isNotEmpty) messages.add(lead);
     final actions = plan['actions'] as List? ?? const [];
     for (final raw in actions) {
       if (raw is! Map) continue;
@@ -322,6 +321,9 @@ $userMessage''';
       );
       messages.add(await _executeTool(call));
       if (_lastToolExecutionVerified == false) break;
+    }
+    if (_lastToolExecutionVerified && lead.isNotEmpty) {
+      messages.insert(0, lead);
     }
     return messages.isEmpty
         ? 'لم ينتج عن الطلب إجراء واضح. وضّح ما تريد تنفيذه.'
