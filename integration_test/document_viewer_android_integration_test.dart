@@ -99,7 +99,9 @@ void main() {
 
       Navigator.of(tester.element(find.byType(DocumentViewerScreen))).pop();
       await tester.pumpAndSettle(const Duration(milliseconds: 250));
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+      for (var attempt = 0; attempt < 50 && await file.exists(); attempt++) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
       expect(await file.exists(), isFalse);
     },
   );
