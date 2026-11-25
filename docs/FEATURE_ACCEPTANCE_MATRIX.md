@@ -152,3 +152,20 @@ This addendum supersedes stale CI/PR references above where they conflict with t
 - Google Drive backup, encrypted archive, restore and scheduled backup remain deferred to Release 2 by approved scope. Production SQLite encryption is not accepted for Release 1.
 
 Do not mark Release 1 ready from the backend or bundle checks alone. The exact-head Flutter gate, real auth/JWT flows, deployed API verification, Web origin/CORS, first-admin bootstrap, and platform runtime acceptance remain release blockers.
+
+
+## Phase 0 baseline acceptance — 2026-11-24
+
+Baseline SHA: `989ad5212971097df868dabab557c1c076d91720`.
+
+| Feature / gate | Evidence | State | Remaining |
+|---|---|---|---|
+| Repository identity and baseline | Public repository, default branch `main`, exact SHA verified through GitHub refs API | COMPLETED | Refresh before merge |
+| PR inventory and integration dependencies | 53 PRs: 36 open, 17 closed, 12 merged; detailed active overlap map in `docs/PR_INTEGRATION_MAP.md` | COMPLETED | Refresh before merge |
+| Mainline quality baseline | Actions run [#45433357599](https://github.com/EduNivora/AcademicOS/actions/runs/45433357599) succeeded on exact baseline SHA | COMPLETED | Re-run on this branch |
+| Flutter `tee` failure propagation | Strict Bash pipefail applied to all relevant tee pipelines in the workflow | IMPLEMENTED — NOT VERIFIED | Exact-head CI |
+| Android emulator failures on #57/#58 | Flutter tests and analysis passed; emulator failed independently with debug log-reader/system_server instability | BLOCKED | Stable fresh emulator run |
+| Phase 1 backup removal | No source changes yet in this PR | NOT STARTED | Separate Phase 1 PR |
+| Academic report preservation | Dedicated report screen is already launched from home; report service and unit tests exist | COMPLETED for current implementation | Keep independent in Phase 1 |
+
+The Phase 0 branch is not accepted until exact-head CI passes. The Phase 1 acceptance matrix will be updated in its own PR.

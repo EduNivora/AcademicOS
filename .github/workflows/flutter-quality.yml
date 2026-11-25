@@ -2,7 +2,7 @@ name: Flutter quality gate
 
 on:
   pull_request:
-    branches: [main, chore/edunivora-phase0-execution, feat/durable-attachment-storage, feat/google-neon-auth-native]
+    branches: [main, chore/edunivora-phase0-execution, chore/phase0-baseline-ci-hardening, feat/durable-attachment-storage, feat/google-neon-auth-native]
   push:
     branches: [main]
   workflow_dispatch:
@@ -23,6 +23,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Set up Java
         uses: actions/setup-java@v5
@@ -62,7 +64,37 @@ jobs:
           ls "$ANDROID_HOME/ndk" || true
 
       - name: Resolve dependencies
-        run: flutter pub get 2>&1 | tee pub-get.log
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter pub get 2>&1 | tee pub-get.log
+
+      - name: Verify formatting of changed Dart files
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+        run: |
+          set -euo pipefail
+          # These legacy files already fail the repository-wide formatter baseline;
+          # avoid unrelated formatting churn while checking the other changed Dart files.
+          mapfile -t changed_dart_files < <(
+            git diff --name-only --diff-filter=ACMRT "$BASE_SHA" "$GITHUB_SHA" -- '*.dart' |
+              sed -e '/^lib\/data\/database\/database_helper\.dart$/d' \
+                  -e '/^lib\/data\/models\/course_model\.dart$/d' \
+                  -e '/^lib\/data\/models\/exam_model\.dart$/d' \
+                  -e '/^lib\/data\/models\/task_model\.dart$/d' \
+                  -e '/^test\/academic_report_service_test\.dart$/d'
+          )
+          if (("${#changed_dart_files[@]}" > 0)); then
+            if ! dart format --output=none --set-exit-if-changed "${changed_dart_files[@]}"; then
+              echo "::group::Formatted Dart output for correction"
+              dart format --output=show "${changed_dart_files[@]}"
+              echo "::endgroup::"
+              exit 1
+            fi
+          else
+            echo "No in-scope changed Dart files to format."
+          fi
 
       - name: Generate Android and iOS launcher icons from approved brand asset
         run: dart run flutter_launcher_icons
@@ -158,7 +190,9 @@ jobs:
 
       - name: Run tests
         shell: bash
-        run: flutter test --no-pub 2>&1 | tee flutter-test.log
+        run: |
+          set -euo pipefail
+          flutter test --no-pub 2>&1 | tee flutter-test.log
 
       - name: Verify native SQLite on Android emulator
         uses: reactivecircus/android-emulator-runner@v2
@@ -169,12 +203,14 @@ jobs:
           target: default
           arch: x86_64
           profile: pixel_2
+          cores: 4
+          memory: 4096
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           disable-animations: true
           # This action executes each newline as a separate shell command, so keep the
           # complete POSIX shell program on one folded line.
           script: >-
-            test_file=integration_test/database_android_integration_test.dart; for attempt in 1 2; do if timeout 120 adb wait-for-device; then boot_ready=0; for probe in $(seq 1 30); do boot_state="$(timeout 2 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"; if [ "$boot_state" = "1" ]; then boot_ready=1; break; fi; sleep 2; done; if [ "$boot_ready" -eq 1 ] && timeout 300 flutter test "$test_file" --no-pub; then exit 0; fi; fi; echo "Android SQLite integration attempt $attempt failed."; adb devices -l || true; if [ "$attempt" -lt 2 ]; then adb reconnect || true; sleep 15; fi; done; echo "Android SQLite integration test failed after bounded retries."; adb logcat -d -t 2000 || true; adb shell getprop sys.boot_completed || true; exit 1
+            test_file=integration_test/database_android_integration_test.dart; for attempt in 1 2; do if timeout 120 adb wait-for-device; then boot_ready=0; for probe in $(seq 1 30); do boot_state="$(timeout 2 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"; if [ "$boot_state" = "1" ]; then boot_ready=1; break; fi; sleep 2; done; package_ready=0; if [ "$boot_ready" -eq 1 ]; then for package_probe in $(seq 1 60); do if timeout 5 adb shell cmd package list packages >/dev/null 2>&1; then package_ready=1; break; fi; sleep 5; done; fi; if [ "$boot_ready" -eq 1 ] && [ "$package_ready" -eq 1 ]; then sleep 10; if timeout 300 flutter test "$test_file" --no-pub; then exit 0; fi; fi; fi; echo "Android SQLite integration attempt $attempt failed (boot_ready=$boot_ready package_ready=$package_ready)."; timeout 10 adb devices -l || true; if [ "$attempt" -lt 2 ]; then timeout 10 adb reconnect || true; sleep 15; fi; done; echo "Android SQLite integration test failed after bounded retries."; timeout 20 adb logcat -d -t 2000 || true; timeout 10 adb shell getprop sys.boot_completed || true; exit 1
 
       - name: Prepare optional production signing
         shell: bash
@@ -268,10 +304,16 @@ jobs:
           df -h /
 
       - name: Build Android debug APK
-        run: flutter build apk --debug --no-pub 2>&1 | tee android-build.log
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter build apk --debug --no-pub 2>&1 | tee android-build.log
 
       - name: Build Web release
-        run: flutter build web --release --no-pub 2>&1 | tee web-build.log
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter build web --release --no-pub 2>&1 | tee web-build.log
 
       - name: Verify Android APK package and launcher icon
         shell: bash
