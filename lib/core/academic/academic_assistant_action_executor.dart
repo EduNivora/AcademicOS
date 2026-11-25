@@ -1172,6 +1172,12 @@ class AcademicAssistantActionExecutor {
       );
     }
     final location = _string(args, 'location');
+    final reminderEnabled = args['reminder_enabled'] is bool
+        ? args['reminder_enabled'] as bool
+        : true;
+    final reminderOffset = (_integer(args['reminder_offset_minutes']) ?? 15)
+        .clamp(0, 1440)
+        .toInt();
     final existingSchedules = await database.getSchedules();
     final duplicateSchedule = existingSchedules.any(
       (row) =>
@@ -1192,17 +1198,17 @@ class AcademicAssistantActionExecutor {
       'start_time': startTime,
       'end_time': endTime,
       'location': location,
-      'reminder_enabled': 1,
-      'reminder_offset_minutes': 15,
+      'reminder_enabled': reminderEnabled ? 1 : 0,
+      'reminder_offset_minutes': reminderOffset,
     });
     await NotificationService.instance.scheduleLectureReminder(
       id: id,
       title: course.name,
       weekdayName: day,
       startTime: startTime,
-      reminderEnabled: true,
+      reminderEnabled: reminderEnabled,
       location: location,
-      reminderOffsetMinutes: 15,
+      reminderOffsetMinutes: reminderOffset,
     );
     return AcademicAssistantToolResult(
       message:
