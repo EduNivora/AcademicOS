@@ -204,7 +204,6 @@ jobs:
           arch: x86_64
           profile: pixel_2
           cores: 4
-          memory: 4096
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           disable-animations: true
           # This action executes each newline as a separate shell command, so keep the
