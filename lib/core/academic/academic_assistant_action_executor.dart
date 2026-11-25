@@ -631,13 +631,22 @@ class AcademicAssistantActionExecutor {
           final date = _date(call.arguments['exam_date']);
           final location = _string(call.arguments, 'location');
           final notes = _string(call.arguments, 'notes');
-          final courseResult = await _resolveCourse(call.arguments);
+          final courseSpecified =
+              call.arguments.containsKey('course_id') ||
+              _string(call.arguments, 'course_name').isNotEmpty;
+          final courseResult = courseSpecified
+              ? await _resolveCourse(call.arguments)
+              : null;
+          if (courseSpecified &&
+              (courseResult!.error != null || courseResult.course == null)) {
+            return false;
+          }
           return (title.isEmpty || exam.title == title) &&
               (date == null || exam.examDate.isAtSameMomentAs(date)) &&
               (location.isEmpty || exam.location == location) &&
               (notes.isEmpty || exam.notes == notes) &&
-              (courseResult.course == null ||
-                  exam.courseId == courseResult.course!.id);
+              (!courseSpecified ||
+                  exam.courseId == courseResult!.course!.id);
         case 'delete_exam':
           if (id == null) return false;
           return await database.getExamById(id) == null;
