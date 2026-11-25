@@ -98,7 +98,8 @@ void main() {
       expect(find.text('1 / 1'), findsOneWidget);
 
       Navigator.of(tester.element(find.byType(DocumentViewerScreen))).pop();
-      await tester.pumpAndSettle(const Duration(milliseconds: 250));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
       for (var attempt = 0; attempt < 50 && await file.exists(); attempt++) {
         await Future<void>.delayed(const Duration(milliseconds: 100));
       }
