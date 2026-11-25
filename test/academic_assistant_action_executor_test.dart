@@ -205,6 +205,52 @@ void main() {
     );
 
     test(
+      'persists requested lecture reminder settings and verifies the saved row',
+      () async {
+        final database = DatabaseHelper.instance;
+        await database.close();
+        courseRepository.courses.add(
+          const CourseEntity(
+            id: 902,
+            name: 'اختبار إعدادات التذكير',
+            instructor: 'محاضر',
+            code: 'REM-902',
+          ),
+        );
+        int? scheduleId;
+        try {
+          const call = AcademicAssistantToolCall(
+            name: 'add_lecture',
+            arguments: {
+              'course_name': 'اختبار إعدادات التذكير',
+              'day': 'السبت',
+              'start_time': '23:00',
+              'end_time': '23:59',
+              'location': 'قاعة الاختبار',
+              'reminder_enabled': false,
+              'reminder_offset_minutes': 30,
+            },
+          );
+          final result = await executor.execute(call);
+          scheduleId = result.affectedRecordId;
+          expect(result.succeeded, isTrue);
+          expect(result.changedData, isTrue);
+          expect(scheduleId, isNotNull);
+          expect(await executor.verifyPostcondition(call, result), isTrue);
+
+          final saved = (await database.getSchedules()).singleWhere(
+            (row) => row['id'] == scheduleId,
+          );
+          expect(saved['reminder_enabled'], 0);
+          expect(saved['reminder_offset_minutes'], 30);
+        } finally {
+          if (scheduleId != null) await database.deleteSchedule(scheduleId!);
+          await database.close();
+        }
+      },
+    );
+
+    test(
       'rejects unsupported file types before saving to a material',
       () async {
         courseRepository.courses.add(
