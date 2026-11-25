@@ -645,8 +645,7 @@ class AcademicAssistantActionExecutor {
               (date == null || exam.examDate.isAtSameMomentAs(date)) &&
               (location.isEmpty || exam.location == location) &&
               (notes.isEmpty || exam.notes == notes) &&
-              (!courseSpecified ||
-                  exam.courseId == courseResult!.course!.id);
+              (!courseSpecified || exam.courseId == courseResult!.course!.id);
         case 'delete_exam':
           if (id == null) return false;
           return await database.getExamById(id) == null;
