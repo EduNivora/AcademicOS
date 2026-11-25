@@ -67,19 +67,37 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: DocumentViewerScreen(
-            filePath: file.path,
-            title: 'integration.pdf',
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: Center(
+                child: TextButton(
+                  key: const Key('open-pdf-integration'),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => DocumentViewerScreen(
+                          filePath: file.path,
+                          title: 'integration.pdf',
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Text('Open PDF'),
+                ),
+              ),
+            ),
           ),
         ),
       );
+      await tester.tap(find.byKey(const Key('open-pdf-integration')));
+      await tester.pump();
       for (var attempt = 0; attempt < 40; attempt++) {
         await tester.pump(const Duration(milliseconds: 250));
         if (find.text('1 / 1').evaluate().isNotEmpty) break;
       }
       expect(find.text('1 / 1'), findsOneWidget);
 
-      await tester.pageBack();
+      Navigator.of(tester.element(find.byType(DocumentViewerScreen))).pop();
       await tester.pumpAndSettle(const Duration(milliseconds: 250));
       await Future<void>.delayed(const Duration(milliseconds: 100));
       expect(await file.exists(), isFalse);
