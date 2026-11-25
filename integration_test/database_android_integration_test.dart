@@ -18,9 +18,7 @@ void main() {
       debugPrint(
         '[SQLite integration] Android=${Platform.operatingSystemVersion}',
       );
-      debugPrint(
-        '[SQLite integration] factory=${databaseFactory.runtimeType}',
-      );
+      debugPrint('[SQLite integration] factory=${databaseFactory.runtimeType}');
 
       final helper = DatabaseHelper.instance;
       await helper.close();
@@ -60,27 +58,32 @@ void main() {
 
         final marker =
             'android-sqlite-${DateTime.now().microsecondsSinceEpoch}';
-        insertedTaskId = await firstOpen.insert('tasks', {
+        final taskId = await firstOpen.insert('tasks', {
           'title': marker,
           'description': 'Native Android SQLite persistence verification',
         });
-        insertedCourseId = await firstOpen.insert('courses', {
+        insertedTaskId = taskId;
+
+        final courseId = await firstOpen.insert('courses', {
           'name': '$marker course',
           'instructor': 'SQLite integration',
           'code': 'ANDROID-${DateTime.now().microsecondsSinceEpoch}',
         });
-        insertedMaterialId = await firstOpen.insert('course_materials', {
-          'course_id': insertedCourseId,
+        insertedCourseId = courseId;
+
+        final materialId = await firstOpen.insert('course_materials', {
+          'course_id': courseId,
           'title': 'android-persistence.pdf',
           'file_path': 'dbblob://$marker',
           'file_type': 'pdf',
           'file_bytes': attachmentBytes,
         });
+        insertedMaterialId = materialId;
 
         final taskBeforeClose = await firstOpen.query(
           'tasks',
           where: 'id = ?',
-          whereArgs: [insertedTaskId],
+          whereArgs: [taskId],
         );
         expect(taskBeforeClose, hasLength(1));
         expect(taskBeforeClose.single['title'], marker);
@@ -88,13 +91,11 @@ void main() {
         final materialBeforeClose = await firstOpen.query(
           'course_materials',
           where: 'id = ?',
-          whereArgs: [insertedMaterialId],
+          whereArgs: [materialId],
         );
         expect(materialBeforeClose, hasLength(1));
         expect(
-          List<int>.from(
-            materialBeforeClose.single['file_bytes'] as Uint8List,
-          ),
+          List<int>.from(materialBeforeClose.single['file_bytes'] as Uint8List),
           orderedEquals(attachmentBytes),
         );
 
@@ -106,7 +107,7 @@ void main() {
         final taskAfterReopen = await reopened.query(
           'tasks',
           where: 'id = ?',
-          whereArgs: [insertedTaskId],
+          whereArgs: [taskId],
         );
         expect(taskAfterReopen, hasLength(1));
         expect(taskAfterReopen.single['title'], marker);
@@ -118,7 +119,7 @@ void main() {
         final materialAfterReopen = await reopened.query(
           'course_materials',
           where: 'id = ?',
-          whereArgs: [insertedMaterialId],
+          whereArgs: [materialId],
         );
         expect(materialAfterReopen, hasLength(1));
         final persistedBytes =
