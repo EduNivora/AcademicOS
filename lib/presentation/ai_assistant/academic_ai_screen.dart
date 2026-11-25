@@ -169,12 +169,14 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
         ),
         result,
       );
-      if (mounted) setState(() => _pendingAttachment = null);
       await widget.onDataChanged?.call();
       if (!verified) {
+        if (mounted) setState(() => _pendingAttachment = null);
         return 'تمت محاولة حفظ الملف، لكن تعذر تأكيد مطابقته في قاعدة البيانات بعد إعادة القراءة. لم أبلغ عن نجاح الحفظ؛ راجع المرفقات قبل إعادة المحاولة لتجنب التكرار.';
       }
     }
+    // Clear the pending upload after both a new save and an already-stored duplicate.
+    if (mounted) setState(() => _pendingAttachment = null);
     return result.message;
   }
 
