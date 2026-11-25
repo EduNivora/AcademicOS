@@ -244,7 +244,7 @@ void main() {
           expect(saved['reminder_enabled'], 0);
           expect(saved['reminder_offset_minutes'], 30);
         } finally {
-          if (scheduleId != null) await database.deleteSchedule(scheduleId!);
+          if (scheduleId != null) await database.deleteSchedule(scheduleId);
           await database.close();
         }
       },
