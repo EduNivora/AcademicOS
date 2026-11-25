@@ -477,6 +477,19 @@ void main() {
           await executor.verifyPostcondition(updateExamCall, updated),
           isTrue,
         );
+        final invalidCourseCall = AcademicAssistantToolCall(
+          name: 'update_exam',
+          arguments: {
+            'exam_id': saved.id,
+            'title': 'اختبار الشبكات النهائي',
+            'exam_date': '2027-02-16T10:00:00.000',
+            'course_name': 'مادة غير موجودة',
+          },
+        );
+        expect(
+          await executor.verifyPostcondition(invalidCourseCall, updated),
+          isFalse,
+        );
         expect(updated.changedData, isTrue);
         expect(
           (await database.getExamById(saved.id!))?.title,
