@@ -24,6 +24,28 @@ void main() {
     expect(result['actions'], hasLength(1));
   });
 
+  test('accepts an attachment action supported by the executor', () {
+    final result = parser.parse(
+      jsonEncode({
+        'actions': [
+          {
+            'name': 'add_material_file',
+            'arguments': {
+              'course_name': 'أمن الشبكات',
+              'file_name': 'lecture.pdf',
+              'file_type': 'pdf',
+              'file_bytes': [37, 80, 68, 70],
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(result, isNotNull);
+    expect(result!['actions'], hasLength(1));
+    expect(result['actions'].single['name'], 'add_material_file');
+  });
+
   test('rejects malformed JSON without producing an action plan', () {
     expect(parser.parse('{"actions": ['), isNull);
   });
