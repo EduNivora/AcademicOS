@@ -314,6 +314,11 @@ $userMessage''';
     final messages = <String>[];
     final lead = plan['reply']?.toString().trim() ?? '';
     final actions = plan['actions'] as List? ?? const [];
+    if (actions.isEmpty) {
+      return lead.isEmpty
+          ? 'لم يتم تنفيذ أي إجراء. وضّح البيانات المطلوبة أو أعد صياغة الطلب.'
+          : '$lead\n\nلم يتم تنفيذ أي إجراء أو تغيير في البيانات.';
+    }
     for (final raw in actions) {
       if (raw is! Map) continue;
       final call = AcademicAssistantToolCall.fromJson(
