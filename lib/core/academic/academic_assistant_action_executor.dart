@@ -1077,9 +1077,11 @@ class AcademicAssistantActionExecutor {
     }
     final type = _string(args, 'type');
     final courseSpecified =
-        args.containsKey('course_id') || _string(args, 'course_name').isNotEmpty;
+        args.containsKey('course_id') ||
+        _string(args, 'course_name').isNotEmpty;
     final courseResult = courseSpecified ? await _resolveCourse(args) : null;
-    if (courseResult?.error != null || (courseSpecified && courseResult?.course == null)) {
+    if (courseResult?.error != null ||
+        (courseSpecified && courseResult?.course == null)) {
       return AcademicAssistantToolResult(
         message: courseResult?.error ?? 'لم أتمكن من تحديد المادة المطلوبة.',
       );
