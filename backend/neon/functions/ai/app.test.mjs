@@ -9,7 +9,11 @@ const createPool = ({ minuteExceeded = false, dayExceeded = false, unavailable =
     calls,
     async query(sql) {
       if (unavailable) throw new Error("database unavailable");
-      if (sql === "SELECT 1 FROM public.ai_usage_windows LIMIT 0") {\n        if (quotaTableMissing) throw new Error("relation public.ai_usage_windows does not exist");\n        return { rows: [] };\n      }\n      if (sql === "SELECT 1") return { rows: [{ "?column?": 1 }] };
+      if (sql === "SELECT 1 FROM public.ai_usage_windows LIMIT 0") {
+        if (quotaTableMissing) throw new Error("relation public.ai_usage_windows does not exist");
+        return { rows: [] };
+      }
+      if (sql === "SELECT 1") return { rows: [{ "?column?": 1 }] };
       throw new Error("unexpected pool query");
     },
     async connect() {
