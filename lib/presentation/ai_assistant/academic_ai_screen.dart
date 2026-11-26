@@ -64,7 +64,8 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
   bool _isCheckingSession = true;
   bool _hasCloudSession = false;
   bool _isGeminiReady = false;
-  bool _lastToolExecutionVerified = true;
+  late final Future<bool> _ledgerRecovery;
+  int _interruptedRunsDetected = 0;
 
   @override
   void initState() {
@@ -73,7 +74,21 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
       courseUseCases: widget.courseUseCases,
       taskUseCases: widget.taskUseCases,
     );
+    _ledgerRecovery = _recoverAssistantLedger();
     _refreshSessionState();
+  }
+
+  Future<bool> _recoverAssistantLedger() async {
+    try {
+      final recovered = await DatabaseHelper.instance.recoverInterruptedAssistantRuns();
+      if (recovered > 0 && mounted) {
+        setState(() => _interruptedRunsDetected = recovered);
+      }
+      return true;
+    } catch (error) {
+      debugPrint('Assistant execution ledger recovery failed: \${error.runtimeType}');
+      return false;
+    }
   }
 
   Future<void> _refreshSessionState() async {
@@ -130,7 +145,7 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
     final file = _pendingAttachment;
     if (file == null) return 'لا يوجد ملف مرفق.';
     if (!RegExp(r'(أضف|اضف|أرفق|ارفق|احفظ|حفظ)').hasMatch(instruction)) {
-      return 'الملف «${file.name}» مرفق. اكتب مثلاً: أضف الملف إلى مادة أمن الشبكات.';
+      return 'الملف «\${file.name}» مرفق. اكتب مثلاً: أضف الملف إلى مادة أمن الشبكات.';
     }
     final match = RegExp(r'مادة\s+(.+)$').firstMatch(instruction);
     if (match == null) {
@@ -142,42 +157,22 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
         .replaceAll(RegExp(r'[،,.]+$'), '')
         .trim();
     if (courseName.isEmpty) return 'اكتب اسم المادة بوضوح.';
-    final extension = (file.extension ?? file.name.split('.').last)
-        .toLowerCase();
-    final result = await _actionExecutor.execute(
-      AcademicAssistantToolCall(
-        name: 'add_material_file',
-        arguments: {
-          'course_name': courseName,
-          'file_name': file.name,
-          'file_type': extension,
-          'file_bytes': file.bytes!,
-        },
-      ),
+
+    final extension = (file.extension ?? file.name.split('.').last).toLowerCase();
+    final call = AcademicAssistantToolCall(
+      name: 'add_material_file',
+      arguments: {
+        'course_name': courseName,
+        'file_name': file.name,
+        'file_type': extension,
+        'file_bytes': file.bytes!,
+      },
     );
-    if (!result.succeeded) return result.message;
-    if (result.changedData) {
-      final verified = await _actionExecutor.verifyPostcondition(
-        AcademicAssistantToolCall(
-          name: 'add_material_file',
-          arguments: {
-            'course_name': courseName,
-            'file_name': file.name,
-            'file_type': extension,
-            'file_bytes': file.bytes!,
-          },
-        ),
-        result,
-      );
-      await widget.onDataChanged?.call();
-      if (!verified) {
-        if (mounted) setState(() => _pendingAttachment = null);
-        return 'تمت محاولة حفظ الملف، لكن تعذر تأكيد مطابقته في قاعدة البيانات بعد إعادة القراءة. لم أبلغ عن نجاح الحفظ؛ راجع المرفقات قبل إعادة المحاولة لتجنب التكرار.';
-      }
+    final run = await _executeTrackedActions([call], source: 'attachment');
+    if (mounted && (run.succeeded || run.changedData)) {
+      setState(() => _pendingAttachment = null);
     }
-    // Clear the pending upload after both a new save and an already-stored duplicate.
-    if (mounted) setState(() => _pendingAttachment = null);
-    return result.message;
+    return run.message;
   }
 
   void _showMessage(String message) {
@@ -311,85 +306,471 @@ $userMessage''';
   }
 
   Future<String> _executeActionPlan(Map<String, dynamic> plan) async {
-    final messages = <String>[];
     final lead = plan['reply']?.toString().trim() ?? '';
     final actions = plan['actions'] as List? ?? const [];
     if (actions.isEmpty) {
       return lead.isEmpty
           ? 'لم يتم تنفيذ أي إجراء. وضّح البيانات المطلوبة أو أعد صياغة الطلب.'
-          : '$lead\n\nلم يتم تنفيذ أي إجراء أو تغيير في البيانات.';
+          : '\$lead\n\nلم يتم تنفيذ أي إجراء أو تغيير في البيانات.';
     }
+
+    final calls = <AcademicAssistantToolCall>[];
     for (final raw in actions) {
-      if (raw is! Map) continue;
-      final call = AcademicAssistantToolCall.fromJson(
-        Map<String, dynamic>.from(raw),
-      );
-      messages.add(await _executeTool(call));
-      if (_lastToolExecutionVerified == false) break;
+      if (raw is! Map) {
+        return 'الخطة غير صالحة. لم يتم تنفيذ أي إجراء.';
+      }
+      calls.add(AcademicAssistantToolCall.fromJson(Map<String, dynamic>.from(raw)));
     }
-    if (_lastToolExecutionVerified && lead.isNotEmpty) {
-      messages.insert(0, lead);
-    }
-    return messages.isEmpty
-        ? 'لم ينتج عن الطلب إجراء واضح. وضّح ما تريد تنفيذه.'
-        : messages.join('\n\n');
+    return (await _executeTrackedActions(
+      calls,
+      source: 'cloud_plan',
+      lead: lead,
+    )).message;
   }
 
   Future<String?> _runLocalCommand(String input) async {
     final call = const AcademicAssistantCommandParser().parse(input);
     if (call == null) return null;
-    return _executeTool(call);
+    return (await _executeTrackedActions(
+      [call],
+      source: 'local_command',
+    )).message;
   }
 
-  Future<String> _executeTool(AcademicAssistantToolCall call) async {
-    _lastToolExecutionVerified = true;
-    try {
-      var result = await _actionExecutor.execute(call);
-      if (result.requiresConfirmation) {
-        if (!mounted) return 'تعذر عرض تأكيد العملية.';
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (dialogContext) => AlertDialog(
-            title: const Text('تأكيد العملية'),
-            content: Text(result.confirmationPrompt ?? result.message),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('إلغاء'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('تأكيد العملية'),
-              ),
-            ],
+  Future<bool?> _showActionConfirmation(AcademicAssistantToolResult result) {
+    if (!mounted) return Future.value(null);
+    return showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('تأكيد العملية'),
+        content: Text(result.confirmationPrompt ?? result.message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('إلغاء'),
           ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('تأكيد الحذف'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<_AssistantTrackedRunResult> _executeTrackedActions(
+    List<AcademicAssistantToolCall> calls, {
+    required String source,
+    String lead = '',
+  }) async {
+    if (calls.isEmpty) {
+      return _AssistantTrackedRunResult(
+        message: lead.isEmpty ? 'لم ينتج عن الطلب إجراء واضح.' : lead,
+        succeeded: true,
+      );
+    }
+
+    final recoveryReady = await _ledgerRecovery;
+    if (!recoveryReady) {
+      return const _AssistantTrackedRunResult(
+        message: 'تعذر تهيئة سجل التنفيذ الدائم. لم يتم تنفيذ أي إجراء.',
+        succeeded: false,
+      );
+    }
+
+    final ledger = DatabaseHelper.instance;
+    int? runId;
+    var currentStep = -1;
+    var anyChangedData = false;
+    try {
+      runId = await ledger.createAssistantActionRun(
+        source: source,
+        actionNames: calls.map((call) => call.name).toList(growable: false),
+      );
+
+      final preflight = await _actionExecutor.preflightPlan(calls);
+      if (!preflight.succeeded) {
+        await ledger.finalizePendingAssistantActionSteps(
+          runId,
+          status: 'skipped',
+          failureCode: 'preflight_rejected',
         );
+        await ledger.updateAssistantActionRun(
+          runId: runId,
+          status: 'rejected',
+          failureCode: 'preflight_rejected',
+        );
+        return _AssistantTrackedRunResult(
+          message: preflight.message,
+          succeeded: false,
+        );
+      }
+
+      const destructiveActions = {
+        'delete_material',
+        'delete_task',
+        'delete_lecture',
+        'delete_exam',
+      };
+      await ledger.updateAssistantActionRun(
+        runId: runId,
+        status: 'awaiting_confirmation',
+      );
+      final approvedDestructiveActions = <int>{};
+      for (var index = 0; index < calls.length; index++) {
+        final call = calls[index];
+        if (!destructiveActions.contains(call.name)) continue;
+
+        final preview = await _actionExecutor.execute(call);
+        if (!preview.requiresConfirmation) {
+          await ledger.finalizePendingAssistantActionSteps(
+            runId,
+            status: 'skipped',
+            failureCode: 'confirmation_unavailable',
+          );
+          await ledger.updateAssistantActionRun(
+            runId: runId,
+            status: 'failed',
+            failureStep: index,
+            failureCode: 'confirmation_unavailable',
+          );
+          return _AssistantTrackedRunResult(
+            message: preview.message,
+            succeeded: false,
+          );
+        }
+
+        final confirmed = await _showActionConfirmation(preview);
         if (confirmed != true) {
-          _lastToolExecutionVerified = false;
-          return 'تم إلغاء العملية بناءً على اختيارك.';
+          await ledger.finalizePendingAssistantActionSteps(
+            runId,
+            status: 'cancelled',
+            failureCode: 'user_cancelled',
+          );
+          await ledger.updateAssistantActionRun(
+            runId: runId,
+            status: 'cancelled',
+            failureStep: index,
+            failureCode: 'user_cancelled',
+          );
+          return const _AssistantTrackedRunResult(
+            message: 'تم إلغاء الخطة قبل التنفيذ. لم تُنفذ أي خطوة.',
+            succeeded: false,
+          );
+        }
+        approvedDestructiveActions.add(index);
+      }
+
+      await ledger.updateAssistantActionRun(runId: runId, status: 'running');
+      final messages = <String>[];
+      if (lead.trim().isNotEmpty) messages.add(lead.trim());
+      var succeededCount = 0;
+
+      for (var index = 0; index < calls.length; index++) {
+        currentStep = index;
+        await ledger.updateAssistantActionStep(
+          runId: runId,
+          stepIndex: index,
+          status: 'running',
+        );
+
+        final outcome = await _executeTool(
+          calls[index],
+          confirmed: approvedDestructiveActions.contains(index),
+        );
+        anyChangedData = anyChangedData || outcome.changedData;
+        messages.add(outcome.message);
+        await ledger.updateAssistantActionStep(
+          runId: runId,
+          stepIndex: index,
+          status: outcome.succeeded
+              ? 'succeeded'
+              : outcome.cancelled
+                  ? 'cancelled'
+                  : 'failed',
+          changedData: outcome.changedData,
+          failureCode: outcome.succeeded
+              ? null
+              : outcome.cancelled
+                  ? 'user_cancelled'
+                  : 'action_failed',
+        );
+        currentStep = -1;
+
+        if (outcome.succeeded) {
+          succeededCount++;
+          continue;
+        }
+
+        final remaining = calls.length - index - 1;
+        if (remaining > 0) {
+          await ledger.finalizePendingAssistantActionSteps(
+            runId,
+            status: 'skipped',
+            failureCode: 'previous_action_failed',
+          );
+          messages.add(
+            'أوقفت بقية الخطة لأن الإجراء \${index + 1} لم يكتمل بنجاح. '
+            'راجع النتيجة ثم اطلب متابعة الخطوات المتبقية.',
+          );
+        }
+        final runStatus = outcome.cancelled
+            ? succeededCount > 0
+                ? 'partial_failure'
+                : 'cancelled'
+            : succeededCount > 0
+                ? 'partial_failure'
+                : 'failed';
+        await ledger.updateAssistantActionRun(
+          runId: runId,
+          status: runStatus,
+          failureStep: index,
+          failureCode: outcome.cancelled ? 'user_cancelled' : 'action_failed',
+        );
+        return _AssistantTrackedRunResult(
+          message: messages.join('\n\n'),
+          succeeded: false,
+          changedData: anyChangedData,
+        );
+      }
+
+      await ledger.updateAssistantActionRun(runId: runId, status: 'succeeded');
+      return _AssistantTrackedRunResult(
+        message: messages.isEmpty
+            ? 'لم ينتج عن الطلب إجراء واضح. وضّح ما تريد تنفيذه.'
+            : messages.join('\n\n'),
+        succeeded: true,
+        changedData: anyChangedData,
+      );
+    } catch (error) {
+      if (runId != null) {
+        try {
+          if (currentStep >= 0) {
+            await ledger.updateAssistantActionStep(
+              runId: runId,
+              stepIndex: currentStep,
+              status: 'interrupted',
+              changedData: anyChangedData,
+              failureCode: 'execution_interrupted',
+            );
+          }
+          await ledger.finalizePendingAssistantActionSteps(
+            runId,
+            status: 'skipped',
+            failureCode: 'execution_interrupted',
+          );
+          await ledger.updateAssistantActionRun(
+            runId: runId,
+            status: 'interrupted',
+            failureStep: currentStep >= 0 ? currentStep : null,
+            failureCode: 'execution_interrupted',
+          );
+        } catch (ledgerError) {
+          debugPrint('Assistant ledger finalization failed: \${ledgerError.runtimeType}');
+        }
+      }
+      debugPrint('Assistant tracked execution failed: \${error.runtimeType}');
+      return _AssistantTrackedRunResult(
+        message: 'توقفت الخطة بسبب خطأ أثناء التنفيذ أو تسجيل نتيجته. '
+            'افحص سجل التنفيذ قبل إعادة الطلب لتجنب تكرار أي خطوة.',
+        succeeded: false,
+        changedData: anyChangedData || currentStep >= 0,
+      );
+    }
+  }
+
+  Future<_AssistantActionOutcome> _executeTool(
+    AcademicAssistantToolCall call, {
+    bool confirmed = false,
+  }) async {
+    var changedData = false;
+    try {
+      var result = await _actionExecutor.execute(call, confirmed: confirmed);
+      if (result.requiresConfirmation) {
+        final approved = await _showActionConfirmation(result);
+        if (approved != true) {
+          return const _AssistantActionOutcome(
+            message: 'تم إلغاء العملية بناءً على اختيارك.',
+            succeeded: false,
+            cancelled: true,
+          );
         }
         result = await _actionExecutor.execute(call, confirmed: true);
       }
+      changedData = result.changedData;
       if (!result.succeeded) {
-        _lastToolExecutionVerified = false;
-        return result.message;
+        return _AssistantActionOutcome(
+          message: result.message,
+          succeeded: false,
+          changedData: changedData,
+        );
       }
       if (result.changedData) {
-        final verified = await _actionExecutor.verifyPostcondition(
-          call,
-          result,
-        );
-        await widget.onDataChanged?.call();
+        final verified = await _actionExecutor.verifyPostcondition(call, result);
+        try {
+          await widget.onDataChanged?.call();
+        } catch (callbackError) {
+          debugPrint('Assistant refresh callback failed: \${callbackError.runtimeType}');
+        }
         if (!verified) {
-          _lastToolExecutionVerified = false;
-          return 'تم تنفيذ طلب التغيير، لكن تعذر تأكيد النتيجة بعد إعادة قراءة البيانات المحفوظة. لم أعتبر العملية ناجحة، وأوقفت متابعة أي إجراء تابع. راجع السجل قبل إعادة المحاولة لتجنب التكرار.';
+          return _AssistantActionOutcome(
+            message: 'تمت محاولة التغيير، لكن تعذر تأكيد النتيجة بعد إعادة قراءة البيانات المحفوظة. '
+                'لم أعتبر العملية ناجحة؛ راجع سجل التنفيذ قبل إعادة المحاولة لتجنب التكرار.',
+            succeeded: false,
+            changedData: true,
+          );
         }
       }
-      return result.message;
+      return _AssistantActionOutcome(
+        message: result.message,
+        succeeded: true,
+        changedData: changedData,
+      );
     } catch (error) {
-      _lastToolExecutionVerified = false;
-      return 'لم يتم تنفيذ «${call.name}»: $error';
+      debugPrint('Assistant action failed: \${error.runtimeType}');
+      return _AssistantActionOutcome(
+        message: 'تعذر تنفيذ العملية والتحقق من نتيجتها. راجع سجل التنفيذ قبل إعادة المحاولة.',
+        succeeded: false,
+        changedData: changedData,
+      );
     }
+  }
+
+  Future<void> _showExecutionHistory() async {
+    if (!await _ledgerRecovery) {
+      _showMessage('سجل التنفيذ غير متاح حالياً.');
+      return;
+    }
+    try {
+      final history = await DatabaseHelper.instance.getAssistantActionHistory(limit: 20);
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('سجل تنفيذ المساعد'),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 420,
+            child: history.isEmpty
+                ? const Center(child: Text('لا توجد عمليات مسجلة بعد.'))
+                : ListView.builder(
+                    itemCount: history.length,
+                    itemBuilder: (context, index) {
+                      final run = history[index];
+                      final steps = (run['steps'] as List? ?? const [])
+                          .map((item) => Map<String, dynamic>.from(item as Map))
+                          .toList(growable: false);
+                      final status = run['status']?.toString();
+                      return ExpansionTile(
+                        key: ValueKey(run['id']),
+                        title: Text(_runStatusLabel(status)),
+                        subtitle: Text(
+                          '\${_runSourceLabel(run['source']?.toString())} • '
+                          '\${_formatLedgerTimestamp(run['created_at'])}',
+                        ),
+                        children: [
+                          if (status == 'interrupted')
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                              child: Text(
+                                'لم تتم إعادة تنفيذ أي خطوة تلقائياً بعد إعادة تشغيل التطبيق.',
+                              ),
+                            ),
+                          ...steps.map((step) {
+                            final changed = step['changed_data'] == 1;
+                            return ListTile(
+                              dense: true,
+                              leading: Icon(_stepStatusIcon(step['status']?.toString())),
+                              title: Text(_actionLabel(step['action_name']?.toString())),
+                              subtitle: Text(
+                                '\${_stepStatusLabel(step['status']?.toString())}'
+                                '\${changed ? ' • تم تغيير البيانات' : ''}',
+                              ),
+                            );
+                          }),
+                        ],
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('إغلاق'),
+            ),
+          ],
+        ),
+      );
+    } catch (error) {
+      debugPrint('Assistant history load failed: \${error.runtimeType}');
+      if (mounted) _showMessage('تعذر تحميل سجل التنفيذ.');
+    }
+  }
+
+  String _runStatusLabel(String? status) => switch (status) {
+    'succeeded' => 'اكتملت العملية',
+    'partial_failure' => 'اكتمل جزء من العملية',
+    'failed' => 'فشلت العملية',
+    'cancelled' => 'أُلغيت العملية',
+    'rejected' => 'رُفضت الخطة قبل التنفيذ',
+    'interrupted' => 'توقفت العملية بعد إعادة التشغيل',
+    'running' => 'قيد التنفيذ',
+    'awaiting_confirmation' => 'بانتظار التأكيد',
+    'preflighting' => 'فحص الخطة',
+    _ => 'حالة غير معروفة',
+  };
+
+  String _stepStatusLabel(String? status) => switch (status) {
+    'succeeded' => 'نجحت الخطوة',
+    'failed' => 'فشلت الخطوة',
+    'cancelled' => 'أُلغيت الخطوة',
+    'skipped' => 'لم تُنفذ الخطوة',
+    'interrupted' => 'انقطعت أثناء التنفيذ',
+    'running' => 'قيد التنفيذ',
+    'pending' => 'بانتظار التنفيذ',
+    _ => 'حالة غير معروفة',
+  };
+
+  IconData _stepStatusIcon(String? status) => switch (status) {
+    'succeeded' => Icons.check_circle_outline_rounded,
+    'failed' => Icons.error_outline_rounded,
+    'cancelled' => Icons.cancel_outlined,
+    'interrupted' => Icons.warning_amber_rounded,
+    _ => Icons.pending_outlined,
+  };
+
+  String _runSourceLabel(String? source) => switch (source) {
+    'cloud_plan' => 'خطة المساعد السحابي',
+    'local_command' => 'أمر محلي',
+    'attachment' => 'حفظ مرفق',
+    _ => 'مصدر غير معروف',
+  };
+
+  String _actionLabel(String? action) => switch (action) {
+    'create_material' => 'إضافة مادة',
+    'update_material' => 'تعديل مادة',
+    'delete_material' => 'حذف مادة',
+    'add_material_file' => 'إضافة ملف للمادة',
+    'create_task' => 'إنشاء مهمة',
+    'update_task' => 'تعديل مهمة',
+    'complete_task' => 'إكمال مهمة',
+    'delete_task' => 'حذف مهمة',
+    'add_lecture' => 'إضافة محاضرة',
+    'update_lecture' => 'تعديل محاضرة',
+    'delete_lecture' => 'حذف محاضرة',
+    'create_exam' => 'إنشاء اختبار',
+    'update_exam' => 'تعديل اختبار',
+    'delete_exam' => 'حذف اختبار',
+    'update_profile' => 'تحديث الملف الأكاديمي',
+    'generate_report' => 'إنشاء تقرير',
+    _ => 'إجراء مساعد',
+  };
+
+  String _formatLedgerTimestamp(Object? value) {
+    final parsed = DateTime.tryParse(value?.toString() ?? '');
+    if (parsed == null) return 'وقت غير متاح';
+    final local = parsed.toLocal().toString();
+    return local.length >= 16 ? local.substring(0, 16) : local;
   }
 
   String _buildLocalAssistantReply(String input) {
@@ -497,6 +878,11 @@ $userMessage''';
       appBar: AppBar(
         title: const Text('المساعد الذكي'),
         actions: [
+          IconButton(
+            tooltip: 'سجل التنفيذ',
+            onPressed: _isSending ? null : _showExecutionHistory,
+            icon: const Icon(Icons.history_rounded),
+          ),
           TextButton.icon(
             onPressed: _isSending
                 ? null
@@ -547,6 +933,27 @@ $userMessage''';
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
+              ),
+            ),
+          if (_interruptedRunsDetected > 0)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+              child: MaterialBanner(
+                leading: const Icon(Icons.warning_amber_rounded),
+                content: Text(
+                  'تم رصد \${_interruptedRunsDetected} عملية توقفت بعد إعادة تشغيل التطبيق. '
+                  'لم تُعد أي خطوة تلقائياً؛ راجع السجل قبل تكرار الطلب.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: _showExecutionHistory,
+                    child: const Text('عرض السجل'),
+                  ),
+                  TextButton(
+                    onPressed: () => setState(() => _interruptedRunsDetected = 0),
+                    child: const Text('إخفاء'),
+                  ),
+                ],
               ),
             ),
           const SizedBox(height: 12),
@@ -698,6 +1105,32 @@ $userMessage''';
       ),
     );
   }
+}
+
+class _AssistantActionOutcome {
+  final String message;
+  final bool succeeded;
+  final bool changedData;
+  final bool cancelled;
+
+  const _AssistantActionOutcome({
+    required this.message,
+    required this.succeeded,
+    this.changedData = false,
+    this.cancelled = false,
+  });
+}
+
+class _AssistantTrackedRunResult {
+  final String message;
+  final bool succeeded;
+  final bool changedData;
+
+  const _AssistantTrackedRunResult({
+    required this.message,
+    required this.succeeded,
+    this.changedData = false,
+  });
 }
 
 class _ChatMessage {
