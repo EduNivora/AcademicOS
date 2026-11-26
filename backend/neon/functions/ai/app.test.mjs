@@ -241,7 +241,7 @@ test("health fails when the quota table has not been migrated", async () => {
   assert.equal(response.status, 503);
   assert.equal((await response.json()).error.code, "ai_quota_store_unavailable");
 });
-\ntest("health fails when the quota database is unavailable", async () => {
+test("health fails when the quota database is unavailable", async () => {
   const response = await make({ pool: createPool({ unavailable: true }) })(
     new Request("https://unit.test/health"),
   );
