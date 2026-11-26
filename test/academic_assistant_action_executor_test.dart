@@ -48,6 +48,98 @@ void main() {
     });
   });
 
+  group('AcademicAssistantActionExecutor preflight', () {
+    test('rejects a later invalid action before any earlier write', () async {
+      final result = await executor.preflightPlan(const [
+        AcademicAssistantToolCall(
+          name: 'create_material',
+          arguments: {'name': 'خطة مادة جديدة'},
+        ),
+        AcademicAssistantToolCall(
+          name: 'create_exam',
+          arguments: {'title': 'اختبار غير صالح', 'exam_date': 'not-a-date'},
+        ),
+      ]);
+
+      expect(result.succeeded, isFalse);
+      expect(courseRepository.courses, isEmpty);
+    });
+
+    test('rejects two mutations targeting the same task before writes', () async {
+      taskRepository.tasks.add(
+        const TaskEntity(id: 44, title: 'مراجعة الشبكات', description: ''),
+      );
+      final result = await executor.preflightPlan(const [
+        AcademicAssistantToolCall(
+          name: 'update_task',
+          arguments: {'task_id': 44, 'title': 'مراجعة الشبكات الجديدة'},
+        ),
+        AcademicAssistantToolCall(
+          name: 'delete_task',
+          arguments: {'task_id': 44},
+        ),
+      ]);
+
+      expect(result.succeeded, isFalse);
+      expect(taskRepository.tasks, hasLength(1));
+      expect(taskRepository.tasks.single.title, 'مراجعة الشبكات');
+    });
+
+    test('simulates planned lectures and rejects a schedule conflict', () async {
+      courseRepository.courses.add(
+        const CourseEntity(
+          id: 3,
+          name: 'الشبكات',
+          instructor: 'مدرس',
+          code: 'NET-3',
+        ),
+      );
+      final result = await executor.preflightPlan(const [
+        AcademicAssistantToolCall(
+          name: 'add_lecture',
+          arguments: {
+            'course_id': 3,
+            'day': 'الأحد',
+            'start_time': '08:00',
+            'end_time': '09:00',
+          },
+        ),
+        AcademicAssistantToolCall(
+          name: 'add_lecture',
+          arguments: {
+            'course_id': 3,
+            'day': 'الأحد',
+            'start_time': '08:30',
+            'end_time': '09:30',
+          },
+        ),
+      ]);
+
+      expect(result.succeeded, isFalse);
+      expect(courseRepository.courses, hasLength(1));
+    });
+
+    test('accepts a valid multi-step plan without mutating records', () async {
+      final result = await executor.preflightPlan(const [
+        AcademicAssistantToolCall(
+          name: 'create_task',
+          arguments: {'title': 'مراجعة قبل الاختبار'},
+        ),
+        AcademicAssistantToolCall(
+          name: 'create_exam',
+          arguments: {
+            'title': 'اختبار الشبكات',
+            'exam_date': '2030-01-15T09:00:00',
+          },
+        ),
+      ]);
+
+      expect(result.succeeded, isTrue);
+      expect(courseRepository.courses, isEmpty);
+      expect(taskRepository.tasks, isEmpty);
+    });
+  });
+
   group('AcademicAssistantActionExecutor', () {
     test(
       'updates the academic profile without clearing unspecified fields',
