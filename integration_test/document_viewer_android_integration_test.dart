@@ -116,9 +116,7 @@ void main() {
       // rather than injecting a test-only temporary directory.
       final title =
           'intent-check-${DateTime.now().microsecondsSinceEpoch}.docx';
-      final service = CourseMaterialFileService(
-        loadBytes: (_) async => bytes,
-      );
+      final service = CourseMaterialFileService(loadBytes: (_) async => bytes);
       final status = await service.openOfficeExternally(
         materialId: 22,
         title: title,
