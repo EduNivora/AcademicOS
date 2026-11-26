@@ -62,5 +62,5 @@ Migration 0003_ai_usage_windows.sql is included in this PR but has not been appl
 ## Explicit limitations
 
 - No server-side academic mutation API exists because academic records are local SQLite data.
-- No durable assistant conversation history or durable action-execution ledger is included in this phase.
+- No durable assistant conversation history is included. The local SQLite action ledger persists run/step history, but automatic crash recovery/resumption and exactly-once execution are not implemented.
 - Real-account Gemini acceptance, production quota migration, and production function deployment are not performed by this PR.
