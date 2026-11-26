@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <cache-path name="academic_material_cache" path="edunivora_materials/" />
+    <!-- open_filex stages Office handoff copies inside the app-private code_cache directory. -->
+    <root-path name="open_filex_private_code_cache" path="data/data/com.arfatalkamli.academicos/code_cache/" />
 </paths>
