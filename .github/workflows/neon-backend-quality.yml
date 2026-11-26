@@ -12,7 +12,6 @@ on:
       - main
       - chore/edunivora-phase0-execution
       - feat/neon-managed-auth-and-notices
-      - feat/other-existing-branch-not-used
     paths:
       - "backend/neon/**"
       - "neon.ts"
