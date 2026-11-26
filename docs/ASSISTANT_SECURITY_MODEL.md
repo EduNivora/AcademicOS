@@ -37,7 +37,7 @@
 - Updates to the academic profile, course records, tasks, lectures, and exams also require explicit confirmation.
 - The UI does not report a successful mutation until the executor returns a successful result and the persisted postcondition passes.
 - If postcondition verification fails, the remaining steps in a multi-action plan are stopped and the UI explicitly says the write could not be confirmed.
-- Duplicate checks prevent repeat creation of equivalent courses, tasks, attachments, lectures, and exams. A durable execution ledger is still a follow-up for crash-safe multi-step recovery.
+- Duplicate checks prevent repeat creation of equivalent courses, tasks, attachments, lectures, and exams. A local SQLite execution ledger persists run/step history across restarts, but it does not automatically resume interrupted plans; crash-safe recovery remains a follow-up.
 
 ## Data handling and logging
 
