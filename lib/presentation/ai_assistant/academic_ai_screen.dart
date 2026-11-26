@@ -86,7 +86,7 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
       }
       return true;
     } catch (error) {
-      debugPrint('Assistant execution ledger recovery failed: \${error.runtimeType}');
+      debugPrint('Assistant execution ledger recovery failed: ${error.runtimeType}');
       return false;
     }
   }
@@ -145,7 +145,7 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
     final file = _pendingAttachment;
     if (file == null) return 'لا يوجد ملف مرفق.';
     if (!RegExp(r'(أضف|اضف|أرفق|ارفق|احفظ|حفظ)').hasMatch(instruction)) {
-      return 'الملف «\${file.name}» مرفق. اكتب مثلاً: أضف الملف إلى مادة أمن الشبكات.';
+      return 'الملف «${file.name}» مرفق. اكتب مثلاً: أضف الملف إلى مادة أمن الشبكات.';
     }
     final match = RegExp(r'مادة\s+(.+)$').firstMatch(instruction);
     if (match == null) {
@@ -510,7 +510,7 @@ $userMessage''';
             failureCode: 'previous_action_failed',
           );
           messages.add(
-            'أوقفت بقية الخطة لأن الإجراء \${index + 1} لم يكتمل بنجاح. '
+            'أوقفت بقية الخطة لأن الإجراء ${index + 1} لم يكتمل بنجاح. '
             'راجع النتيجة ثم اطلب متابعة الخطوات المتبقية.',
           );
         }
@@ -566,10 +566,10 @@ $userMessage''';
             failureCode: 'execution_interrupted',
           );
         } catch (ledgerError) {
-          debugPrint('Assistant ledger finalization failed: \${ledgerError.runtimeType}');
+          debugPrint('Assistant ledger finalization failed: ${ledgerError.runtimeType}');
         }
       }
-      debugPrint('Assistant tracked execution failed: \${error.runtimeType}');
+      debugPrint('Assistant tracked execution failed: ${error.runtimeType}');
       return _AssistantTrackedRunResult(
         message: 'توقفت الخطة بسبب خطأ أثناء التنفيذ أو تسجيل نتيجته. '
             'افحص سجل التنفيذ قبل إعادة الطلب لتجنب تكرار أي خطوة.',
@@ -610,7 +610,7 @@ $userMessage''';
         try {
           await widget.onDataChanged?.call();
         } catch (callbackError) {
-          debugPrint('Assistant refresh callback failed: \${callbackError.runtimeType}');
+          debugPrint('Assistant refresh callback failed: ${callbackError.runtimeType}');
         }
         if (!verified) {
           return _AssistantActionOutcome(
@@ -627,7 +627,7 @@ $userMessage''';
         changedData: changedData,
       );
     } catch (error) {
-      debugPrint('Assistant action failed: \${error.runtimeType}');
+      debugPrint('Assistant action failed: ${error.runtimeType}');
       return _AssistantActionOutcome(
         message: 'تعذر تنفيذ العملية والتحقق من نتيجتها. راجع سجل التنفيذ قبل إعادة المحاولة.',
         succeeded: false,
@@ -665,8 +665,8 @@ $userMessage''';
                         key: ValueKey(run['id']),
                         title: Text(_runStatusLabel(status)),
                         subtitle: Text(
-                          '\${_runSourceLabel(run['source']?.toString())} • '
-                          '\${_formatLedgerTimestamp(run['created_at'])}',
+                          '${_runSourceLabel(run['source']?.toString())} • '
+                          '${_formatLedgerTimestamp(run['created_at'])}',
                         ),
                         children: [
                           if (status == 'interrupted')
@@ -683,8 +683,8 @@ $userMessage''';
                               leading: Icon(_stepStatusIcon(step['status']?.toString())),
                               title: Text(_actionLabel(step['action_name']?.toString())),
                               subtitle: Text(
-                                '\${_stepStatusLabel(step['status']?.toString())}'
-                                '\${changed ? ' • تم تغيير البيانات' : ''}',
+                                '${_stepStatusLabel(step['status']?.toString())}'
+                                '${changed ? ' • تم تغيير البيانات' : ''}',
                               ),
                             );
                           }),
@@ -702,7 +702,7 @@ $userMessage''';
         ),
       );
     } catch (error) {
-      debugPrint('Assistant history load failed: \${error.runtimeType}');
+      debugPrint('Assistant history load failed: ${error.runtimeType}');
       if (mounted) _showMessage('تعذر تحميل سجل التنفيذ.');
     }
   }
@@ -941,7 +941,7 @@ $userMessage''';
               child: MaterialBanner(
                 leading: const Icon(Icons.warning_amber_rounded),
                 content: Text(
-                  'تم رصد \${_interruptedRunsDetected} عملية توقفت بعد إعادة تشغيل التطبيق. '
+                  'تم رصد ${_interruptedRunsDetected} عملية توقفت بعد إعادة تشغيل التطبيق. '
                   'لم تُعد أي خطوة تلقائياً؛ راجع السجل قبل تكرار الطلب.',
                 ),
                 actions: [
