@@ -130,7 +130,7 @@ export function createAiHandler({ verifyIdentity, apiKey, pool, allowedOrigins =
     const url = new URL(request.url);
     if (request.method === "GET" && url.pathname === "/health") {
       try {
-        await pool.query("SELECT 1");
+        await pool.query("SELECT 1 FROM public.ai_usage_windows LIMIT 0");
       } catch {
         return fail(503, "ai_quota_store_unavailable",
           "قاعدة بيانات حصص المساعد غير متاحة حاليًا.", headers);

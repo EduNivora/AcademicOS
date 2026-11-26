@@ -3,13 +3,13 @@ import assert from "node:assert/strict";
 import { createAiHandler } from "./app.mjs";
 const token = "valid";
 const identity = { sub: "00000000-0000-4000-8000-000000000123" };
-const createPool = ({ minuteExceeded = false, dayExceeded = false, unavailable = false } = {}) => {
+const createPool = ({ minuteExceeded = false, dayExceeded = false, unavailable = false, quotaTableMissing = false } = {}) => {
   const calls = [];
   const pool = {
     calls,
     async query(sql) {
       if (unavailable) throw new Error("database unavailable");
-      if (sql === "SELECT 1") return { rows: [{ "?column?": 1 }] };
+      if (sql === "SELECT 1 FROM public.ai_usage_windows LIMIT 0") {\n        if (quotaTableMissing) throw new Error("relation public.ai_usage_windows does not exist");\n        return { rows: [] };\n      }\n      if (sql === "SELECT 1") return { rows: [{ "?column?": 1 }] };
       throw new Error("unexpected pool query");
     },
     async connect() {
@@ -230,7 +230,14 @@ test("quota store failure fails closed without calling Gemini", async () => {
 });
 
 
-test("health fails when the quota database is unavailable", async () => {
+test("health fails when the quota table has not been migrated", async () => {
+  const response = await make({ pool: createPool({ quotaTableMissing: true }) })(
+    new Request("https://unit.test/health"),
+  );
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error.code, "ai_quota_store_unavailable");
+});
+\ntest("health fails when the quota database is unavailable", async () => {
   const response = await make({ pool: createPool({ unavailable: true }) })(
     new Request("https://unit.test/health"),
   );
