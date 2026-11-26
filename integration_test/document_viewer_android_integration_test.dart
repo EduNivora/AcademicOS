@@ -116,7 +116,7 @@ void main() {
       // fixture under the app cache directory (not code_cache / systemTemp),
       // which is one of the provider's configured roots.
       final cacheDirectory = Directory(
-        '${Directory.systemTemp.parent.parent.path}/cache',
+        '${Directory.systemTemp.parent.path}/cache',
       );
       await cacheDirectory.create(recursive: true);
       final root = await cacheDirectory.createTemp(
