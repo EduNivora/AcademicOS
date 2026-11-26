@@ -2,11 +2,42 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createAiHandler } from "./app.mjs";
 const token = "valid";
-const identity = { sub: "user-123" };
-const make = ({ apiKey = "test-api-key-not-real", fetchImpl, verifyIdentity } = {}) =>
+const identity = { sub: "00000000-0000-4000-8000-000000000123" };
+const createPool = ({ minuteExceeded = false, dayExceeded = false, unavailable = false, quotaTableMissing = false } = {}) => {
+  const calls = [];
+  const pool = {
+    calls,
+    async query(sql) {
+      if (unavailable) throw new Error("database unavailable");
+      if (sql === "SELECT 1 FROM public.ai_usage_windows LIMIT 0") {
+        if (quotaTableMissing) throw new Error("relation public.ai_usage_windows does not exist");
+        return { rows: [] };
+      }
+      if (sql === "SELECT 1") return { rows: [{ "?column?": 1 }] };
+      throw new Error("unexpected pool query");
+    },
+    async connect() {
+      if (unavailable) throw new Error("database unavailable");
+      return {
+        async query(sql) {
+          calls.push(sql);
+          if (sql === "BEGIN" || sql === "COMMIT" || sql === "ROLLBACK") return { rows: [] };
+          if (sql.startsWith("DELETE FROM public.ai_usage_windows")) return { rows: [], rowCount: 0 };
+          if (sql.includes("'minute'")) return { rows: minuteExceeded ? [] : [{ request_count: 1 }] };
+          if (sql.includes("'day'")) return { rows: dayExceeded ? [] : [{ request_count: 1 }] };
+          throw new Error("unexpected quota SQL");
+        },
+        release() {},
+      };
+    },
+  };
+  return pool;
+};
+const make = ({ apiKey = "test-api-key-not-real", fetchImpl, verifyIdentity, pool } = {}) =>
   createAiHandler({
     verifyIdentity: verifyIdentity ?? (async (value) => value === token ? identity : null),
     apiKey,
+    pool: pool ?? createPool(),
     allowedOrigins: ["https://app.example.test"],
     fetchImpl: fetchImpl ?? (async () => Response.json({
       steps: [{ type: "model_output", content: [{ type: "text", text: "جواب اختباري" }] }],
@@ -30,6 +61,7 @@ test("health route", async () => {
   const health = await response.json();
   assert.equal(health.service, "edunivora-ai");
   assert.equal(health.configured, true);
+  assert.equal(health.quotaStore, "ready");
 });
 test("authentication is required", async () => {
   assert.equal((await make()(request("سؤال", { bearer: null }))).status, 401);
@@ -48,6 +80,10 @@ test("valid request calls Gemini Interactions API", async () => {
   assert.equal(sent.url, "https://generativelanguage.googleapis.com/v1beta/interactions");
   assert.equal(JSON.parse(sent.options.body).model, "gemini-3.8-flash");
   assert.equal(JSON.parse(sent.options.body).store, false);
+  assert.match(
+    JSON.parse(sent.options.body).system_instruction,
+    /لا تدّع أنك أضفت أو عدّلت أو حذفت أو حفظت سجلاً/,
+  );
 });
 test("academic context is bounded and forwarded separately", async () => {
   let payload;
@@ -136,4 +172,95 @@ test("schedule image parsing rejects unsupported image types before Gemini", asy
 test("schedule image parsing requires authentication", async () => {
   const response = await make()(scheduleRequest({ bearer: null }));
   assert.equal(response.status, 401);
+});
+
+
+test("AI quota reserves minute and daily counters atomically before provider calls", async () => {
+  const pool = createPool();
+  let providerCalled = false;
+  const response = await make({
+    pool,
+    fetchImpl: async () => {
+      providerCalled = true;
+      return Response.json({ steps: [{ type: "model_output", content: [{ type: "text", text: "تمام" }] }] });
+    },
+  })(request("اشرح"));
+  assert.equal(response.status, 200);
+  assert.equal(providerCalled, true);
+  assert.equal(pool.calls[0], "BEGIN");
+  assert.ok(pool.calls.some((sql) => sql.includes("'minute'")));
+  assert.ok(pool.calls.some((sql) => sql.includes("'day'")));
+  assert.equal(pool.calls.at(-1), "COMMIT");
+});
+
+test("minute quota returns 429 and does not call Gemini", async () => {
+  const pool = createPool({ minuteExceeded: true });
+  let providerCalled = false;
+  const response = await make({
+    pool,
+    fetchImpl: async () => { providerCalled = true; return Response.json({}); },
+  })(request("اشرح"));
+  assert.equal(response.status, 429);
+  assert.equal((await response.json()).error.code, "ai_quota_exceeded");
+  const retryAfter = Number(response.headers.get("Retry-After"));
+  assert.ok(retryAfter >= 1 && retryAfter <= 60);
+  assert.equal(providerCalled, false);
+  assert.equal(pool.calls.at(-1), "ROLLBACK");
+});
+
+test("daily quota rolls back minute reservation and does not call Gemini", async () => {
+  const pool = createPool({ dayExceeded: true });
+  let providerCalled = false;
+  const response = await make({
+    pool,
+    fetchImpl: async () => { providerCalled = true; return Response.json({}); },
+  })(request("اشرح"));
+  assert.equal(response.status, 429);
+  assert.equal((await response.json()).error.code, "ai_quota_exceeded");
+  assert.ok(Number(response.headers.get("Retry-After")) > 0);
+  assert.equal(providerCalled, false);
+  assert.equal(pool.calls.at(-1), "ROLLBACK");
+});
+
+test("quota store failure fails closed without calling Gemini", async () => {
+  let providerCalled = false;
+  const response = await make({
+    pool: createPool({ unavailable: true }),
+    fetchImpl: async () => { providerCalled = true; return Response.json({}); },
+  })(request("اشرح"));
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error.code, "ai_quota_unavailable");
+  assert.equal(providerCalled, false);
+});
+
+
+test("health fails when the quota table has not been migrated", async () => {
+  const response = await make({ pool: createPool({ quotaTableMissing: true }) })(
+    new Request("https://unit.test/health"),
+  );
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error.code, "ai_quota_store_unavailable");
+});
+test("health fails when the quota database is unavailable", async () => {
+  const response = await make({ pool: createPool({ unavailable: true }) })(
+    new Request("https://unit.test/health"),
+  );
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error.code, "ai_quota_store_unavailable");
+});
+
+
+test("rejects a verified identity without a Neon UUID subject before quota access", async () => {
+  let connected = false;
+  const pool = {
+    async query() { return { rows: [] }; },
+    async connect() { connected = true; throw new Error("must not connect"); },
+  };
+  const response = await make({
+    pool,
+    verifyIdentity: async () => ({ sub: "not-a-neon-uuid" }),
+  })(request("سؤال"));
+  assert.equal(response.status, 401);
+  assert.equal((await response.json()).error.code, "invalid_token");
+  assert.equal(connected, false);
 });

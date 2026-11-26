@@ -47,9 +47,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     try {
       final schedules = await _databaseHelper.getSchedules();
       final courses = await _databaseHelper.getCourses();
-      final courseMap = {
-        for (final course in courses) course.id!: course,
-      };
+      final courseMap = {for (final course in courses) course.id!: course};
 
       final mappedLectures = schedules.map((row) {
         final courseId = row['course_id'] is int
@@ -115,11 +113,15 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       _ => null,
     };
     final bytes = file.bytes;
-    if (mimeType == null || bytes == null || bytes.isEmpty ||
+    if (mimeType == null ||
+        bytes == null ||
+        bytes.isEmpty ||
         bytes.length > 8 * 1024 * 1024) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('اختر صورة JPG أو PNG أو WebP لا يتجاوز حجمها 8 ميجابايت.'),
+          content: Text(
+            'اختر صورة JPG أو PNG أو WebP لا يتجاوز حجمها 8 ميجابايت.',
+          ),
         ),
       );
       return;
@@ -170,12 +172,15 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         );
       }
 
-      String normalize(String value) => value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+      String normalize(String value) =>
+          value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
       final matchedEntries = <Map<String, dynamic>>[];
       final unmatchedNames = <String>{};
       for (final entry in extracted) {
         final courseName = entry['course_name']?.toString() ?? '';
-        final course = _courses.where((item) => normalize(item.name) == normalize(courseName)).firstOrNull;
+        final course = _courses
+            .where((item) => normalize(item.name) == normalize(courseName))
+            .firstOrNull;
         if (course?.id == null) {
           unmatchedNames.add(courseName);
           continue;
@@ -220,8 +225,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 final entry = matchedEntries[index];
                 return ListTile(
                   dense: true,
-                  title: Text('${entry['course_name']} — ${entry['day_of_week']}'),
-                  subtitle: Text('${entry['start_time']} - ${entry['end_time']}  •  ${entry['location']}'),
+                  title: Text(
+                    '${entry['course_name']} — ${entry['day_of_week']}',
+                  ),
+                  subtitle: Text(
+                    '${entry['start_time']} - ${entry['end_time']}  •  ${entry['location']}',
+                  ),
                 );
               },
             ),
@@ -243,11 +252,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       final existingSchedules = await _databaseHelper.getSchedules();
       final toSave = <Map<String, dynamic>>[];
       for (final entry in matchedEntries) {
-        final isDuplicate = existingSchedules.any((row) =>
-            row['course_id'] == entry['course_id'] &&
-            row['day_of_week'] == entry['day_of_week'] &&
-            row['start_time'] == entry['start_time'] &&
-            row['end_time'] == entry['end_time']);
+        final isDuplicate = existingSchedules.any(
+          (row) =>
+              row['course_id'] == entry['course_id'] &&
+              row['day_of_week'] == entry['day_of_week'] &&
+              row['start_time'] == entry['start_time'] &&
+              row['end_time'] == entry['end_time'],
+        );
         if (isDuplicate) continue;
 
         final validation = ScheduleConflictValidator.validate(
@@ -273,12 +284,21 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       if (toSave.isEmpty) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('كل المحاضرات المستخرجة موجودة مسبقاً في جدولك.')),
+          const SnackBar(
+            content: Text('كل المحاضرات المستخرجة موجودة مسبقاً في جدولك.'),
+          ),
         );
         return;
       }
 
-      final savedIds = await _databaseHelper.insertSchedules(toSave);
+      final databaseEntries = toSave
+          .map((entry) {
+            final persistedEntry = Map<String, dynamic>.from(entry)
+              ..remove('course_name');
+            return persistedEntry;
+          })
+          .toList(growable: false);
+      final savedIds = await _databaseHelper.insertSchedules(databaseEntries);
       for (var index = 0; index < toSave.length; index++) {
         final entry = toSave[index];
         await NotificationService.instance.scheduleLectureReminder(
@@ -294,16 +314,18 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       await _loadLectures();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تم استيراد ${toSave.length} محاضرة وربطها بموادك.')),
+        SnackBar(
+          content: Text('تم استيراد ${toSave.length} محاضرة وربطها بموادك.'),
+        ),
       );
     } catch (error) {
       if (!mounted) return;
       final message = error is AcademicAiRemoteException
           ? error.message
           : 'تعذر استيراد الجدول. حاول مرة أخرى أو أدخله يدوياً.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) setState(() => _isImportingSchedule = false);
     }
@@ -316,10 +338,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     String selectedDay = lecture != null
         ? lecture['day']?.toString() ?? _selectedDay
         : _selectedDay;
-    String selectedStart =
-        lecture != null ? lecture['start']?.toString() ?? '08:00' : '08:00';
-    String selectedEnd =
-        lecture != null ? lecture['end']?.toString() ?? '09:30' : '09:30';
+    String selectedStart = lecture != null
+        ? lecture['start']?.toString() ?? '08:00'
+        : '08:00';
+    String selectedEnd = lecture != null
+        ? lecture['end']?.toString() ?? '09:30'
+        : '09:30';
     bool reminderEnabled = lecture != null ? lecture['reminder'] == true : true;
     int? selectedCourseId = lecture != null
         ? (lecture['course_id'] is int ? lecture['course_id'] as int : null)
@@ -376,9 +400,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                 ),
                               )
                               .toList(),
-                          onChanged: (value) => setStateDialog(
-                            () => selectedCourseId = value,
-                          ),
+                          onChanged: (value) =>
+                              setStateDialog(() => selectedCourseId = value),
                           validator: (value) => value == null
                               ? 'اختر المادة المرتبطة بالمحاضرة.'
                               : null,
@@ -450,7 +473,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     if (selectedCourseId == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('يجب إضافة مادة واختيارها قبل حفظ المحاضرة.')),
+        const SnackBar(
+          content: Text('يجب إضافة مادة واختيارها قبل حفظ المحاضرة.'),
+        ),
       );
       return;
     }
@@ -490,9 +515,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           null => 'تعذر التحقق من تعارض المواعيد.',
         };
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(message)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(message)));
         }
         return;
       }
@@ -504,10 +529,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         final id = lecture['id'];
         if (id != null) {
           savedId = id as int;
-          await _databaseHelper.updateSchedule({
-            ...scheduleEntry,
-            'id': id,
-          });
+          await _databaseHelper.updateSchedule({...scheduleEntry, 'id': id});
         }
       }
 
@@ -516,16 +538,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           id: savedId,
           title: selectedCourseId != null
               ? (_courses
-                  .firstWhere(
-                    (course) => course.id == selectedCourseId,
-                    orElse: () => const CourseModel(
-                      id: null,
-                      name: 'محاضرة',
-                      instructor: '',
-                      code: 'GENERAL',
-                    ),
-                  )
-                  .name)
+                    .firstWhere(
+                      (course) => course.id == selectedCourseId,
+                      orElse: () => const CourseModel(
+                        id: null,
+                        name: 'محاضرة',
+                        instructor: '',
+                        code: 'GENERAL',
+                      ),
+                    )
+                    .name)
               : 'محاضرة',
           weekdayName: selectedDay,
           startTime: selectedStart,
@@ -542,11 +564,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       await _loadLectures();
     } catch (error, stackTrace) {
       debugPrint(
-          'ScheduleScreen._showLectureDialog save error: $error\n$stackTrace');
+        'ScheduleScreen._showLectureDialog save error: $error\n$stackTrace',
+      );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تعذر حفظ المحاضرة.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('تعذر حفظ المحاضرة.')));
       }
     }
   }
@@ -572,8 +595,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   List<Map<String, dynamic>> _dayLectures(String day) {
     try {
-      final list =
-          _lectures.where((lecture) => (lecture['day'] ?? '') == day).toList();
+      final list = _lectures
+          .where((lecture) => (lecture['day'] ?? '') == day)
+          .toList();
       list.sort((a, b) {
         final aTime = (a['start'] ?? '00:00').toString();
         final bTime = (b['start'] ?? '00:00').toString();
@@ -652,8 +676,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   height: 62,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     itemCount: _days.length,
                     separatorBuilder: (_, __) => const SizedBox(width: 8),
                     itemBuilder: (context, index) {
@@ -677,133 +703,140 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   child: _isLoading
                       ? const Center(child: CircularProgressIndicator())
                       : selectedLectures.isEmpty
-                          ? Center(
-                              child: Padding(
-                                padding: const EdgeInsets.all(24),
-                                child: Column(
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.event_busy_outlined,
+                                  size: 52,
+                                  color: Colors.grey.shade400,
+                                ),
+                                const SizedBox(height: 16),
+                                const Text(
+                                  'لا توجد محاضرات لهذا اليوم',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'أضف محاضرة جديدة من الزر في الأسفل.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: Colors.grey.shade600),
+                                ),
+                                const SizedBox(height: 16),
+                                FilledButton.icon(
+                                  onPressed: () => _showLectureDialog(),
+                                  icon: const Icon(Icons.add),
+                                  label: const Text('إضافة محاضرة'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: selectedLectures.length,
+                          itemBuilder: (context, index) {
+                            final lecture = selectedLectures[index];
+                            final color = lecture['color'] is Color
+                                ? lecture['color'] as Color
+                                : Theme.of(context).colorScheme.primary;
+
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              color: Theme.of(context).cardColor,
+                              child: ListTile(
+                                leading: Container(
+                                  width: 14,
+                                  height: 14,
+                                  decoration: BoxDecoration(
+                                    color: color,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                title: Text(lecture['courseTitle'] ?? 'محاضرة'),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.access_time, size: 16),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          '${lecture['start'] ?? '--:--'} - ${lecture['end'] ?? '--:--'}',
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.location_on_outlined,
+                                          size: 16,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: Text(
+                                            lecture['location'] ?? 'غير محدد',
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      lecture['instructor'] ?? '',
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall,
+                                    ),
+                                  ],
+                                ),
+                                trailing: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.event_busy_outlined,
-                                        size: 52, color: Colors.grey.shade400),
-                                    const SizedBox(height: 16),
-                                    const Text(
-                                      'لا توجد محاضرات لهذا اليوم',
-                                      style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold),
+                                    if (lecture['reminder'] == true)
+                                      const Icon(
+                                        Icons.notifications_active_outlined,
+                                        color: Colors.orange,
+                                      ),
+                                    const SizedBox(width: 4),
+                                    IconButton(
+                                      icon: const Icon(Icons.edit_outlined),
+                                      onPressed: () =>
+                                          _showLectureDialog(lecture: lecture),
                                     ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'أضف محاضرة جديدة من الزر في الأسفل.',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                          color: Colors.grey.shade600),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    FilledButton.icon(
-                                      onPressed: () => _showLectureDialog(),
-                                      icon: const Icon(Icons.add),
-                                      label: const Text('إضافة محاضرة'),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.delete_outline,
+                                        color: Colors.red,
+                                      ),
+                                      onPressed: () async {
+                                        final id = lecture['id'];
+                                        if (id != null) {
+                                          final scheduleId = id as int;
+                                          await _databaseHelper.deleteSchedule(
+                                            scheduleId,
+                                          );
+                                          await NotificationService.instance
+                                              .cancelLectureReminder(
+                                                scheduleId,
+                                              );
+                                          await _loadLectures();
+                                        }
+                                      },
                                     ),
                                   ],
                                 ),
                               ),
-                            )
-                          : ListView.builder(
-                              padding: const EdgeInsets.all(16),
-                              itemCount: selectedLectures.length,
-                              itemBuilder: (context, index) {
-                                final lecture = selectedLectures[index];
-                                final color = lecture['color'] is Color
-                                    ? lecture['color'] as Color
-                                    : Theme.of(context).colorScheme.primary;
-
-                                return Card(
-                                  margin: const EdgeInsets.only(bottom: 12),
-                                  color: Theme.of(context).cardColor,
-                                  child: ListTile(
-                                    leading: Container(
-                                      width: 14,
-                                      height: 14,
-                                      decoration: BoxDecoration(
-                                        color: color,
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                    title: Text(
-                                        lecture['courseTitle'] ?? 'محاضرة'),
-                                    subtitle: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        const SizedBox(height: 6),
-                                        Row(
-                                          children: [
-                                            const Icon(Icons.access_time,
-                                                size: 16),
-                                            const SizedBox(width: 6),
-                                            Text(
-                                                '${lecture['start'] ?? '--:--'} - ${lecture['end'] ?? '--:--'}'),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Row(
-                                          children: [
-                                            const Icon(
-                                                Icons.location_on_outlined,
-                                                size: 16),
-                                            const SizedBox(width: 6),
-                                            Expanded(
-                                                child: Text(
-                                                    lecture['location'] ??
-                                                        'غير محدد')),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          lecture['instructor'] ?? '',
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .bodySmall,
-                                        ),
-                                      ],
-                                    ),
-                                    trailing: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        if (lecture['reminder'] == true)
-                                          const Icon(
-                                              Icons
-                                                  .notifications_active_outlined,
-                                              color: Colors.orange),
-                                        const SizedBox(width: 4),
-                                        IconButton(
-                                          icon: const Icon(Icons.edit_outlined),
-                                          onPressed: () => _showLectureDialog(
-                                              lecture: lecture),
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(Icons.delete_outline,
-                                              color: Colors.red),
-                                          onPressed: () async {
-                                            final id = lecture['id'];
-                                            if (id != null) {
-                                              final scheduleId = id as int;
-                                              await _databaseHelper
-                                                  .deleteSchedule(scheduleId);
-                                              await NotificationService.instance
-                                                  .cancelLectureReminder(
-                                                      scheduleId);
-                                              await _loadLectures();
-                                            }
-                                          },
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
+                            );
+                          },
+                        ),
                 ),
               ],
             ),

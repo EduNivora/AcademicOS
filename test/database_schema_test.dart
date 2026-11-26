@@ -374,7 +374,7 @@ void main() {
   );
 
   test(
-    'schema v11 upgrades to v13 and adds completion timestamps without losing course data',
+    'schema v11 upgrades to v14 and adds the assistant ledger without losing course data',
     () async {
       final helper = DatabaseHelper.instance;
       await helper.close();
@@ -398,7 +398,19 @@ void main() {
 
         final upgradedDb = await helper.database;
         final version = await upgradedDb.rawQuery('PRAGMA user_version');
-        expect(version.single['user_version'], 13);
+        expect(version.single['user_version'], 14);
+
+        final ledgerTables = await upgradedDb.rawQuery(
+          '''
+          SELECT name FROM sqlite_master
+          WHERE type = 'table' AND name IN (?, ?)
+          ''',
+          ['assistant_action_runs', 'assistant_action_steps'],
+        );
+        expect(
+          ledgerTables.map((row) => row['name']),
+          containsAll(['assistant_action_runs', 'assistant_action_steps']),
+        );
 
         final termColumns = await upgradedDb.rawQuery(
           'PRAGMA table_info(academic_terms)',
