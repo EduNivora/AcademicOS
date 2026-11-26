@@ -80,13 +80,16 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
 
   Future<bool> _recoverAssistantLedger() async {
     try {
-      final recovered = await DatabaseHelper.instance.recoverInterruptedAssistantRuns();
+      final recovered = await DatabaseHelper.instance
+          .recoverInterruptedAssistantRuns();
       if (recovered > 0 && mounted) {
         setState(() => _interruptedRunsDetected = recovered);
       }
       return true;
     } catch (error) {
-      debugPrint('Assistant execution ledger recovery failed: ${error.runtimeType}');
+      debugPrint(
+        'Assistant execution ledger recovery failed: ${error.runtimeType}',
+      );
       return false;
     }
   }
@@ -158,7 +161,8 @@ class _AcademicAiScreenState extends State<AcademicAiScreen> {
         .trim();
     if (courseName.isEmpty) return 'اكتب اسم المادة بوضوح.';
 
-    final extension = (file.extension ?? file.name.split('.').last).toLowerCase();
+    final extension = (file.extension ?? file.name.split('.').last)
+        .toLowerCase();
     final call = AcademicAssistantToolCall(
       name: 'add_material_file',
       arguments: {
@@ -319,7 +323,9 @@ $userMessage''';
       if (raw is! Map) {
         return 'الخطة غير صالحة. لم يتم تنفيذ أي إجراء.';
       }
-      calls.add(AcademicAssistantToolCall.fromJson(Map<String, dynamic>.from(raw)));
+      calls.add(
+        AcademicAssistantToolCall.fromJson(Map<String, dynamic>.from(raw)),
+      );
     }
     return (await _executeTrackedActions(
       calls,
@@ -331,10 +337,9 @@ $userMessage''';
   Future<String?> _runLocalCommand(String input) async {
     final call = const AcademicAssistantCommandParser().parse(input);
     if (call == null) return null;
-    return (await _executeTrackedActions(
-      [call],
-      source: 'local_command',
-    )).message;
+    return (await _executeTrackedActions([
+      call,
+    ], source: 'local_command')).message;
   }
 
   Future<bool?> _showActionConfirmation(
@@ -492,14 +497,14 @@ $userMessage''';
           status: outcome.succeeded
               ? 'succeeded'
               : outcome.cancelled
-                  ? 'cancelled'
-                  : 'failed',
+              ? 'cancelled'
+              : 'failed',
           changedData: outcome.changedData,
           failureCode: outcome.succeeded
               ? null
               : outcome.cancelled
-                  ? 'user_cancelled'
-                  : 'action_failed',
+              ? 'user_cancelled'
+              : 'action_failed',
         );
         currentStep = -1;
 
@@ -522,11 +527,11 @@ $userMessage''';
         }
         final runStatus = outcome.cancelled
             ? succeededCount > 0
-                ? 'partial_failure'
-                : 'cancelled'
+                  ? 'partial_failure'
+                  : 'cancelled'
             : succeededCount > 0
-                ? 'partial_failure'
-                : 'failed';
+            ? 'partial_failure'
+            : 'failed';
         await ledger.updateAssistantActionRun(
           runId: runId,
           status: runStatus,
@@ -572,12 +577,15 @@ $userMessage''';
             failureCode: 'execution_interrupted',
           );
         } catch (ledgerError) {
-          debugPrint('Assistant ledger finalization failed: ${ledgerError.runtimeType}');
+          debugPrint(
+            'Assistant ledger finalization failed: ${ledgerError.runtimeType}',
+          );
         }
       }
       debugPrint('Assistant tracked execution failed: ${error.runtimeType}');
       return _AssistantTrackedRunResult(
-        message: 'توقفت الخطة بسبب خطأ أثناء التنفيذ أو تسجيل نتيجته. '
+        message:
+            'توقفت الخطة بسبب خطأ أثناء التنفيذ أو تسجيل نتيجته. '
             'افحص سجل التنفيذ قبل إعادة الطلب لتجنب تكرار أي خطوة.',
         succeeded: false,
         changedData: anyChangedData || currentStep >= 0,
@@ -612,15 +620,21 @@ $userMessage''';
         );
       }
       if (result.changedData) {
-        final verified = await _actionExecutor.verifyPostcondition(call, result);
+        final verified = await _actionExecutor.verifyPostcondition(
+          call,
+          result,
+        );
         try {
           await widget.onDataChanged?.call();
         } catch (callbackError) {
-          debugPrint('Assistant refresh callback failed: ${callbackError.runtimeType}');
+          debugPrint(
+            'Assistant refresh callback failed: ${callbackError.runtimeType}',
+          );
         }
         if (!verified) {
           return _AssistantActionOutcome(
-            message: 'تمت محاولة التغيير، لكن تعذر تأكيد النتيجة بعد إعادة قراءة البيانات المحفوظة. '
+            message:
+                'تمت محاولة التغيير، لكن تعذر تأكيد النتيجة بعد إعادة قراءة البيانات المحفوظة. '
                 'لم أعتبر العملية ناجحة؛ راجع سجل التنفيذ قبل إعادة المحاولة لتجنب التكرار.',
             succeeded: false,
             changedData: true,
@@ -635,7 +649,8 @@ $userMessage''';
     } catch (error) {
       debugPrint('Assistant action failed: ${error.runtimeType}');
       return _AssistantActionOutcome(
-        message: 'تعذر تنفيذ العملية والتحقق من نتيجتها. راجع سجل التنفيذ قبل إعادة المحاولة.',
+        message:
+            'تعذر تنفيذ العملية والتحقق من نتيجتها. راجع سجل التنفيذ قبل إعادة المحاولة.',
         succeeded: false,
         changedData: changedData,
       );
@@ -648,7 +663,9 @@ $userMessage''';
       return;
     }
     try {
-      final history = await DatabaseHelper.instance.getAssistantActionHistory(limit: 20);
+      final history = await DatabaseHelper.instance.getAssistantActionHistory(
+        limit: 20,
+      );
       if (!mounted) return;
       await showDialog<void>(
         context: context,
@@ -677,7 +694,10 @@ $userMessage''';
                         children: [
                           if (status == 'interrupted')
                             const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 6,
+                              ),
                               child: Text(
                                 'لم تتم إعادة تنفيذ أي خطوة تلقائياً بعد إعادة تشغيل التطبيق.',
                               ),
@@ -686,8 +706,12 @@ $userMessage''';
                             final changed = step['changed_data'] == 1;
                             return ListTile(
                               dense: true,
-                              leading: Icon(_stepStatusIcon(step['status']?.toString())),
-                              title: Text(_actionLabel(step['action_name']?.toString())),
+                              leading: Icon(
+                                _stepStatusIcon(step['status']?.toString()),
+                              ),
+                              title: Text(
+                                _actionLabel(step['action_name']?.toString()),
+                              ),
                               subtitle: Text(
                                 '${_stepStatusLabel(step['status']?.toString())}'
                                 '${changed ? ' • تم تغيير البيانات' : ''}',
@@ -956,7 +980,8 @@ $userMessage''';
                     child: const Text('عرض السجل'),
                   ),
                   TextButton(
-                    onPressed: () => setState(() => _interruptedRunsDetected = 0),
+                    onPressed: () =>
+                        setState(() => _interruptedRunsDetected = 0),
                     child: const Text('إخفاء'),
                   ),
                 ],
