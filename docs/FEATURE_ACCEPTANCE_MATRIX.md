@@ -175,17 +175,30 @@ The Phase 0 branch is not accepted until exact-head CI passes. The Phase 1 accep
 
 | Feature | Implementation evidence | Acceptance state | Remaining |
 |---|---|---|---|
-| Dedicated academic reports screen | Existing `AcademicReportsScreen` remains the home-screen destination | COMPLETED for preserved UI | Widget and exact-head CI evidence |
-| Academic report generation | Daily/weekly/monthly/final reports remain in `AcademicReportService` using local courses, tasks, exams and schedules | IMPLEMENTED — NOT VERIFIED | Unit tests and Flutter CI on this PR |
-| Report export | TXT save and clipboard copy remain in the standalone report screen | IMPLEMENTED — NOT VERIFIED | Platform-specific widget/CI evidence |
-| Combined backup/report screen | Removed; it was not the home-screen report destination | IMPLEMENTED — NOT VERIFIED | Search regression and CI |
-| Backup payload validator and tests | Removed with its only application consumer | IMPLEMENTED — NOT VERIFIED | Confirm no remaining code references |
-| Whole-workspace replacement API | Removed after reference audit showed only restore screen/tests consumed it | IMPLEMENTED — NOT VERIFIED | Confirm CRUD and attachment persistence tests pass |
-| Academic CRUD and SQLite BLOB persistence | Ordinary insert/update/delete and material BLOB methods retained | IMPLEMENTED — NOT VERIFIED | Full regression suite |
-| Backup/restore product capability | Explicitly excluded in product scope and architecture | IMPLEMENTED — NOT VERIFIED | Final search and exact-head CI |
+| Dedicated academic reports screen | Existing `AcademicReportsScreen` remains the home-screen destination; standalone screen widget tests pass on the exact PR #68 source head | CI VERIFIED | Platform-specific file-save/clipboard acceptance remains separate |
+| Academic report generation | Daily/weekly/monthly/final reports remain in `AcademicReportService` using local courses, tasks, exams and schedules; report unit tests pass | CI VERIFIED | Continue platform acceptance for date/locale edge cases |
+| Report export | TXT save and clipboard copy remain in the standalone report screen; UI is covered by widget tests | UI/WIDGET CI VERIFIED | Actual Android file-picker/save and clipboard behavior is not proven by the current automated gate |
+| Combined backup/report screen | Removed; the existing standalone report destination is preserved | REMOVED / CI VERIFIED | No remaining Phase 1 acceptance work |
+| Backup payload validator and tests | Removed with its only application consumer and restore-specific tests | REMOVED / CI VERIFIED | No remaining Phase 1 acceptance work |
+| Whole-workspace replacement API | Removed after reference audit showed only restore screen/tests consumed it | REMOVED / CI VERIFIED | Ordinary CRUD and attachment regression coverage passed |
+| Academic CRUD and SQLite BLOB persistence | Ordinary insert/update/delete and material BLOB methods retained | REGRESSION CI VERIFIED | Physical-device and upgrade-path acceptance remain separate |
+| Backup/restore product capability | Explicitly excluded in product scope, architecture, roadmap and privacy copy | EXCLUDED / DOCUMENTED | Do not reintroduce UI, services, routes, APIs or database replacement |
 
 Report export is a TXT report only. It must not be treated as backup/export of the academic database.
 
+
+## Phase 1 exact-head CI update — 2026-11-25
+
+PR #68 source head `999dd635ebaa5ed362efb02a84e60ec5354141ac` passed [Flutter quality run #45531164225](https://github.com/EduNivora/AcademicOS/actions/runs/45531164225):
+- 155 Flutter automated tests passed.
+- Dart analyzer reported 0 errors, 0 warnings and 43 informational findings.
+- Changed-file formatting passed.
+- Android native SQLite create/persist/close/reopen integration passed after one bounded emulator retry.
+- Android Debug APK build and package/launcher verification passed.
+- Web Release build passed. Its WebAssembly dry run still reports unsupported imports from `flutter_secure_storage_web`; this does not fail the normal Web Release build and does not establish Web runtime acceptance.
+- Optional production-signed ARM64 APK was skipped because signing secrets/configuration were unavailable.
+
+The CI run above applies to source SHA `162387b...`, not to the later documentation refresh. The resulting documentation head must pass a new exact-head run before PR #68 is merged. Physical-device validation, real file-save/clipboard behavior, production signing and Web runtime acceptance remain outside this Phase 1 CI result.
 
 ## Phase 3 — document viewer and lazy attachment loading
 

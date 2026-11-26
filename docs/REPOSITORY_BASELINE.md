@@ -1,15 +1,15 @@
 # AcademicOS — Repository Baseline
 
-**Snapshot date:** 2026-11-24 (UTC)  
+**Snapshot date:** 2026-11-26 (UTC)  
 **Repository:** [EduNivora/AcademicOS](https://github.com/EduNivora/AcademicOS)  
 **Default branch:** `main`  
-**Baseline SHA:** `989ad5212971097df868dabab557c1c076d91720`  
+**Baseline SHA:** `9df489c0f8c1d960cae337033717fc27a78ff4ec`  
 **Visibility:** public  
 **Repository permissions observed:** admin / maintain / push available to the connected GitHub identity.
 
 ## Verified repository state
 
-- The live `refs/heads/main` API returned the baseline SHA above. It matches the supplied reference SHA.
+- The live `refs/heads/main` API returned `a84d62016ec1c3d2febe9e054f2c43b335d1cba4`. The pre-Phase-0 historical baseline was `989ad5212971097df868dabab557c1c076d91720`.
 - The default branch is `main`; no changes were made directly to it.
 - The repository PR inventory endpoint returned 53 PRs: 36 open, 17 closed, 12 merged.
 - At the initial baseline snapshot, branch search returned 60 names on its first page and a continuation cursor. A later full branches API snapshot is recorded below.
@@ -25,6 +25,8 @@
 | [#57](https://github.com/EduNivora/AcademicOS/pull/57) | `2ce5e1c9c52745de79fba281fc9e4d9e8d2882ac` | main at baseline SHA | Analysis and Flutter tests passed; Android emulator step failed | Focused CI fix. Emulator log shows app install followed by “Error waiting for a debug connection: The log reader stopped unexpectedly”; no Flutter test failure. Keep unmerged until a fresh full CI run succeeds. |
 | [#58](https://github.com/EduNivora/AcademicOS/pull/58) | `877e7c637c263c0c3eedfd984aa26e8d260f8faf` | main at baseline SHA | Analysis and Flutter tests passed; emulator process/system_server crashed during integration | Focused DB close/reopen regression test. Failure is emulator/runtime instability in this run, not evidence that the Flutter test suite failed. Require fresh exact-head CI. |
 | [#59](https://github.com/EduNivora/AcademicOS/pull/59) | `d6759a347c731b624c0b0d3931fb07bafeb3f1ae` | QA branch at `b0faf987...` | Flutter and assistant safety workflows succeeded | Stacked on #50/QA, not main. Its green CI does not establish main readiness. |
+| [#60](https://github.com/EduNivora/AcademicOS/pull/60) | `d4962ea5f0bb803f5a67d9a08cfeef60c07a1134` | main at historical baseline | Flutter quality run [#45501790768](https://github.com/EduNivora/AcademicOS/actions/runs/45501790768) succeeded; merged as `a84d620...` with the same tree | Merged; Phase 0 baseline and workflow hardening are now in main. |
+| [#68](https://github.com/EduNivora/AcademicOS/pull/68) | `999dd635ebaa5ed362efb02a84e60ec5354141ac` | main at `a84d620...` | Exact-head Flutter quality run [#45531164225](https://github.com/EduNivora/AcademicOS/actions/runs/45531164225) succeeded: 155 tests, 0 analyzer errors/warnings, Android SQLite integration and Android/Web builds | Merged into `main` as `9df489c0f8c1d960cae337033717fc27a78ff4ec`; exact-head CI succeeded. |
 
 Combined commit statuses returned no legacy status contexts for the seven queried SHAs; Actions run evidence above is the stronger available evidence.
 
@@ -56,3 +58,20 @@ GitHub API inventory and file reads were available. A local Git clone could not 
 - No PR was merged and no production branch, database, secret or user data was changed.
 
 The PR inventory and branch count above are a current execution snapshot; refresh them again before merging.
+
+
+## Current execution update — 2026-11-25
+
+- Current `main` is `a84d62016ec1c3d2febe9e054f2c43b335d1cba4`, the merge commit for PR #60. Its tree is identical to the Phase 0 head `d4962ea5f0bb803f5a67d9a08cfeef60c07a1134`, whose Flutter quality run #45501790768 succeeded.
+- PR #68 targets `main` directly. Its source head `999dd635ebaa5ed362efb02a84e60ec5354141ac` passed Flutter quality run #45531164225: 155 Flutter tests, Dart analyzer 0 errors/0 warnings/42 infos, Android SQLite integration, Android Debug APK/package verification and Web Release build.
+- The Phase 1 branch ancestry was synchronized with current main using a tree-preserving merge commit. A subsequent documentation-only update records the current acceptance evidence and must pass a new exact-head run before merge.
+- No production deployment, Neon/database migration, secret change or user-data mutation was performed.
+- Production-signed ARM64 APK generation remains unverified because signing configuration was not available; WebAssembly dry-run compatibility warnings are documented separately.
+
+
+## Current execution state — 2026-11-26
+
+- `main` now points to `9df489c0f8c1d960cae337033717fc27a78ff4ec`, the merge commit for PR #68. PR #60 Phase 0 remains included in the mainline ancestry.
+- PR #68 Phase 1 passed exact-head run [#45531164225](https://github.com/EduNivora/AcademicOS/actions/runs/45531164225): 155 Flutter tests, analyzer 0 errors/0 warnings/43 infos, Android native SQLite integration, Android Debug APK/package verification and Web Release build. Optional signed ARM64 output was skipped because signing configuration was unavailable.
+- PR #69 Phase 3 and PR #70 Phase 4 remain open and stacked. The Flutter Android integration job needs a fresh exact-head run after replacing the flaky Flutter Driver teardown with `flutter test` on the device. PR #70 Neon backend quality passed on its recorded head.
+- No production deployment, Neon migration, secret change or user-data mutation is included in this synchronization.
