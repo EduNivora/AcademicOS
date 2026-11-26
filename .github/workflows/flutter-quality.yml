@@ -194,7 +194,7 @@ jobs:
           set -euo pipefail
           flutter test --no-pub 2>&1 | tee flutter-test.log
 
-      - name: Verify native SQLite on Android emulator
+      - name: Verify native SQLite and document integration on Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         env:
           ANDROID_I_WANT_MY_TCG: 'yes'
@@ -207,10 +207,11 @@ jobs:
           ram-size: 4096
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           disable-animations: true
-          # This action executes each newline as a separate shell command, so keep the
-          # complete POSIX shell program on one folded line.
+          # Run the integration_test directory with Flutter's device test runner.
+          # This avoids flutter drive's flaky "Failed to stop app" teardown after
+          # the tests have already passed, and runs both Android integration suites.
           script: >-
-            test_file=integration_test/database_android_integration_test.dart; for attempt in 1 2; do if timeout 120 adb wait-for-device; then boot_ready=0; for probe in $(seq 1 30); do boot_state="$(timeout 2 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"; if [ "$boot_state" = "1" ]; then boot_ready=1; break; fi; sleep 2; done; package_ready=0; if [ "$boot_ready" -eq 1 ]; then for package_probe in $(seq 1 60); do if timeout 5 adb shell cmd package list packages >/dev/null 2>&1; then package_ready=1; break; fi; sleep 5; done; fi; if [ "$boot_ready" -eq 1 ] && [ "$package_ready" -eq 1 ]; then sleep 10; if timeout 300 flutter drive --driver=test_driver/integration_test.dart --target="$test_file" --no-pub -d emulator-5554 && timeout 300 flutter drive --driver=test_driver/integration_test.dart --target=integration_test/document_viewer_android_integration_test.dart --no-pub -d emulator-5554; then exit 0; fi; fi; fi; echo "Android SQLite integration attempt $attempt failed (boot_ready=$boot_ready package_ready=$package_ready)."; timeout 10 adb devices -l || true; if [ "$attempt" -lt 2 ]; then timeout 10 adb reconnect || true; sleep 15; fi; done; echo "Android SQLite integration test failed after bounded retries."; timeout 20 adb logcat -d -t 2000 || true; timeout 10 adb shell getprop sys.boot_completed || true; exit 1
+            for attempt in 1 2; do boot_ready=0; package_ready=0; if timeout 120 adb wait-for-device; then for probe in $(seq 1 30); do boot_state="$(timeout 2 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"; if [ "$boot_state" = "1" ]; then boot_ready=1; break; fi; sleep 2; done; if [ "$boot_ready" -eq 1 ]; then for package_probe in $(seq 1 60); do if timeout 5 adb shell cmd package list packages >/dev/null 2>&1; then package_ready=1; break; fi; sleep 5; done; fi; fi; if [ "$boot_ready" -eq 1 ] && [ "$package_ready" -eq 1 ]; then sleep 10; if timeout 600 flutter test --no-pub -d emulator-5554 integration_test; then exit 0; fi; fi; echo "Android integration attempt $attempt failed (boot_ready=$boot_ready package_ready=$package_ready)."; timeout 10 adb devices -l || true; if [ "$attempt" -lt 2 ]; then timeout 10 adb reconnect || true; sleep 15; fi; done; echo "Android SQLite/document integration tests failed after bounded retries."; timeout 20 adb logcat -d -t 2000 || true; timeout 10 adb shell getprop sys.boot_completed || true; exit 1
 
       - name: Prepare optional production signing
         shell: bash
