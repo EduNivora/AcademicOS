@@ -594,7 +594,9 @@ class DatabaseHelper {
       );
       history.add({
         ...Map<String, dynamic>.from(run),
-        'steps': steps.map(Map<String, dynamic>.from).toList(growable: false),
+        'steps': steps
+            .map((step) => Map<String, dynamic>.from(step))
+            .toList(growable: false),
       });
     }
     return history;
