@@ -488,9 +488,9 @@ $userMessage''';
     final statusText = _isCheckingSession
         ? 'جارٍ التحقق من الاتصال...'
         : _isGeminiReady
-        ? 'Gemini 3.8 Flash جاهز'
+        ? 'خدمة Gemini مهيأة'
         : _hasCloudSession
-        ? 'الحساب متصل — خدمة Gemini بانتظار المفتاح'
+        ? 'الحساب متصل — خدمة Gemini غير جاهزة حالياً'
         : 'المساعد المحلي يعمل';
 
     return Scaffold(
