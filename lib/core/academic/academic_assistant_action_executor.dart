@@ -476,7 +476,7 @@ class AcademicAssistantActionExecutor {
       }) {
         final id = _integer(args['course_id']);
         final name = _string(args, 'course_name');
-        if (args.containsKey('course_id') && id == null) {
+        if (args['course_id'] != null && id == null) {
           throw StateError('معرّف المادة يجب أن يكون عدداً صحيحاً موجباً.');
         }
         if (id == null && name.isEmpty) {
@@ -507,7 +507,7 @@ class AcademicAssistantActionExecutor {
       TaskEntity resolveTask(Map<String, dynamic> args) {
         final id = _integer(args['task_id']);
         final title = _string(args, 'task_title');
-        if (args.containsKey('task_id') && id == null) {
+        if (args['task_id'] != null && id == null) {
           throw StateError('معرّف المهمة يجب أن يكون عدداً صحيحاً موجباً.');
         }
         if (id != null) {
@@ -982,7 +982,7 @@ class AcademicAssistantActionExecutor {
               ? (isCreate ? 15 : task.reminderOffsetMinutes)
               : rawReminderOffset.clamp(0, 1440).toInt();
           final courseSpecified =
-              args.containsKey('course_id') ||
+              args['course_id'] != null ||
               _string(args, 'course_name').isNotEmpty;
           if (courseSpecified) {
             final courseResult = await _resolveCourse(args);
@@ -1051,7 +1051,7 @@ class AcademicAssistantActionExecutor {
               ? (isCreate ? 15 : null)
               : rawReminderOffset.clamp(0, 1440).toInt();
           final courseSpecified =
-              args.containsKey('course_id') ||
+              args['course_id'] != null ||
               _string(args, 'course_name').isNotEmpty;
           final courseResult = courseSpecified
               ? await _resolveCourse(args)
@@ -1100,7 +1100,7 @@ class AcademicAssistantActionExecutor {
           final location = _string(call.arguments, 'location');
           final notes = _string(call.arguments, 'notes');
           final courseSpecified =
-              call.arguments.containsKey('course_id') ||
+              call.arguments['course_id'] != null ||
               _string(call.arguments, 'course_name').isNotEmpty;
           final courseResult = courseSpecified
               ? await _resolveCourse(call.arguments)
@@ -1553,7 +1553,7 @@ class AcademicAssistantActionExecutor {
     }
     final type = _string(args, 'type');
     final courseSpecified =
-        args.containsKey('course_id') ||
+        args['course_id'] != null ||
         _string(args, 'course_name').isNotEmpty;
     final courseResult = courseSpecified ? await _resolveCourse(args) : null;
     if (courseResult?.error != null ||
