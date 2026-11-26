@@ -7,7 +7,16 @@ concurrency:
 on:
   push:
     branches:
+      - main
       - feat/edunivora-gemini-ai
+    paths:
+      - "backend/neon/functions/ai/**"
+      - "package.json"
+      - "neon.ts"
+      - ".github/workflows/neon-ai-function-bundle.yml"
+  pull_request:
+    branches:
+      - main
     paths:
       - "backend/neon/functions/ai/**"
       - "package.json"
@@ -33,14 +42,23 @@ jobs:
           npm test
       - name: Build standalone Node.js 24 AI bundle
         run: npm run build:ai
-      - name: Package deployable Neon function
+      - name: Package deployable Neon function with runtime dependencies
         shell: bash
         run: |
           set -euo pipefail
           package_dir="$RUNNER_TEMP/ai-function"
           mkdir -p "$package_dir"
           cp backend/neon/dist/ai.mjs "$package_dir/index.mjs"
-          printf '{"type":"module"}\n' > "$package_dir/package.json"
+          cat > "$package_dir/package.json" <<'JSON'
+          {
+            "type": "module",
+            "dependencies": {
+              "@neon/functions": "0.11.0",
+              "pg": "8.16.3"
+            }
+          }
+          JSON
+          npm install --prefix "$package_dir" --omit=dev --ignore-scripts --no-audit --no-fund
           (cd "$package_dir" && zip -9qr "$RUNNER_TEMP/ai-function.zip" .)
       - name: Upload deployable AI bundle
         uses: actions/upload-artifact@v4
