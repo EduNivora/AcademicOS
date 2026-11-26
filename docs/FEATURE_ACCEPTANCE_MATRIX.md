@@ -21,7 +21,7 @@
 | Exams | Present / partially verified | Exam model tests and academic report tests | CRUD lifecycle, course association, past/upcoming filtering, timezone and boundary-date tests |
 | Grades and GPA tools | Present / unverified | GPA/grade screens and calculation code are present | Formula validation, credit weighting, rounding, edge cases, empty/incomplete grades and regression tests |
 | Study planning and focus | Present / unverified | Study planner and focus timer screens are present | Persisted sessions, pause/resume, timer lifecycle, schedule integration, app background/foreground behavior |
-| Course materials | Implemented / CI verified; runtime acceptance pending | PR #17 is merged into the Release 1 integration branch. SQLite BLOB migration, bytes-only picker import, guarded legacy-temp migration, attachment-byte persistence and regression coverage are present; exact integration head `8904bf0af783c7f01d24bbbd70922a69af680e15` passed Flutter analysis/tests and Android Debug build in run `43753940254` | Android/Web persistence runtime checks, large-file behavior, legacy migration fixtures, viewer lifecycle and restart/upgrade persistence on supported platforms. Backup inclusion remains Release 2 |
+| Course materials | Implemented / CI verified; runtime acceptance pending | PR #17 is merged into the Release 1 integration branch. SQLite BLOB migration, bytes-only picker import, guarded legacy-temp migration, attachment-byte persistence and regression coverage are present; exact integration head `8904bf0af783c7f01d24bbbd70922a69af680e15` passed Flutter analysis/tests and Android Debug build in run `43753940254` | Android/Web persistence runtime checks, large-file behavior, legacy migration fixtures, viewer lifecycle and restart/upgrade persistence on supported platforms. Backup/restore are excluded from the product. |
 | Academic dashboard and reports | Present / partially verified | Dashboard and report service tests | Reconciliation against source records, empty-state behavior, date boundaries and large datasets |
 | Academic AI assistant | Present / partially verified | Assistant service and dashboard tests; intent/action code exists | Malformed-input safety, deterministic action execution, confirmation for destructive actions, permissions, offline behavior and action auditability |
 | Notifications and reminders | Present / unverified | Local notification/timezone dependencies and feature code exist | Android notification permission/channel tests, exact-fire-time checks, reboot behavior, timezone/DST, iOS/Web/Desktop support claims |
@@ -37,8 +37,8 @@
 | App lock / PIN | Present / partially verified | Argon2id PIN verification, legacy migration and throttling tests | Biometric enrollment/removal, lifecycle lock timing, device tests and clock-tampering resilience |
 | Persistent SQLite storage | Present / partially verified | Database helper, schema versioning and database tests; startup fails closed | Migration from every supported schema, crash recovery, concurrent access, corruption handling and device/browser persistence tests |
 | SQLite encryption at rest | **Not implemented** | Production database key is not connected to an encrypted SQLite engine. PR #12 remains an isolated compatibility proof only; it does not encrypt the production database. The Release 1 integration branch still uses the ordinary SQLite factories | Production driver integration, complete plugin/platform compatibility, on-disk ciphertext inspection, wrong-key rejection, key lifecycle and crash-safe migration/rollback are required before claiming encryption |
-| JSON backup validation | Present / partially verified | Strict payload validator and malformed/duplicate/orphan-reference tests | Fuzzing, schema compatibility guarantees, large payload handling and end-to-end rollback/failure injection |
-| Backup export/import | Deferred to Release 2; excluded from Release 1 | Legacy JSON export/import code and backup validation remain in the repository as unaccepted work-in-progress; backup screens must not be exposed in Release 1. PR #13 remains a separate Draft security mitigation and is not part of Release 1 acceptance | Reassess during Release 2: encrypted archive, complete database/settings/attachment payload, manifest/checksums, staged restore, rollback, cross-device recovery, cleanup and Web/browser acceptance |
+| Backup/restore implementation | Removed / excluded | Backup serializer, validator, UI and whole-workspace replacement are removed from the Phase 1 branch | No backup/restore acceptance work is in scope |
+| Backup export/import | Excluded from AcademicOS | No in-app backup/export archive, import, restore or database replacement is shipped | Not applicable; do not add backup UI, services, routes or dependencies |
 | Cloud sync and multi-device conflict resolution | **Not implemented** | No verified sync backend or conflict-resolution implementation | Product decision, threat model, sync protocol, conflict strategy, encryption/key lifecycle and offline queue semantics |
 
 | Registered announcement receipts | Implemented / end-to-end unverified | Flutter obtains Neon JWTs and sends Bearer-authenticated delivery/read receipts; repository tests cover registered-versus-guest routing | Exact-head Flutter CI, live JWT verification and idempotent database receipts, session expiry, and Web CORS |
@@ -86,11 +86,11 @@ The following decisions are binding scope for future implementation and acceptan
 | App entry | Guest-first; no login required to open or use core academic features | Fresh install opens to usable app; guest CRUD works offline; account prompts are optional |
 | Accounts | Optional Google or email/password account | Central database contains only minimum account identity/profile fields; no academic records or files |
 | Academic data | Local-only | Terms, courses, schedule, tasks, exams, notes, settings, materials and reports remain on device; no remote academic sync |
-| Attachments | Durable app-owned local storage | File bytes persist across restart/upgrade; backup inclusion is a Release 2 gate |
-| Google Drive backup | Deferred to Release 2; excluded from Release 1 | Do not merge or expose backup UI in Release 1; Release 2 must meet full encryption, completeness, restore and platform acceptance |
-| Backup trigger | Release 2 only | Explicit user-initiated backup; no scheduled/automatic backup requirement unless separately approved |
-| Backup cryptography | Release 2 only | Student-chosen password, memory-hard KDF, wrapped random key, authenticated encryption, tamper/wrong-password rejection |
-| Backup completeness and restore | Release 2 only | Full database, attachments, settings, manifest/checksums, staged restore, rollback, cross-device recovery and failure-injection tests |
+| Attachments | Durable app-owned local storage | File bytes persist across restart/upgrade; they remain local academic data and are not packaged for backup |
+| Backup and restore | Excluded | No UI, service, API, route or product flow | Not applicable |
+| Backup trigger | Excluded | No backup trigger or scheduled operation | Not applicable |
+| Backup cryptography | Excluded | No backup archive or backup-password feature | Not applicable |
+| Backup completeness and restore | Excluded | No whole-workspace snapshot or restore operation | Not applicable |
 | Notices | Public notices for all app installations, guests and accounts | Notice appears in app; online installations can acknowledge delivery and opening |
 | Notice analytics | Named receipts for registered accounts; anonymous aggregates for guests | No guest identity or stable guest profile; delivery and read events are distinct and timestamped |
 | Operator tooling | Minimal notice publishing/reporting only | Separate protected interface; no student/lecturer/attendance/finance/university administration |
@@ -107,9 +107,9 @@ Notice delivery is not guaranteed while a device is offline or notifications are
 
 ## Release boundary decision — 2026-11-15
 
-Google Drive backup, encrypted archive export/import, upload/download and backup-specific UI are **deferred to Release 2**. They are not Release 1 acceptance gates and must not delay the core academic application, optional accounts, public notices, local persistence, security hardening or Release 1 validation.
+Backup, restore, archive export/import and cloud-drive transfer are **excluded from AcademicOS**. The core academic application retains local persistence, academic reports and TXT report export.
 
-Existing PRs/branches for backup are parked as draft work. Do not merge them into the Release 1 integration branch. Reassess their code, dependencies and security assumptions during Release 2 planning; passing isolated tests does not change the release boundary.
+Historical backup-related PRs/branches are not part of the product and must not be merged into the application. Their presence as Git history does not make the capability available or supported.
 
 
 ## Neon account and public-notice backend — implementation status (2026-11-15)
@@ -149,7 +149,7 @@ This addendum supersedes stale CI/PR references above where they conflict with t
 - Neon Auth config inspection confirms email/password with required email verification configured as OTP, but no production trusted origins, no project-owned Google OAuth credentials, and a shared development email sender. Flutter auth tests are adapter-level mocks, not real-account end-to-end tests.
 - The first-admin bootstrap SQL is an operator-only procedure and has not been executed. No admin account or app user records were present at the last database inspection.
 - Guest analytics remain aggregate event counters, not unique guest counts. Rate limiting/abuse controls and retention/purge policy remain incomplete.
-- Google Drive backup, encrypted archive, restore and scheduled backup remain deferred to Release 2 by approved scope. Production SQLite encryption is not accepted for Release 1.
+- Backup and restore are excluded from AcademicOS. Production SQLite encryption remains a separate security decision.
 
 Do not mark Release 1 ready from the backend or bundle checks alone. The exact-head Flutter gate, real auth/JWT flows, deployed API verification, Web origin/CORS, first-admin bootstrap, and platform runtime acceptance remain release blockers.
 
@@ -161,11 +161,41 @@ Baseline SHA: `989ad5212971097df868dabab557c1c076d91720`.
 | Feature / gate | Evidence | State | Remaining |
 |---|---|---|---|
 | Repository identity and baseline | Public repository, default branch `main`, exact SHA verified through GitHub refs API | COMPLETED | Refresh before merge |
-| PR inventory and integration dependencies | 53 PRs: 36 open, 17 closed, 12 merged; detailed active overlap map in `docs/PR_INTEGRATION_MAP.md` | COMPLETED | Refresh before merge |
+| PR inventory and integration dependencies | 62 PRs: 34 open, 28 closed, 12 merged; 69 branch refs; detailed active overlap map in `docs/PR_INTEGRATION_MAP.md` | COMPLETED | Refresh before merge |
 | Mainline quality baseline | Actions run [#45433357599](https://github.com/EduNivora/AcademicOS/actions/runs/45433357599) succeeded on exact baseline SHA | COMPLETED | Re-run on this branch |
-| Flutter `tee` failure propagation | Strict Bash pipefail applied to all relevant tee pipelines in the workflow | IMPLEMENTED — NOT VERIFIED | Exact-head CI |
+| Flutter `tee` failure propagation | Strict Bash pipefail applied to all seven `tee` pipelines; related CI workflows use direct commands without tee | IMPLEMENTED — NOT VERIFIED | Exact-head CI run #45501790768 on `d4962ea...` |
 | Android emulator failures on #57/#58 | Flutter tests and analysis passed; emulator failed independently with debug log-reader/system_server instability | BLOCKED | Stable fresh emulator run |
-| Phase 1 backup removal | No source changes yet in this PR | NOT STARTED | Separate Phase 1 PR |
+| Phase 1 backup/restore removal | Source removal and report preservation are implemented in PR #68; branch synchronized with latest Phase 0 head | IMPLEMENTED — NOT VERIFIED | Exact-head tests and CI on synchronized merge commit |
 | Academic report preservation | Dedicated report screen is already launched from home; report service and unit tests exist | COMPLETED for current implementation | Keep independent in Phase 1 |
 
 The Phase 0 branch is not accepted until exact-head CI passes. The Phase 1 acceptance matrix will be updated in its own PR.
+
+
+## Phase 1 — backup/restore removal and report separation
+
+| Feature | Implementation evidence | Acceptance state | Remaining |
+|---|---|---|---|
+| Dedicated academic reports screen | Existing `AcademicReportsScreen` remains the home-screen destination; standalone screen widget tests pass on the exact PR #68 source head | CI VERIFIED | Platform-specific file-save/clipboard acceptance remains separate |
+| Academic report generation | Daily/weekly/monthly/final reports remain in `AcademicReportService` using local courses, tasks, exams and schedules; report unit tests pass | CI VERIFIED | Continue platform acceptance for date/locale edge cases |
+| Report export | TXT save and clipboard copy remain in the standalone report screen; UI is covered by widget tests | UI/WIDGET CI VERIFIED | Actual Android file-picker/save and clipboard behavior is not proven by the current automated gate |
+| Combined backup/report screen | Removed; the existing standalone report destination is preserved | REMOVED / CI VERIFIED | No remaining Phase 1 acceptance work |
+| Backup payload validator and tests | Removed with its only application consumer and restore-specific tests | REMOVED / CI VERIFIED | No remaining Phase 1 acceptance work |
+| Whole-workspace replacement API | Removed after reference audit showed only restore screen/tests consumed it | REMOVED / CI VERIFIED | Ordinary CRUD and attachment regression coverage passed |
+| Academic CRUD and SQLite BLOB persistence | Ordinary insert/update/delete and material BLOB methods retained | REGRESSION CI VERIFIED | Physical-device and upgrade-path acceptance remain separate |
+| Backup/restore product capability | Explicitly excluded in product scope, architecture, roadmap and privacy copy | EXCLUDED / DOCUMENTED | Do not reintroduce UI, services, routes, APIs or database replacement |
+
+Report export is a TXT report only. It must not be treated as backup/export of the academic database.
+
+
+## Phase 1 exact-head CI update — 2026-11-25
+
+PR #68 source head `162387bb4cf7535e93ac1ac9375bbe755893b3ef` passed [Flutter quality run #45523083668](https://github.com/EduNivora/AcademicOS/actions/runs/45523083668):
+- 155 Flutter automated tests passed.
+- Dart analyzer reported 0 errors, 0 warnings and 42 informational findings.
+- Changed-file formatting passed.
+- Android native SQLite create/persist/close/reopen integration passed after one bounded emulator retry.
+- Android Debug APK build and package/launcher verification passed.
+- Web Release build passed. Its WebAssembly dry run still reports unsupported imports from `flutter_secure_storage_web`; this does not fail the normal Web Release build and does not establish Web runtime acceptance.
+- Optional production-signed ARM64 APK was skipped because signing secrets/configuration were unavailable.
+
+The CI run above applies to source SHA `162387b...`, not to the later documentation refresh. The resulting documentation head must pass a new exact-head run before PR #68 is merged. Physical-device validation, real file-save/clipboard behavior, production signing and Web runtime acceptance remain outside this Phase 1 CI result.

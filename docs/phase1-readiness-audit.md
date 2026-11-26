@@ -71,7 +71,7 @@ This inventory confirms code presence, not full end-to-end or physical-device co
 ### E. SQLite at-rest protection is incomplete
 - README explicitly states the local SQLite database is not encrypted in Release 1.
 - Credentials/secrets use secure storage, but that does not encrypt the database file.
-- Treat this as a documented security limitation and perform a threat/compatibility assessment before selecting an encryption migration. Do not change the DB engine or migrate user data without a tested backup/restore and migration plan.
+- Treat this as a documented security limitation and perform a threat/compatibility assessment before selecting an encryption migration. Do not change the DB engine or migrate user data without a tested migration and recovery plan that does not assume backup/restore functionality.
 
 ### F. Database migration and relationship behavior need targeted regression coverage
 - Database schema version is 13.
@@ -120,3 +120,39 @@ Parallel work is limited to read-only reviews and independent test authoring. Do
 The branch has a successful automated baseline, but it is not release-ready. The next blocking work is Gemini activation and authenticated end-to-end assistant verification, followed by data-lifecycle and uncovered notification/document tests. Production signing and physical-device acceptance remain later release gates.
 
 No claim is made that all UI, notifications, documents, AI actions, database upgrade paths, or performance have been verified end-to-end.
+
+
+## Phase 1 implementation addendum — 2026-11-24
+
+- A dedicated academic reports screen already exists at `lib/presentation/reports/academic_reports_screen.dart` and is opened from the home screen. It is preserved rather than recreated.
+- The report service's backup payload serialization was removed while daily, weekly, monthly and final report generation remains.
+- Restore-only `replaceAcademicData`, backup payload validation, and the combined backup/report screen have been removed from the Phase 1 branch. Ordinary academic CRUD, SQLite attachment BLOB persistence and report TXT export are retained.
+- The pending statement above is superseded by the exact-head CI evidence recorded in the 2026-11-25 verification addendum below.
+
+
+## Phase 1 exact-head verification — 2026-11-25
+
+**Repository:** `EduNivora/AcademicOS`  
+**PR:** [#68](https://github.com/EduNivora/AcademicOS/pull/68)  
+**Branch:** `feat/phase1-remove-backup-separate-reports-v8`  
+**Verified source SHA:** `162387bb4cf7535e93ac1ac9375bbe755893b3ef`  
+**Workflow:** [Flutter quality gate run #45523083668](https://github.com/EduNivora/AcademicOS/actions/runs/45523083668)  
+**Result:** SUCCESS.
+
+Exact-head evidence:
+- Dependency resolution completed.
+- Changed-file Dart formatting gate passed.
+- Dart analyzer: **0 errors, 0 warnings, 42 informational findings**.
+- Flutter automated test suite: **155 tests passed**.
+- Android native SQLite integration: **passed**, including database creation and persistence after close/reopen. The first emulator attempt timed out while waiting for the Flutter Driver extension; the bounded retry completed successfully.
+- Android Debug APK build and package/launcher-icon verification passed.
+- Web Release build passed.
+- Optional signed ARM64 release APK was **skipped** because production signing configuration was incomplete (`PRODUCTION_SIGNING_READY=false`). No signed production APK is claimed.
+- The Web build emitted a non-blocking WebAssembly dry-run compatibility warning for `flutter_secure_storage_web` imports (`dart:html`, `dart:js_util`, and `package:js`); the normal Web Release build nevertheless completed successfully.
+
+Review and merge boundary:
+- PR #60 has been merged into `main`; current main SHA at this audit is `a84d62016ec1c3d2febe9e054f2c43b335d1cba4`.
+- The Phase 1 branch was synchronized with that main commit by a tree-preserving merge commit before this documentation refresh.
+- The exact-head CI result above predates the documentation-only acceptance updates now being committed. The updated documentation head must receive its own exact-head CI run before merge.
+- PR #68 had no submitted review records at the time of this audit. Repository branch-protection details were not readable through the connected GitHub integration, so no claim is made about required approval rules.
+- No merge, production deployment, database migration, secret change, or user-data mutation was performed in this verification.

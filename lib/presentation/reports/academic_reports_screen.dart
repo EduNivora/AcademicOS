@@ -8,8 +8,7 @@ import '../../core/academic/academic_report_service.dart';
 import '../../core/notifications/notification_service.dart';
 import '../../data/database/database_helper.dart';
 
-/// Release 1 academic reporting; backup export and restore are deliberately
-/// kept out of the student-facing application until Release 2.
+/// Release 1 academic reporting backed by the student's local academic records.
 class AcademicReportsScreen extends StatefulWidget {
   const AcademicReportsScreen({super.key});
 
@@ -95,15 +94,15 @@ class _AcademicReportsScreenState extends State<AcademicReportsScreen> {
       final message = savedPath == null
           ? 'تم نسخ التقرير إلى الحافظة. لم يتم حفظ ملف.'
           : 'تم حفظ التقرير في $savedPath ونسخه إلى الحافظة.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     } catch (error, stackTrace) {
       debugPrint('Academic report export failed: $error\\n$stackTrace');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر حفظ التقرير: $error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('تعذر حفظ التقرير: $error')));
     }
   }
 

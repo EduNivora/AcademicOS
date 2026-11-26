@@ -48,4 +48,4 @@ audit records. No academic data or files may be written there.
 - The Neon Function is deployed to the default branch and its health route,
   public feed, and unauthenticated admin guard have passed live smoke tests.
   Authenticated JWT flows and end-to-end Flutter behavior remain unverified.
-- Google Drive backup remains Release 2 and is not part of this decision.
+- Backup and restore are excluded from AcademicOS and are not part of this decision.

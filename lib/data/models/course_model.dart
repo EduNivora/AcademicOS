@@ -22,12 +22,12 @@ class CourseModel extends CourseEntity {
   factory CourseModel.fromMap(Map<String, dynamic> map) {
     for (final key in ['name', 'instructor', 'code']) {
       if (map[key] is! String) {
-        throw FormatException('Invalid course backup: "$key" must be a string.');
+        throw FormatException('Invalid course data: "$key" must be a string.');
       }
     }
     if ((map['name'] as String).trim().isEmpty ||
         (map['code'] as String).trim().isEmpty) {
-      throw const FormatException('Invalid course backup: name and code are required.');
+      throw const FormatException('Invalid course data: name and code are required.');
     }
 
     final idValue = map['id'];
@@ -36,7 +36,7 @@ class CourseModel extends CourseEntity {
         ? null
         : DateTime.tryParse(lectureDateValue.toString());
     if (lectureDateValue != null && lectureDate == null) {
-      throw const FormatException('Invalid course backup: lecture_date is not a valid date.');
+      throw const FormatException('Invalid course data: lecture_date is not a valid date.');
     }
 
     return CourseModel(
