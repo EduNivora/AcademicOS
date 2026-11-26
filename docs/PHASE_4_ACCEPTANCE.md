@@ -1,7 +1,7 @@
 # Phase 4 — Academic Assistant Acceptance
 
 Target branch: feat/phase4-secure-academic-assistant-execution  
-Base: Phase 3 branch feat/phase3-document-viewer-rearchitecture  
+Base: main (Phase 3 merged in commit b6520180e0f0b118379dcacf282957ee15041b6d)  
 Product boundary: local-first academic records; Gemini is a remote planner/answering service, not a database executor.
 
 ## Acceptance matrix
