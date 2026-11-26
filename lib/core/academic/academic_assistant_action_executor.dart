@@ -1553,8 +1553,7 @@ class AcademicAssistantActionExecutor {
     }
     final type = _string(args, 'type');
     final courseSpecified =
-        args['course_id'] != null ||
-        _string(args, 'course_name').isNotEmpty;
+        args['course_id'] != null || _string(args, 'course_name').isNotEmpty;
     final courseResult = courseSpecified ? await _resolveCourse(args) : null;
     if (courseResult?.error != null ||
         (courseSpecified && courseResult?.course == null)) {
