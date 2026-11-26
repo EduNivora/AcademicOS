@@ -112,7 +112,14 @@ void main() {
     (tester) async {
       expect(Platform.isAndroid, isTrue);
       final bytes = Uint8List.fromList([0x50, 0x4b, 0x03, 0x04]);
-      final root = await Directory.systemTemp.createTemp(
+      // open_filex exposes files through its Android FileProvider. Keep the
+      // fixture under the app cache directory (not code_cache / systemTemp),
+      // which is one of the provider's configured roots.
+      final cacheDirectory = Directory(
+        '${Directory.systemTemp.parent.parent.path}/cache',
+      );
+      await cacheDirectory.create(recursive: true);
+      final root = await cacheDirectory.createTemp(
         'edunivora-office-intent-',
       );
       addTearDown(() async {
