@@ -119,19 +119,14 @@ void main() {
         '${Directory.systemTemp.parent.path}/cache/edunivora_materials',
       );
       await cacheDirectory.create(recursive: true);
-      final root = await cacheDirectory.createTemp(
-        'edunivora-office-intent-',
-      );
-      addTearDown(() async {
-        if (await root.exists()) await root.delete(recursive: true);
-      });
+      final title =
+          'intent-check-${DateTime.now().microsecondsSinceEpoch}.docx';
       final service = CourseMaterialFileService(
         loadBytes: (_) async => bytes,
-        temporaryDirectory: () async => root,
       );
       final status = await service.openOfficeExternally(
         materialId: 22,
-        title: 'intent-check.docx',
+        title: title,
         fileType: 'docx',
       );
       expect(
@@ -141,11 +136,22 @@ void main() {
           ExternalMaterialOpenStatus.noApp,
         ),
       );
-      final files = Directory(root.path + '/edunivora_materials');
+      final files = Directory(
+        '${Directory.systemTemp.parent.path}/cache/edunivora_materials',
+      );
+      final matchingFiles = files
+          .listSync()
+          .whereType<File>()
+          .where((file) => file.path.endsWith('_$title'))
+          .toList();
       if (status == ExternalMaterialOpenStatus.opened) {
-        expect(files.listSync().whereType<File>(), isNotEmpty);
+        expect(matchingFiles, hasLength(1));
+        expect(await matchingFiles.single.exists(), isTrue);
       } else {
-        expect(files.listSync().whereType<File>(), isEmpty);
+        expect(matchingFiles, isEmpty);
+      }
+      for (final file in matchingFiles) {
+        await file.delete();
       }
     },
   );
