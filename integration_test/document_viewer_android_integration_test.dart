@@ -112,8 +112,9 @@ void main() {
     (tester) async {
       expect(Platform.isAndroid, isTrue);
       final bytes = Uint8List.fromList([0x50, 0x4b, 0x03, 0x04]);
-      // Exercise the production cache path exposed by Android FileProvider,
-      // rather than injecting a test-only temporary directory.
+      // Exercise the production cache path exposed by Android FileProvider.
+      // It must match android/app/src/main/res/xml/filepaths.xml rather than
+      // Dart's code_cache directory or an injected test-only temporary path.
       final title =
           'intent-check-${DateTime.now().microsecondsSinceEpoch}.docx';
       final service = CourseMaterialFileService(loadBytes: (_) async => bytes);
