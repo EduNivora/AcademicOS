@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
@@ -524,7 +525,11 @@ class DatabaseHelper {
 
   Future<List<Map<String, dynamic>>> getAllMaterials() async {
     final db = await database;
-    return db.query(_materialsTable, orderBy: 'created_at DESC');
+    return db.query(
+      _materialsTable,
+      columns: const ['id', 'course_id', 'title', 'file_path', 'file_type', 'created_at'],
+      orderBy: 'created_at DESC',
+    );
   }
 
   /// Returns all student-defined academic terms in chronological order.
@@ -924,6 +929,7 @@ class DatabaseHelper {
     final db = await database;
     return await db.query(
       _materialsTable,
+      columns: const ['id', 'course_id', 'title', 'file_path', 'file_type', 'created_at'],
       where: 'course_id = ?',
       whereArgs: [courseId],
       orderBy: 'created_at DESC',
@@ -933,6 +939,23 @@ class DatabaseHelper {
   Future<int> deleteMaterial(int id) async {
     final db = await database;
     return await db.delete(_materialsTable, where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<Uint8List?> getMaterialFileBytes(int id) async {
+    final db = await database;
+    final rows = await db.query(
+      _materialsTable,
+      columns: const ['file_bytes'],
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    final value = rows.single['file_bytes'];
+    if (value == null) return null;
+    if (value is Uint8List) return value;
+    if (value is List<int>) return Uint8List.fromList(value);
+    return null;
   }
 
   Future<Map<String, dynamic>?> getMaterialById(int id) async {

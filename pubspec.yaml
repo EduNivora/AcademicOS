@@ -28,7 +28,8 @@ dependencies:
   sqflite_common_ffi: ^2.3.3
   sqflite_common_ffi_web: ^1.0.0
   flutter_pdf_text: ^0.9.0
-  offline_document_viewer: ^0.1.0
+  pdfx: ^2.11.0
+  open_filex: ^5.0.0
 
 dev_dependencies:
   flutter_test:

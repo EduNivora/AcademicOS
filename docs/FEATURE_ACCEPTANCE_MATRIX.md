@@ -189,9 +189,9 @@ Report export is a TXT report only. It must not be treated as backup/export of t
 
 ## Phase 1 exact-head CI update — 2026-11-25
 
-PR #68 source head `162387bb4cf7535e93ac1ac9375bbe755893b3ef` passed [Flutter quality run #45523083668](https://github.com/EduNivora/AcademicOS/actions/runs/45523083668):
+PR #68 source head `999dd635ebaa5ed362efb02a84e60ec5354141ac` passed [Flutter quality run #45531164225](https://github.com/EduNivora/AcademicOS/actions/runs/45531164225):
 - 155 Flutter automated tests passed.
-- Dart analyzer reported 0 errors, 0 warnings and 42 informational findings.
+- Dart analyzer reported 0 errors, 0 warnings and 43 informational findings.
 - Changed-file formatting passed.
 - Android native SQLite create/persist/close/reopen integration passed after one bounded emulator retry.
 - Android Debug APK build and package/launcher verification passed.
@@ -199,3 +199,10 @@ PR #68 source head `162387bb4cf7535e93ac1ac9375bbe755893b3ef` passed [Flutter qu
 - Optional production-signed ARM64 APK was skipped because signing secrets/configuration were unavailable.
 
 The CI run above applies to source SHA `162387b...`, not to the later documentation refresh. The resulting documentation head must pass a new exact-head run before PR #68 is merged. Physical-device validation, real file-save/clipboard behavior, production signing and Web runtime acceptance remain outside this Phase 1 CI result.
+
+## Phase 3 — document viewer and lazy attachment loading
+
+- PDF is opened in-app through pdfx; Office files are handed to installed platform apps through open_filex.
+- Course-material list queries return metadata only. The selected attachment BLOB is fetched only after an explicit open action.
+- PDF summary is a separate local pipeline. Scanned/image-only PDFs are reported as non-extractable; OCR and remote document processing are not implied.
+- Exact acceptance evidence is tracked in docs/PHASE_3_ACCEPTANCE.md and docs/DOCUMENT_VIEWER_ARCHITECTURE.md.

@@ -135,14 +135,14 @@ No claim is made that all UI, notifications, documents, AI actions, database upg
 **Repository:** `EduNivora/AcademicOS`  
 **PR:** [#68](https://github.com/EduNivora/AcademicOS/pull/68)  
 **Branch:** `feat/phase1-remove-backup-separate-reports-v8`  
-**Verified source SHA:** `162387bb4cf7535e93ac1ac9375bbe755893b3ef`  
-**Workflow:** [Flutter quality gate run #45523083668](https://github.com/EduNivora/AcademicOS/actions/runs/45523083668)  
+**Verified source SHA:** `999dd635ebaa5ed362efb02a84e60ec5354141ac`  
+**Workflow:** [Flutter quality gate run #45531164225](https://github.com/EduNivora/AcademicOS/actions/runs/45531164225)  
 **Result:** SUCCESS.
 
 Exact-head evidence:
 - Dependency resolution completed.
 - Changed-file Dart formatting gate passed.
-- Dart analyzer: **0 errors, 0 warnings, 42 informational findings**.
+- Dart analyzer: **0 errors, 0 warnings, 43 informational findings**.
 - Flutter automated test suite: **155 tests passed**.
 - Android native SQLite integration: **passed**, including database creation and persistence after close/reopen. The first emulator attempt timed out while waiting for the Flutter Driver extension; the bounded retry completed successfully.
 - Android Debug APK build and package/launcher-icon verification passed.
@@ -153,6 +153,14 @@ Exact-head evidence:
 Review and merge boundary:
 - PR #60 has been merged into `main`; current main SHA at this audit is `a84d62016ec1c3d2febe9e054f2c43b335d1cba4`.
 - The Phase 1 branch was synchronized with that main commit by a tree-preserving merge commit before this documentation refresh.
-- The exact-head CI result above predates the documentation-only acceptance updates now being committed. The updated documentation head must receive its own exact-head CI run before merge.
+- The exact-head CI result above applies to PR #68 head `999dd635ebaa5ed362efb02a84e60ec5354141ac`; PR #68 was merged into `main` as `9df489c0f8c1d960cae337033717fc27a78ff4ec` on 2026-11-26.
 - PR #68 had no submitted review records at the time of this audit. Repository branch-protection details were not readable through the connected GitHub integration, so no claim is made about required approval rules.
 - No merge, production deployment, database migration, secret change, or user-data mutation was performed in this verification.
+
+
+## Phase 1 merge confirmation — 2026-11-26
+
+- PR #68 was merged into `main` at `9df489c0f8c1d960cae337033717fc27a78ff4ec` after exact-head CI run #45531164225 succeeded.
+- The verified run recorded 155 Flutter tests passed, 0 analyzer errors, 0 warnings, 43 infos, Android SQLite integration passed after a bounded emulator retry, Android Debug APK/package verification passed, and Web Release build passed.
+- Production-signed ARM64 APK generation remains unverified because signing configuration was unavailable. Physical-device file-save/clipboard acceptance and Web runtime acceptance remain separate release gates.
+- Backup and restore remain excluded from AcademicOS; no backup/restore implementation is to be reintroduced.

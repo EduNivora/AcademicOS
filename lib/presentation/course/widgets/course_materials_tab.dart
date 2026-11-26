@@ -1,8 +1,13 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
+import '../../../core/documents/course_material_file_service.dart';
+import '../../../core/documents/document_summary_service.dart';
 import '../../../data/database/database_helper.dart';
 import '../../../data/models/course_material_model.dart';
 import '../document_viewer_screen.dart';
@@ -18,6 +23,9 @@ class CourseMaterialsTab extends StatefulWidget {
 class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
   List<CourseMaterialModel> _materials = [];
   bool _isLoading = true;
+  final Set<int> _openingMaterialIds = <int>{};
+  final Set<int> _summarizingMaterialIds = <int>{};
+  final CourseMaterialFileService _fileService = CourseMaterialFileService();
 
   @override
   void initState() {
@@ -27,8 +35,9 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
 
   Future<void> _loadMaterials() async {
     setState(() => _isLoading = true);
-    final rows =
-        await DatabaseHelper.instance.getMaterialsByCourseId(widget.courseId);
+    final rows = await DatabaseHelper.instance.getMaterialsByCourseId(
+      widget.courseId,
+    );
     if (!mounted) return;
     setState(() {
       _materials = rows.map(CourseMaterialModel.fromMap).toList();
@@ -40,11 +49,41 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
     final FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'txt'],
-      withData: true,
+      withData: kIsWeb,
     );
     if (result == null || !mounted) return;
     final file = result.files.first;
-    final bytes = file.bytes;
+    const maxFileBytes = 50 * 1024 * 1024;
+    if (file.size > maxFileBytes) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('حجم الملف يتجاوز الحد المسموح (50 MB).')),
+      );
+      return;
+    }
+
+    Uint8List? bytes = file.bytes;
+    if (bytes == null && file.path != null) {
+      try {
+        final source = File(file.path!);
+        if (await source.exists()) {
+          final length = await source.length();
+          if (length > maxFileBytes) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('حجم الملف يتجاوز الحد المسموح (50 MB).'),
+                ),
+              );
+            }
+            return;
+          }
+          if (length > 0) bytes = await source.readAsBytes();
+        }
+      } on FileSystemException {
+        // Fall through to the common unavailable-file message.
+      }
+    }
+    if (!mounted) return;
     if (bytes == null || bytes.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('تعذر قراءة محتوى الملف المحدد.')),
@@ -52,19 +91,12 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
       return;
     }
 
-    if (bytes.length > 50 * 1024 * 1024) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('حجم الملف يتجاوز الحد المسموح (50 MB).')),
-      );
-      return;
-    }
-
     final fileName = p.basename(file.name);
     final ext = p.extension(fileName).replaceFirst('.', '').toLowerCase();
     if (!{'pdf', 'doc', 'docx', 'ppt', 'pptx', 'txt'}.contains(ext)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('نوع الملف غير مدعوم.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('نوع الملف غير مدعوم.')));
       return;
     }
 
@@ -92,44 +124,254 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
   }
 
   Future<void> _openMaterial(CourseMaterialModel material) async {
-    if (material.fileBytes == null || material.fileBytes!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('محتوى هذا المرفق غير متاح أو لم تتم استعادته. أعد إرفاق الملف الأصلي.')),
-      );
+    final materialId = material.id;
+    if (materialId == null ||
+        _openingMaterialIds.contains(materialId) ||
+        _summarizingMaterialIds.contains(materialId)) {
       return;
     }
-    if (material.fileType == 'txt') {
-      final text = utf8.decode(material.fileBytes!, allowMalformed: true);
-      await showDialog<void>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: Text(material.title),
-          content: SizedBox(
-            width: 520,
-            height: 420,
-            child: SingleChildScrollView(child: SelectableText(text)),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('إغلاق'),
+    setState(() => _openingMaterialIds.add(materialId));
+
+    PreparedMaterialFile? preparedPdf;
+    try {
+      final extension = material.fileType.toLowerCase().replaceFirst('.', '');
+      Uint8List? bytes = await _fileService.loadMaterialBytes(materialId);
+      if (!mounted) return;
+
+      if (extension == 'txt') {
+        final text = utf8.decode(bytes, allowMalformed: true);
+        bytes = null;
+        await showDialog<void>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: Text(material.title),
+            content: SizedBox(
+              width: 520,
+              height: 420,
+              child: SingleChildScrollView(child: SelectableText(text)),
             ),
-          ],
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('إغلاق'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
+      if (extension == 'pdf') {
+        preparedPdf = await _fileService.preparePdfForViewing(
+          materialId: materialId,
+          title: material.title,
+          fileType: material.fileType,
+          bytes: bytes,
+        );
+        bytes = null;
+        if (!mounted) {
+          await preparedPdf.delete();
+          preparedPdf = null;
+          return;
+        }
+        try {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => DocumentViewerScreen(
+                filePath: preparedPdf!.file.path,
+                title: material.title,
+              ),
+            ),
+          );
+          // The viewer owns cleanup after the PDF native handle is closed.
+          preparedPdf = null;
+        } catch (_) {
+          await preparedPdf?.delete();
+          preparedPdf = null;
+          rethrow;
+        }
+        return;
+      }
+
+      if (const {'doc', 'docx', 'ppt', 'pptx'}.contains(extension)) {
+        final status = await _fileService.openOfficeExternally(
+          materialId: materialId,
+          title: material.title,
+          fileType: material.fileType,
+          bytes: bytes,
+        );
+        bytes = null;
+        if (!mounted) return;
+        final message = switch (status) {
+          ExternalMaterialOpenStatus.opened =>
+            'تم إرسال الملف إلى التطبيق الخارجي. سيبقى الملف المؤقت متاحاً لفترة آمنة.',
+          ExternalMaterialOpenStatus.noApp =>
+            'لا يوجد تطبيق مثبت يستطيع فتح هذا النوع من الملفات.',
+          ExternalMaterialOpenStatus.unsupportedPlatform =>
+            'فتح ملفات Office خارجياً غير متاح على هذه المنصة.',
+          ExternalMaterialOpenStatus.failed =>
+            'تعذر فتح الملف خارجياً. تحقق من صلاحيات التطبيق وحاول مجدداً.',
+        };
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('نوع الملف غير مدعوم للعرض.')),
+      );
+    } on MaterialFileUnavailableException catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+    } on UnsupportedMaterialFormatException catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (error) {
+      debugPrint('Opening course material failed: $error');
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'تعذر تجهيز الملف للعرض. لم يتم تعديل المرفق الأصلي.',
+            ),
+          ),
+        );
+    } finally {
+      await preparedPdf?.delete();
+      if (mounted) setState(() => _openingMaterialIds.remove(materialId));
+    }
+  }
+
+  Future<void> _summarizeMaterial(CourseMaterialModel material) async {
+    final materialId = material.id;
+    if (materialId == null ||
+        _summarizingMaterialIds.contains(materialId) ||
+        _openingMaterialIds.contains(materialId)) {
+      return;
+    }
+    final extension = material.fileType.toLowerCase().replaceFirst('.', '');
+    if (extension != 'pdf') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تلخيص المستند متاح حالياً لملفات PDF النصية فقط.'),
         ),
       );
       return;
     }
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => DocumentViewerScreen(
-          filePath: material.filePath,
-          title: material.title,
-          fileBytes: material.fileBytes,
+    setState(() => _summarizingMaterialIds.add(materialId));
+    PreparedMaterialFile? prepared;
+    try {
+      prepared = await _fileService.preparePdfForViewing(
+        materialId: materialId,
+        title: material.title,
+        fileType: material.fileType,
+      );
+      if (!mounted) return;
+      final result = await DocumentSummaryService().summarizePdf(
+        prepared.file.path,
+      );
+      if (!mounted) return;
+      if (!result.isSuccess) {
+        final message = switch (result.status) {
+          DocumentSummaryStatus.fileMissing => 'تعذر العثور على ملف PDF.',
+          DocumentSummaryStatus.emptyFile => 'ملف PDF فارغ.',
+          DocumentSummaryStatus.unsupportedFormat =>
+            'صيغة المستند غير مدعومة للتلخيص.',
+          DocumentSummaryStatus.tooLarge =>
+            'الملف كبير جداً لاستخراج النص منه.',
+          DocumentSummaryStatus.noExtractableText =>
+            'لم يُعثر على نص قابل للاستخراج. قد يكون الملف ممسوحاً ضوئياً؛ OCR غير متاح حالياً.',
+          DocumentSummaryStatus.failed =>
+            'فشل استخراج النص من المستند. لم يتم إرسال الملف إلى أي خدمة خارجية.',
+          DocumentSummaryStatus.success => 'تعذر تجهيز الملخص.',
+        };
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
+        return;
+      }
+      final summary = result.summary!;
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (sheetContext) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'ملخص المستند محلياً',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(summary.quickSummary),
+                  if (summary.keyPoints.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    const Text(
+                      'النقاط الأساسية',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    ...summary.keyPoints.map(
+                      (point) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text('• $point'),
+                      ),
+                    ),
+                  ],
+                  if (summary.coreConcepts.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    const Text(
+                      'المفاهيم الأساسية',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: summary.coreConcepts
+                          .map((item) => Chip(label: Text(item)))
+                          .toList(),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
         ),
-      ),
-    );
+      );
+    } on MaterialFileUnavailableException catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+    } on UnsupportedMaterialFormatException catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (error) {
+      debugPrint('Summarizing course material failed: $error');
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تعذر تلخيص المستند. لم يتم تعديل الملف الأصلي.'),
+          ),
+        );
+    } finally {
+      await prepared?.delete();
+      if (mounted) setState(() => _summarizingMaterialIds.remove(materialId));
+    }
   }
 
   Future<void> _deleteMaterial(int id) async {
@@ -142,7 +384,9 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('حذف المرفق؟'),
         content: Text(
-          'سيتم حذف «' + material.title + '» وبيانات الملف المحفوظة على هذا الجهاز.',
+          'سيتم حذف «' +
+              material.title +
+              '» وبيانات الملف المحفوظة على هذا الجهاز.',
         ),
         actions: [
           TextButton(
@@ -183,12 +427,16 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
           child: Row(
             children: [
               Expanded(
-                  child: Text('المحاضرات والمرفقات',
-                      style: TextStyle(fontWeight: FontWeight.bold))),
+                child: Text(
+                  'المحاضرات والمرفقات',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
               ElevatedButton.icon(
-                  onPressed: _pickAndSave,
-                  icon: const Icon(Icons.attach_file),
-                  label: const Text('إضافة محاضرة / ملف')),
+                onPressed: _pickAndSave,
+                icon: const Icon(Icons.attach_file),
+                label: const Text('إضافة محاضرة / ملف'),
+              ),
             ],
           ),
         ),
@@ -196,35 +444,71 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
               : _materials.isEmpty
-                  ? Center(
-                      child: Column(
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('لا توجد محاضرات مضافة بعد.'),
+                      const SizedBox(height: 8),
+                      ElevatedButton.icon(
+                        onPressed: _pickAndSave,
+                        icon: const Icon(Icons.add),
+                        label: const Text('إضافة محاضرة'),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.separated(
+                  itemCount: _materials.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final m = _materials[index];
+                    return ListTile(
+                      leading: _fileBadge(m.fileType),
+                      title: Text(m.title),
+                      subtitle: Text(m.fileType.toUpperCase()),
+                      trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text('لا توجد محاضرات مضافة بعد.'),
-                          const SizedBox(height: 8),
-                          ElevatedButton.icon(
-                              onPressed: _pickAndSave,
-                              icon: const Icon(Icons.add),
-                              label: const Text('إضافة محاضرة')),
+                          if (m.fileType.toLowerCase().replaceFirst('.', '') ==
+                              'pdf')
+                            _summarizingMaterialIds.contains(m.id)
+                                ? const SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : IconButton(
+                                    tooltip: 'تلخيص PDF دون فتح العارض',
+                                    icon: const Icon(Icons.summarize_outlined),
+                                    onPressed:
+                                        _openingMaterialIds.contains(m.id)
+                                        ? null
+                                        : () => _summarizeMaterial(m),
+                                  ),
+                          _openingMaterialIds.contains(m.id)
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : IconButton(
+                                  icon: const Icon(
+                                    Icons.delete,
+                                    color: Colors.red,
+                                  ),
+                                  onPressed: () => _deleteMaterial(m.id!),
+                                ),
                         ],
                       ),
-                    )
-                  : ListView.separated(
-                      itemCount: _materials.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
-                      itemBuilder: (context, index) {
-                        final m = _materials[index];
-                        return ListTile(
-                          leading: _fileBadge(m.fileType),
-                          title: Text(m.title),
-                          subtitle: Text(m.fileType.toUpperCase()),
-                          trailing: IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () => _deleteMaterial(m.id!)),
-                          onTap: () => _openMaterial(m),
-                        );
-                      },
-                    ),
+                      onTap: () => _openMaterial(m),
+                    );
+                  },
+                ),
         ),
       ],
     );
@@ -254,7 +538,8 @@ class _CourseMaterialsTabState extends State<CourseMaterialsTab> {
         color = Colors.grey;
     }
     return CircleAvatar(
-        backgroundColor: color.withValues(alpha: 0.12),
-        child: Icon(icon, color: color));
+      backgroundColor: color.withValues(alpha: 0.12),
+      child: Icon(icon, color: color),
+    );
   }
 }
