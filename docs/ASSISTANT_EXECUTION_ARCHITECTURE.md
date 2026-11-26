@@ -17,7 +17,7 @@ This is intentionally a local-first architecture. The current product does not s
 7. The executor writes through existing use cases/database methods. The model never chooses a table, SQL statement, file path, database connection, or account identity.
 8. For every mutation result, verifyPostcondition reads the affected record again from the authoritative local repository/database and compares the requested values, relationships, or attachment bytes.
 9. The UI reports success only when the action result is successful and the postcondition passes. If verification fails, the UI reports that the result could not be confirmed, refreshes visible data, and stops the remaining steps in that plan.
-10. The UI keeps the current conversation in memory for the active screen session. Durable conversation history and a durable multi-step execution ledger are not implemented in this branch.
+10. The UI keeps the current conversation in memory for the active screen session. A local SQLite execution ledger persists run and step status/history across app restarts; interrupted work is recorded and is never replayed automatically. Durable conversation history and automatic crash recovery/resumption are not implemented.
 
 ## Supported action allowlist
 
@@ -49,7 +49,7 @@ A successful database method call by itself is not proof of success.
 
 ## Retry and duplicate protection
 
-The executor checks for equivalent existing data before creating a course, task, attachment, lecture, or exam. Attachment duplicate detection compares exact stored bytes for a matching course/name/type. This is a data-level duplicate guard, not a replacement for a durable execution ledger. A durable action receipt/ledger that survives process death and recovers interrupted multi-step plans remains a separate follow-up.
+The executor checks for equivalent existing data before creating a course, task, attachment, lecture, or exam. Attachment duplicate detection compares exact stored bytes for a matching course/name/type. These data-level duplicate guards are complemented by the local SQLite action ledger (`assistant_action_runs` and `assistant_action_steps`), which records each run and step and exposes recent execution history. The ledger survives process restarts, but it does not automatically resume or replay interrupted plans; a crash-safe recovery/resumption protocol remains a separate follow-up.
 
 ## Document interaction
 
