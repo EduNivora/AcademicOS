@@ -11,9 +11,9 @@ permissions:
   contents: read
 
 concurrency:
-  # A newer commit supersedes stale PR checks; only the latest SHA should occupy the runner.
+  # Preserve an active exact-head verification through Android emulator and build gates.
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   quality:
