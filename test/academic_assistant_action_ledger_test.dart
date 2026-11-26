@@ -3,6 +3,7 @@ import 'package:academic_os/data/database/database_helper.dart';
 import 'package:academic_os/data/models/course_model.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   group('Academic assistant execution ledger', () {
     test('upgrades schema v13 to v14 without losing academic records', () async {
       final helper = DatabaseHelper.instance;
