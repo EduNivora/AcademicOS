@@ -11,7 +11,7 @@ export default defineConfig({
     ai: {
       name: "EduNivora AI",
       source: "backend/neon/functions/ai/index.mjs",
-      externalPackages: [],
+      externalPackages: ["pg", "@neon/functions"],
       env: {
         GEMINI_API_KEY: {
           value: process.env.GEMINI_API_KEY,
