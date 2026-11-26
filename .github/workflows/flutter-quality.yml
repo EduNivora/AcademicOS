@@ -192,7 +192,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          flutter test --no-pub 2>&1 | tee flutter-test.log
+          flutter test --no-pub --concurrency=1 2>&1 | tee flutter-test.log
 
       - name: Verify native SQLite and document integration on Android emulator
         uses: reactivecircus/android-emulator-runner@v2
