@@ -12,7 +12,7 @@ notes, academic materials, attachment bytes, or academic reports.
 - The app-owned `public.app_users` table is a minimal profile/role projection
   linked to `neon_auth."user"(id)`; it is not a second password store.
 - PostgreSQL stores announcements, registered delivery/read receipts, anonymous
-  daily guest counters, and a narrow admin audit trail.
+  daily guest counters, a narrow admin audit trail, and AI quota counters only.
 - A Neon Function exposes the HTTP API next to the database. The function reads
   `DATABASE_URL`, `NEON_AUTH_BASE_URL`, and `NEON_AUTH_JWKS_URL` injected by
   Neon. Set `APP_ORIGINS` only after the actual Web app origin is known.
@@ -23,12 +23,18 @@ Apply in numeric order after provisioning Neon Auth:
 
 1. `migrations/0001_initial.sql`
 2. `migrations/0002_neon_auth_and_delivery.sql`
+3. `migrations/0003_ai_usage_windows.sql` — AI per-account minute/day quota counters.
 
-The migrations are idempotent for the existing empty EduNivora project. They
-must be tested on a Neon child branch before being applied to any database that
-contains real users or notices.
+The migrations are idempotent for their intended schema changes. They must be
+tested on a Neon child branch before being applied to any database that contains
+real users or notices.
 
-The current Neon project has already had both schema steps applied and verified.
+The current Neon project has had all three schema steps applied and verified.
+Migration 0003 was tested on a child branch and applied to production main on
+2026-11-27. Its `public.ai_usage_windows` table and three indexes were verified;
+the table had zero rows at verification time. This is only the database
+prerequisite: the AI Function still requires its quota-aware bundle deployment.
+
 No application user records or announcements existed when the Auth foreign key
 was introduced.
 
@@ -69,22 +75,28 @@ and tested. Public notice reading remains available independently of metrics.
 
 ## Authentication setup status
 
-Neon Managed Auth is enabled for the EduNivora branch. Email/password is enabled
-with mandatory email verification by OTP. The initial shared Neon SMTP sender
-is suitable for development only; configure a production SMTP sender before
-public release. Neon currently reports a shared Google OAuth provider for
-development. Production Google sign-in requires the project's own Google OAuth
-client ID and secret, plus verified redirect/trusted-origin configuration.
+Neon Managed Auth is enabled for the EduNivora main branch. Email/password is
+enabled with mandatory email verification by OTP.
 
-The Flutter client now contains a Neon Managed Auth REST adapter for email
+**Production authentication is not ready.** The verified Neon Auth configuration
+on 2026-11-27 reports only `http://localhost:43821` in trusted origins and
+`allow_localhost=false`; no production Web origin is registered. The email
+provider is still Neon's shared development sender (`auth@mail.myneon.app`),
+and Google OAuth uses a shared development provider/client rather than a
+verified project-owned production OAuth configuration. Do not expose public
+Web sign-up or claim production Google/email authentication until the exact
+production origin, project-owned OAuth credentials, production SMTP sender,
+redirect URIs, and real-account end-to-end flows are configured and verified.
+
+The Flutter client contains a Neon Managed Auth REST adapter for email
 sign-up/sign-in, email-verification OTP, session restoration, sign-out, and JWT
 retrieval. Native session cookies are persisted through Flutter Secure Storage;
 Web requests use browser-managed credential cookies. The login and registration
 screens use email/password and OTP verification, while guest access remains
 available without a network connection. This implementation has unit coverage,
 but real-account end-to-end flows on Android and Web are not yet accepted.
-Production Web authentication is blocked until the actual deployed origin is
-added to Neon trusted origins and credentialed CORS is verified.
+Production Web authentication remains blocked until the actual deployed origin
+is added to Neon trusted origins and credentialed CORS is verified.
 
 ## First administrator bootstrap
 
@@ -101,14 +113,12 @@ The Notices API is deployed to the Neon project's default branch.
 
 - Function slug: `notices`
 - Runtime: Node.js 24
-- Last confirmed live deployment: deployment ID 7 (Node.js 24)
+- Active deployment reported by Neon on 2026-11-27: deployment ID 8, created 2026-11-20.
 - Invocation URL: `https://br-late-bread-bajll3is-notices.compute.c-8.eu-central-1.aws.neon.tech`
-- Health check: `GET /health` returned HTTP 200 and confirmed a database query.
-- Public feed: `GET /v1/announcements` returned HTTP 200 with an empty feed.
-- Admin guard: unauthenticated `GET /v1/admin/announcements` returned HTTP 401.
-- The current source branch adds authenticated `GET /v1/me`, receipt/profile improvements, and the corrected JWT issuer/audience validation. The latest source bundle is built and stored as a GitHub Actions artifact, but these newer source changes have **not yet been deployed** to the live Function. The active deployment remains version 7; the recorded smoke check returned 404 for `GET /v1/me`, while `/health` and the public feed returned 200 and the unauthenticated admin route returned 401. Do not consider the admin console operational until a verified deployment exposes `/v1/me` and accepts a real Neon JWT.
+- The active deployment metadata does not identify the source commit or prove that the latest source is deployed.
+- A prior smoke check against deployment 7 returned 404 for `GET /v1/me`, while `/health` and the public feed returned 200 and the unauthenticated admin route returned 401. No fresh `/v1/me` smoke test against deployment 8 has been recorded here. Do not consider the admin console operational until the active bundle is matched to an accepted source SHA and verified with a real Neon JWT.
 
-The bundle workflow builds the Node.js 24 entrypoint, packages its runtime
+The Notices bundle workflow builds the Node.js 24 entrypoint, packages its runtime
 dependencies, and uploads the ZIP plus bundled entrypoint as a GitHub Actions
 artifact for 14 days. It does not commit generated files or push bot commits to
 the source branch. The `neon.ts` config points to the maintained source entry
