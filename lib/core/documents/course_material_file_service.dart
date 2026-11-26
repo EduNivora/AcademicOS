@@ -65,8 +65,14 @@ class CourseMaterialFileService {
        _openExternal = openExternal ?? _openWithPlatform,
        _now = now ?? DateTime.now;
 
-  static Future<Directory> _defaultTemporaryDirectory() async =>
-      Directory.systemTemp;
+  static Future<Directory> _defaultTemporaryDirectory() async {
+    // Android's systemTemp resolves to code_cache, which is not included in
+    // the FileProvider paths. Use the sibling app cache directory instead.
+    if (Platform.isAndroid) {
+      return Directory(p.join(Directory.systemTemp.parent.path, 'cache'));
+    }
+    return Directory.systemTemp;
+  }
 
   Future<Uint8List> loadMaterialBytes(int materialId) async {
     if (materialId <= 0) {
