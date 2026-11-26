@@ -337,7 +337,10 @@ $userMessage''';
     )).message;
   }
 
-  Future<bool?> _showActionConfirmation(AcademicAssistantToolResult result) {
+  Future<bool?> _showActionConfirmation(
+    AcademicAssistantToolResult result, {
+    String confirmLabel = 'تأكيد العملية',
+  }) {
     if (!mounted) return Future.value(null);
     return showDialog<bool>(
       context: context,
@@ -351,7 +354,7 @@ $userMessage''';
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('تأكيد الحذف'),
+            child: Text(confirmLabel),
           ),
         ],
       ),
@@ -440,7 +443,10 @@ $userMessage''';
           );
         }
 
-        final confirmed = await _showActionConfirmation(preview);
+        final confirmed = await _showActionConfirmation(
+          preview,
+          confirmLabel: 'تأكيد الحذف',
+        );
         if (confirmed != true) {
           await ledger.finalizePendingAssistantActionSteps(
             runId,
