@@ -476,7 +476,7 @@ class AcademicAssistantActionExecutor {
       }) {
         final id = _integer(args['course_id']);
         final name = _string(args, 'course_name');
-        if (args.containsKey('course_id') && id == null) {
+        if (args['course_id'] != null && id == null) {
           throw StateError('معرّف المادة يجب أن يكون عدداً صحيحاً موجباً.');
         }
         if (id == null && name.isEmpty) {
@@ -507,7 +507,7 @@ class AcademicAssistantActionExecutor {
       TaskEntity resolveTask(Map<String, dynamic> args) {
         final id = _integer(args['task_id']);
         final title = _string(args, 'task_title');
-        if (args.containsKey('task_id') && id == null) {
+        if (args['task_id'] != null && id == null) {
           throw StateError('معرّف المهمة يجب أن يكون عدداً صحيحاً موجباً.');
         }
         if (id != null) {
@@ -709,13 +709,13 @@ class AcademicAssistantActionExecutor {
               final end = _string(args, 'end_time');
               if (!validDays.contains(day))
                 throw StateError('يوم المحاضرة غير صحيح.');
-              if (args.containsKey('reminder_enabled') &&
+              if (args['reminder_enabled'] != null &&
                   args['reminder_enabled'] is! bool) {
                 throw StateError(
                   'قيمة تفعيل تذكير المحاضرة يجب أن تكون true أو false.',
                 );
               }
-              if (args.containsKey('reminder_offset_minutes') &&
+              if (args['reminder_offset_minutes'] != null &&
                   _integer(args['reminder_offset_minutes']) == null) {
                 throw StateError(
                   'مدة التنبيه يجب أن تكون عدداً صحيحاً بالدقائق.',
@@ -817,7 +817,7 @@ class AcademicAssistantActionExecutor {
               final course = resolveCourse(args, allowPlanned: true);
               if (course?.id != null) usedCourseIds.add(course!.id!);
               if (call.name == 'update_exam' &&
-                  args.containsKey('exam_date') &&
+                  args['exam_date'] != null &&
                   _date(args['exam_date']) == null) {
                 throw StateError('تاريخ الاختبار الجديد غير صالح.');
               }
@@ -982,7 +982,7 @@ class AcademicAssistantActionExecutor {
               ? (isCreate ? 15 : task.reminderOffsetMinutes)
               : rawReminderOffset.clamp(0, 1440).toInt();
           final courseSpecified =
-              args.containsKey('course_id') ||
+              args['course_id'] != null ||
               _string(args, 'course_name').isNotEmpty;
           if (courseSpecified) {
             final courseResult = await _resolveCourse(args);
@@ -1051,7 +1051,7 @@ class AcademicAssistantActionExecutor {
               ? (isCreate ? 15 : null)
               : rawReminderOffset.clamp(0, 1440).toInt();
           final courseSpecified =
-              args.containsKey('course_id') ||
+              args['course_id'] != null ||
               _string(args, 'course_name').isNotEmpty;
           final courseResult = courseSpecified
               ? await _resolveCourse(args)
@@ -1100,7 +1100,7 @@ class AcademicAssistantActionExecutor {
           final location = _string(call.arguments, 'location');
           final notes = _string(call.arguments, 'notes');
           final courseSpecified =
-              call.arguments.containsKey('course_id') ||
+              call.arguments['course_id'] != null ||
               _string(call.arguments, 'course_name').isNotEmpty;
           final courseResult = courseSpecified
               ? await _resolveCourse(call.arguments)
@@ -1553,7 +1553,7 @@ class AcademicAssistantActionExecutor {
     }
     final type = _string(args, 'type');
     final courseSpecified =
-        args.containsKey('course_id') ||
+        args['course_id'] != null ||
         _string(args, 'course_name').isNotEmpty;
     final courseResult = courseSpecified ? await _resolveCourse(args) : null;
     if (courseResult?.error != null ||
@@ -1922,9 +1922,9 @@ class AcademicAssistantActionExecutor {
     if (courseResult.error != null) {
       return AcademicAssistantToolResult(message: courseResult.error!);
     }
-    final examDate = args.containsKey('exam_date')
-        ? _date(args['exam_date'])
-        : existing.examDate;
+    final examDate = args['exam_date'] == null
+        ? existing.examDate
+        : _date(args['exam_date']);
     if (examDate == null) {
       return const AcademicAssistantToolResult(
         message: 'تاريخ الاختبار الجديد غير صحيح.',
