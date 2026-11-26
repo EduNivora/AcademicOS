@@ -48,6 +48,135 @@ void main() {
     });
   });
 
+  group('AcademicAssistantActionExecutor preflight', () {
+    test('rejects a later invalid action before any earlier write', () async {
+      final result = await executor.preflightPlan(const [
+        AcademicAssistantToolCall(
+          name: 'create_material',
+          arguments: {'name': 'خطة مادة جديدة'},
+        ),
+        AcademicAssistantToolCall(
+          name: 'create_exam',
+          arguments: {'title': 'اختبار غير صالح', 'exam_date': 'not-a-date'},
+        ),
+      ]);
+
+      expect(result.succeeded, isFalse);
+      expect(courseRepository.courses, isEmpty);
+    });
+
+    test(
+      'rejects two mutations targeting the same task before writes',
+      () async {
+        taskRepository.tasks.add(
+          const TaskEntity(id: 44, title: 'مراجعة الشبكات', description: ''),
+        );
+        final result = await executor.preflightPlan(const [
+          AcademicAssistantToolCall(
+            name: 'update_task',
+            arguments: {'task_id': 44, 'title': 'مراجعة الشبكات الجديدة'},
+          ),
+          AcademicAssistantToolCall(
+            name: 'delete_task',
+            arguments: {'task_id': 44},
+          ),
+        ]);
+
+        expect(result.succeeded, isFalse);
+        expect(taskRepository.tasks, hasLength(1));
+        expect(taskRepository.tasks.single.title, 'مراجعة الشبكات');
+      },
+    );
+
+    test(
+      'simulates planned lectures and rejects a schedule conflict',
+      () async {
+        courseRepository.courses.add(
+          const CourseEntity(
+            id: 3,
+            name: 'الشبكات',
+            instructor: 'مدرس',
+            code: 'NET-3',
+          ),
+        );
+        final result = await executor.preflightPlan(const [
+          AcademicAssistantToolCall(
+            name: 'add_lecture',
+            arguments: {
+              'course_id': 3,
+              'day': 'الأحد',
+              'start_time': '08:00',
+              'end_time': '09:00',
+            },
+          ),
+          AcademicAssistantToolCall(
+            name: 'add_lecture',
+            arguments: {
+              'course_id': 3,
+              'day': 'الأحد',
+              'start_time': '08:30',
+              'end_time': '09:30',
+            },
+          ),
+        ]);
+
+        expect(result.succeeded, isFalse);
+        expect(courseRepository.courses, hasLength(1));
+      },
+    );
+
+    test(
+      'accepts null optional fields while validating required values',
+      () async {
+        final result = await executor.preflightPlan(const [
+          AcademicAssistantToolCall(
+            name: 'create_task',
+            arguments: {
+              'title': 'مراجعة اختيارية',
+              'course_id': null,
+              'course_name': null,
+              'end_date_time': null,
+              'reminder_enabled': null,
+            },
+          ),
+          AcademicAssistantToolCall(
+            name: 'create_exam',
+            arguments: {
+              'title': 'اختبار مؤكد التاريخ',
+              'exam_date': '2030-01-15T09:00:00',
+              'course_id': null,
+              'course_name': null,
+            },
+          ),
+        ]);
+
+        expect(result.succeeded, isTrue);
+        expect(taskRepository.tasks, isEmpty);
+        expect(courseRepository.courses, isEmpty);
+      },
+    );
+
+    test('accepts a valid multi-step plan without mutating records', () async {
+      final result = await executor.preflightPlan(const [
+        AcademicAssistantToolCall(
+          name: 'create_task',
+          arguments: {'title': 'مراجعة قبل الاختبار'},
+        ),
+        AcademicAssistantToolCall(
+          name: 'create_exam',
+          arguments: {
+            'title': 'اختبار الشبكات',
+            'exam_date': '2030-01-15T09:00:00',
+          },
+        ),
+      ]);
+
+      expect(result.succeeded, isTrue);
+      expect(courseRepository.courses, isEmpty);
+      expect(taskRepository.tasks, isEmpty);
+    });
+  });
+
   group('AcademicAssistantActionExecutor', () {
     test(
       'updates the academic profile without clearing unspecified fields',
@@ -65,12 +194,14 @@ void main() {
           }),
         });
 
-        final result = await executor.execute(
-          const AcademicAssistantToolCall(
-            name: 'update_profile',
-            arguments: {'semester': 'الثاني', 'department': 'الأمن السيبراني'},
-          ),
+        const updateCall = AcademicAssistantToolCall(
+          name: 'update_profile',
+          arguments: {'semester': 'الثاني', 'department': 'الأمن السيبراني'},
         );
+        final pending = await executor.execute(updateCall);
+        expect(pending.requiresConfirmation, isTrue);
+        final result = await executor.execute(updateCall, confirmed: true);
+        expect(await executor.verifyPostcondition(updateCall, result), isTrue);
         final profile = await StudentProfile.load();
 
         expect(result.changedData, isTrue);
@@ -106,6 +237,43 @@ void main() {
     );
 
     test(
+      'rejects model-supplied identity and unknown fields before any write',
+      () async {
+        final result = await executor.execute(
+          const AcademicAssistantToolCall(
+            name: 'create_material',
+            arguments: {
+              'name': 'مادة غير مصرح بها',
+              'user_id': 'another-account',
+            },
+          ),
+        );
+        expect(result.changedData, isFalse);
+        expect(result.message, contains('حقول غير مسموح بها'));
+        expect(courseRepository.courses, isEmpty);
+      },
+    );
+
+    test(
+      'verifies a created course by re-reading it and detects later drift',
+      () async {
+        const call = AcademicAssistantToolCall(
+          name: 'create_material',
+          arguments: {'name': 'أمن الشبكات', 'instructor': 'د. علي'},
+        );
+        final result = await executor.execute(call);
+        expect(result.changedData, isTrue);
+        expect(result.affectedRecordId, isNotNull);
+        expect(await executor.verifyPostcondition(call, result), isTrue);
+
+        courseRepository.courses[0] = courseRepository.courses.single.copyWith(
+          name: 'قيمة مختلفة',
+        );
+        expect(await executor.verifyPostcondition(call, result), isFalse);
+      },
+    );
+
+    test(
       'creates a task linked to the material and records automatic start time',
       () async {
         courseRepository.courses.add(
@@ -132,10 +300,129 @@ void main() {
         expect(taskRepository.tasks.single.courseId, 7);
         expect(taskRepository.tasks.single.courseName, 'أمن الشبكات');
         expect(taskRepository.tasks.single.startDateTime, isNotNull);
+        const createTaskCall = AcademicAssistantToolCall(
+          name: 'create_task',
+          arguments: {
+            'title': 'مراجعة المحاضرة الأولى',
+            'course_name': 'أمن الشبكات',
+          },
+        );
+        expect(result.affectedRecordId, taskRepository.tasks.single.id);
+        expect(
+          await executor.verifyPostcondition(createTaskCall, result),
+          isTrue,
+        );
+        taskRepository.tasks[0] = taskRepository.tasks.single.copyWith(
+          title: 'عنوان مختلف',
+        );
+        expect(
+          await executor.verifyPostcondition(createTaskCall, result),
+          isFalse,
+        );
+        taskRepository.tasks[0] = taskRepository.tasks.single.copyWith(
+          title: 'مراجعة المحاضرة الأولى',
+        );
+        final retry = await executor.execute(createTaskCall);
+        expect(retry.succeeded, isTrue);
+        expect(retry.changedData, isFalse);
+        expect(taskRepository.tasks, hasLength(1));
         expect(
           taskRepository.tasks.single.startDateTime!.isBefore(before),
           isFalse,
         );
+      },
+    );
+
+    test(
+      'persists requested lecture reminder settings and verifies the saved row',
+      () async {
+        final database = DatabaseHelper.instance;
+        await database.close();
+        courseRepository.courses.add(
+          const CourseEntity(
+            id: 902,
+            name: 'اختبار إعدادات التذكير',
+            instructor: 'محاضر',
+            code: 'REM-902',
+          ),
+        );
+        int? scheduleId;
+        try {
+          const call = AcademicAssistantToolCall(
+            name: 'add_lecture',
+            arguments: {
+              'course_name': 'اختبار إعدادات التذكير',
+              'day': 'السبت',
+              'start_time': '23:00',
+              'end_time': '23:59',
+              'location': 'قاعة الاختبار',
+              'reminder_enabled': false,
+              'reminder_offset_minutes': 30,
+            },
+          );
+          final result = await executor.execute(call);
+          scheduleId = result.affectedRecordId;
+          expect(result.succeeded, isTrue);
+          expect(result.changedData, isTrue);
+          expect(scheduleId, isNotNull);
+          expect(await executor.verifyPostcondition(call, result), isTrue);
+
+          final saved = (await database.getSchedules()).singleWhere(
+            (row) => row['id'] == scheduleId,
+          );
+          expect(saved['reminder_enabled'], 0);
+          expect(saved['reminder_offset_minutes'], 30);
+        } finally {
+          if (scheduleId != null) await database.deleteSchedule(scheduleId);
+          await database.close();
+        }
+      },
+    );
+
+    test(
+      'updates a task type and course link and verifies persisted values',
+      () async {
+        courseRepository.courses.addAll([
+          const CourseEntity(
+            id: 7,
+            name: 'المادة القديمة',
+            instructor: 'محاضر',
+            code: 'OLD-7',
+          ),
+          const CourseEntity(
+            id: 8,
+            name: 'المادة الجديدة',
+            instructor: 'محاضر',
+            code: 'NEW-8',
+          ),
+        ]);
+        taskRepository.tasks.add(
+          const TaskEntity(
+            id: 31,
+            title: 'مشروع الفصل',
+            description: 'وصف المشروع',
+            type: TaskType.homework,
+            courseId: 7,
+            courseName: 'المادة القديمة',
+          ),
+        );
+        const call = AcademicAssistantToolCall(
+          name: 'update_task',
+          arguments: {
+            'task_id': 31,
+            'type': 'project',
+            'course_name': 'المادة الجديدة',
+          },
+        );
+        final pending = await executor.execute(call);
+        expect(pending.requiresConfirmation, isTrue);
+        final result = await executor.execute(call, confirmed: true);
+
+        expect(result.changedData, isTrue);
+        expect(taskRepository.tasks.single.type, TaskType.project);
+        expect(taskRepository.tasks.single.courseId, 8);
+        expect(taskRepository.tasks.single.courseName, 'المادة الجديدة');
+        expect(await executor.verifyPostcondition(call, result), isTrue);
       },
     );
 
@@ -176,16 +463,18 @@ void main() {
           code: 'NET-31',
         ),
       );
-      final result = await executor.execute(
-        const AcademicAssistantToolCall(
-          name: 'update_material',
-          arguments: {
-            'course_id': 31,
-            'name': 'أمن الشبكات المتقدم',
-            'credits': 3,
-          },
-        ),
+      const updateCall = AcademicAssistantToolCall(
+        name: 'update_material',
+        arguments: {
+          'course_id': 31,
+          'name': 'أمن الشبكات المتقدم',
+          'credits': 3,
+        },
       );
+      final pending = await executor.execute(updateCall);
+      expect(pending.requiresConfirmation, isTrue);
+      final result = await executor.execute(updateCall, confirmed: true);
+      expect(await executor.verifyPostcondition(updateCall, result), isTrue);
 
       expect(result.changedData, isTrue);
       expect(courseRepository.courses.single.name, 'أمن الشبكات المتقدم');
@@ -216,6 +505,61 @@ void main() {
       },
     );
 
+    test(
+      'verifies the persisted attachment row and exact BLOB bytes',
+      () async {
+        final database = DatabaseHelper.instance;
+        await database.close();
+        int? materialId;
+        try {
+          courseRepository.courses.add(
+            const CourseEntity(
+              id: 55,
+              name: 'أمن الشبكات',
+              instructor: 'محاضر',
+              code: 'SEC-55',
+            ),
+          );
+          final bytes = Uint8List.fromList([37, 80, 68, 70, 1, 2, 3]);
+          final call = AcademicAssistantToolCall(
+            name: 'add_material_file',
+            arguments: {
+              'course_name': 'أمن الشبكات',
+              'file_name': 'lecture.pdf',
+              'file_type': 'pdf',
+              'file_bytes': bytes,
+            },
+          );
+          final result = await executor.execute(call);
+          materialId = result.affectedRecordId;
+          expect(result.changedData, isTrue);
+          expect(materialId, isNotNull);
+          expect(await executor.verifyPostcondition(call, result), isTrue);
+          final duplicate = await executor.execute(call);
+          expect(duplicate.succeeded, isTrue);
+          expect(duplicate.changedData, isFalse);
+
+          final db = await database.database;
+          await db.update(
+            'course_materials',
+            {
+              'file_bytes': Uint8List.fromList([37, 80, 68, 70, 1, 2, 4]),
+            },
+            where: 'id = ?',
+            whereArgs: [materialId],
+          );
+          expect(await executor.verifyPostcondition(call, result), isFalse);
+
+          await database.deleteMaterial(materialId!);
+          expect(await executor.verifyPostcondition(call, result), isFalse);
+          materialId = null;
+        } finally {
+          if (materialId != null) await database.deleteMaterial(materialId);
+          await database.close();
+        }
+      },
+    );
+
     test('manages exams in the database and confirms deletion', () async {
       final database = DatabaseHelper.instance;
       await database.close();
@@ -241,20 +585,39 @@ void main() {
           ),
         );
         expect(created.changedData, isTrue);
-        final saved = (await database.getExams())
-            .singleWhere((exam) => exam.title == 'اختبار الشبكات');
+        final saved = (await database.getExams()).singleWhere(
+          (exam) => exam.title == 'اختبار الشبكات',
+        );
         createdExamId = saved.id;
         expect(saved.courseId, 77);
 
-        final updated = await executor.execute(
-          AcademicAssistantToolCall(
-            name: 'update_exam',
-            arguments: {
-              'exam_id': saved.id,
-              'title': 'اختبار الشبكات النهائي',
-              'exam_date': '2027-02-16T10:00:00.000',
-            },
-          ),
+        final updateExamCall = AcademicAssistantToolCall(
+          name: 'update_exam',
+          arguments: {
+            'exam_id': saved.id,
+            'title': 'اختبار الشبكات النهائي',
+            'exam_date': '2027-02-16T10:00:00.000',
+          },
+        );
+        final updateConfirmation = await executor.execute(updateExamCall);
+        expect(updateConfirmation.requiresConfirmation, isTrue);
+        final updated = await executor.execute(updateExamCall, confirmed: true);
+        expect(
+          await executor.verifyPostcondition(updateExamCall, updated),
+          isTrue,
+        );
+        final invalidCourseCall = AcademicAssistantToolCall(
+          name: 'update_exam',
+          arguments: {
+            'exam_id': saved.id,
+            'title': 'اختبار الشبكات النهائي',
+            'exam_date': '2027-02-16T10:00:00.000',
+            'course_name': 'مادة غير موجودة',
+          },
+        );
+        expect(
+          await executor.verifyPostcondition(invalidCourseCall, updated),
+          isFalse,
         );
         expect(updated.changedData, isTrue);
         expect(
@@ -303,6 +666,26 @@ void main() {
       expect(result.requiresConfirmation, isTrue);
       expect(result.confirmationPrompt, contains('مراجعة التشفير'));
       expect(taskRepository.tasks, hasLength(1));
+
+      final deleted = await executor.execute(
+        const AcademicAssistantToolCall(
+          name: 'delete_task',
+          arguments: {'task_id': 12},
+        ),
+        confirmed: true,
+      );
+      expect(deleted.changedData, isTrue);
+      expect(deleted.affectedRecordId, 12);
+      expect(
+        await executor.verifyPostcondition(
+          const AcademicAssistantToolCall(
+            name: 'delete_task',
+            arguments: {'task_id': 12},
+          ),
+          deleted,
+        ),
+        isTrue,
+      );
     });
   });
 }
