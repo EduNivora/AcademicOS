@@ -112,13 +112,8 @@ void main() {
     (tester) async {
       expect(Platform.isAndroid, isTrue);
       final bytes = Uint8List.fromList([0x50, 0x4b, 0x03, 0x04]);
-      // open_filex exposes files through its Android FileProvider. Keep the
-      // fixture under the app cache directory (not code_cache / systemTemp),
-      // which is one of the provider's configured roots.
-      final cacheDirectory = Directory(
-        '${Directory.systemTemp.parent.path}/cache/edunivora_materials',
-      );
-      await cacheDirectory.create(recursive: true);
+      // Exercise the production cache path exposed by Android FileProvider,
+      // rather than injecting a test-only temporary directory.
       final title =
           'intent-check-${DateTime.now().microsecondsSinceEpoch}.docx';
       final service = CourseMaterialFileService(
