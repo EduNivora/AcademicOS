@@ -332,6 +332,7 @@ class AcademicAssistantActionExecutor {
     for (final entry in call.arguments.entries) {
       final key = entry.key;
       final value = entry.value;
+      if (value == null) continue;
       if (key == 'file_bytes') {
         if (value is! List ||
             value.isEmpty ||

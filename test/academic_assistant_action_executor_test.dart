@@ -119,6 +119,34 @@ void main() {
       expect(courseRepository.courses, hasLength(1));
     });
 
+    test('accepts null optional fields while validating required values', () async {
+      final result = await executor.preflightPlan(const [
+        AcademicAssistantToolCall(
+          name: 'create_task',
+          arguments: {
+            'title': 'مراجعة اختيارية',
+            'course_id': null,
+            'course_name': null,
+            'end_date_time': null,
+            'reminder_enabled': null,
+          },
+        ),
+        AcademicAssistantToolCall(
+          name: 'create_exam',
+          arguments: {
+            'title': 'اختبار مؤكد التاريخ',
+            'exam_date': '2030-01-15T09:00:00',
+            'course_id': null,
+            'course_name': null,
+          },
+        ),
+      ]);
+
+      expect(result.succeeded, isTrue);
+      expect(taskRepository.tasks, isEmpty);
+      expect(courseRepository.courses, isEmpty);
+    });
+
     test('accepts a valid multi-step plan without mutating records', () async {
       final result = await executor.preflightPlan(const [
         AcademicAssistantToolCall(
