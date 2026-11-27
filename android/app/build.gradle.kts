@@ -10,12 +10,14 @@ val releaseStorePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSW
 val releaseKeyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS").orNull
 val releaseKeyPassword = providers.environmentVariable("ANDROID_KEY_PASSWORD").orNull
 
-val releaseSigningConfigured = listOf(
+val releaseSigningInputs = listOf(
     releaseStoreFilePath,
     releaseStorePassword,
     releaseKeyAlias,
     releaseKeyPassword,
-).all { !it.isNullOrBlank() }
+)
+val releaseSigningConfigured = releaseSigningInputs.all { !it.isNullOrBlank() }
+val releaseSigningInputsPresent = releaseSigningInputs.any { !it.isNullOrBlank() }
 
 val qaReleaseRequested = providers.gradleProperty("qaRelease")
     .map(String::toBoolean)
@@ -36,8 +38,8 @@ if (isReleaseBuildRequested && !qaReleaseRequested) {
 }
 
 if (isReleaseBuildRequested && qaReleaseRequested) {
-    require(!releaseSigningConfigured) {
-        "QA release mode must not receive production signing credentials."
+    require(!releaseSigningInputsPresent) {
+        "QA release mode must not receive any production signing credentials."
     }
 }
 

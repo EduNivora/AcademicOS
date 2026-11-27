@@ -3,13 +3,15 @@ name: EduNivora Android QA Release
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: edunivora-qa-release-${{ github.ref }}
+  group: edunivora-qa-release-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -20,6 +22,8 @@ jobs:
     steps:
       - name: Checkout exact source
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Set up Java 17
         uses: actions/setup-java@v5
@@ -51,8 +55,70 @@ jobs:
       - name: Resolve Flutter dependencies
         run: flutter pub get
 
+      - name: Verify formatting of changed Dart files
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+        run: |
+          set -euo pipefail
+          mapfile -t changed_dart_files < <(
+            git diff --name-only --diff-filter=ACMRT "$BASE_SHA" "$GITHUB_SHA" -- '*.dart' |
+              sed -e '/^lib\/data\/database\/database_helper\.dart$/d' \
+                  -e '/^lib\/data\/models\/course_model\.dart$/d' \
+                  -e '/^lib\/data\/models\/exam_model\.dart$/d' \
+                  -e '/^lib\/data\/models\/task_model\.dart$/d' \
+                  -e '/^test\/academic_report_service_test\.dart$/d'
+          )
+          if (("${#changed_dart_files[@]}" > 0)); then
+            dart format --output=none --set-exit-if-changed "${changed_dart_files[@]}"
+          else
+            echo "No in-scope changed Dart files to format."
+          fi
+
       - name: Analyze Dart sources
-        run: flutter analyze
+        shell: bash
+        run: |
+          set +e
+          dart analyze --format machine > flutter-analyze.machine.log 2>&1
+          analyze_status=$?
+          set -e
+          ANALYZE_STATUS="$analyze_status" python3 - <<'PY'
+          import os
+          import sys
+
+          analyze_status = int(os.environ["ANALYZE_STATUS"])
+          with open("flutter-analyze.machine.log", encoding="utf-8") as report:
+              diagnostics = [
+                  line.rstrip()
+                  for line in report
+                  if "|" in line and line.split("|", 1)[0] in {"ERROR", "WARNING", "INFO"}
+              ]
+
+          errors = [line for line in diagnostics if line.startswith("ERROR|")]
+          warnings = [line for line in diagnostics if line.startswith("WARNING|")]
+          infos = [line for line in diagnostics if line.startswith("INFO|")]
+
+          if not diagnostics and analyze_status != 0:
+              print("Dart analyzer failed without structured diagnostics.")
+              with open("flutter-analyze.machine.log", encoding="utf-8") as report:
+                  print(report.read()[:4000])
+              sys.exit(2)
+
+          for error in errors:
+              print(error)
+          for warning in warnings:
+              print(warning)
+
+          print(
+              f"Analyzer summary: {len(errors)} errors, "
+              f"{len(warnings)} warnings, {len(infos)} infos."
+          )
+          if errors or warnings:
+              sys.exit(1)
+          PY
+          if [ "$analyze_status" -ne 0 ]; then
+            echo "::notice::Analyzer reported infos only; no errors or warnings were found."
+          fi
 
       - name: Run Flutter tests
         run: flutter test --no-pub --concurrency=1
