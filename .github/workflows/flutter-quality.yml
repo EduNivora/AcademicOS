@@ -304,6 +304,51 @@ jobs:
           echo "Disk space after cleanup:"
           df -h /
 
+      - name: Build optimized ARM64 QA Release APK
+        shell: bash
+        env:
+          ORG_GRADLE_PROJECT_qaRelease: 'true'
+        run: |
+          set -euo pipefail
+          flutter build apk --release --no-pub \
+            --target-platform android-arm64 \
+            --split-per-abi \
+            --obfuscate \
+            --split-debug-info=build/symbols/qa 2>&1 | tee android-qa-release-build.log
+
+      - name: Verify QA Release APK identity, signature, and 30 MiB limit
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="build/app/outputs/flutter-apk/app-arm64-v8a-release.apk"
+          test -s "$apk"
+          build_tools="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          "$build_tools/aapt" dump badging "$apk" > apk-badging-qa.txt
+          grep -q "package: name='com.arfatalkamli.academicos'" apk-badging-qa.txt
+          grep -q "application-label:'EduNivora'" apk-badging-qa.txt
+          "$build_tools/apksigner" verify --verbose --print-certs "$apk" > apk-signature-qa.txt
+          apk_bytes="$(stat -c%s "$apk")"
+          apk_mib="$(awk -v bytes="$apk_bytes" 'BEGIN { printf "%.3f", bytes / 1048576 }')"
+          echo "QA ARM64 APK: ${apk_bytes} bytes (${apk_mib} MiB)"
+          sha256sum "$apk" | tee SHA256SUMS-qa.txt
+          if [ "$apk_bytes" -gt 31457280 ]; then
+            echo "::error::QA APK exceeds the mandatory 30 MiB limit; it will not be uploaded."
+            exit 1
+          fi
+
+      - name: Upload verified QA Release APK and symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: edunivora-qa-arm64-${{ github.sha }}
+          path: |
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            build/symbols/qa/**
+            apk-badging-qa.txt
+            apk-signature-qa.txt
+            SHA256SUMS-qa.txt
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Build Android debug APK
         shell: bash
         run: |
