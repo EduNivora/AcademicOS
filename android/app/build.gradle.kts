@@ -17,17 +17,27 @@ val releaseSigningConfigured = listOf(
     releaseKeyPassword,
 ).all { !it.isNullOrBlank() }
 
+val qaReleaseRequested = providers.gradleProperty("qaRelease")
+    .map(String::toBoolean)
+    .getOrElse(false)
+
 val isReleaseBuildRequested = gradle.startParameter.taskNames.any {
     it.contains("release", ignoreCase = true)
 }
 
-if (isReleaseBuildRequested) {
+if (isReleaseBuildRequested && !qaReleaseRequested) {
     require(releaseSigningConfigured) {
-        "Production release signing is not configured. Set ANDROID_KEYSTORE_PATH, " +
-            "ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, and ANDROID_KEY_PASSWORD."
+        "Production release signing is not configured. For a non-production QA build, " +
+            "set ORG_GRADLE_PROJECT_qaRelease=true. Never use a QA key for production."
     }
     require(file(requireNotNull(releaseStoreFilePath)).isFile) {
         "Production Android keystore file was not found at ANDROID_KEYSTORE_PATH."
+    }
+}
+
+if (isReleaseBuildRequested && qaReleaseRequested) {
+    require(!releaseSigningConfigured) {
+        "QA release mode must not receive production signing credentials."
     }
 }
 
@@ -77,11 +87,12 @@ android {
                 "proguard-rules.pro",
             )
 
-            // Release builds must use the dedicated production keystore.
-            signingConfig = if (releaseSigningConfigured) {
-                signingConfigs.getByName("productionRelease")
-            } else {
-                null
+            // QA Release uses Android's debug keystore only when explicitly requested.
+            // Production Release continues to require the dedicated production keystore.
+            signingConfig = when {
+                qaReleaseRequested -> signingConfigs.getByName("debug")
+                releaseSigningConfigured -> signingConfigs.getByName("productionRelease")
+                else -> null
             }
         }
     }
