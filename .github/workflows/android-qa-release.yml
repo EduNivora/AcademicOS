@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: edunivora-qa-release-v4-${{ github.ref }}
+  group: edunivora-qa-release-v5-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -99,7 +99,7 @@ jobs:
         run: |
           set -euo pipefail
           flutter pub get
-          flutter build --config-only
+          flutter build apk --config-only
           registrant="android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java"
           if [ -f "$registrant" ] && grep -Fq "IntegrationTestPlugin" "$registrant"; then
             echo "::error::Release plugin registrant still contains the dev-only integration_test plugin."
