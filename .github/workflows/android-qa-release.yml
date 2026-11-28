@@ -114,56 +114,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics
           disable-animations: true
           emulator-boot-timeout: 600
-          script: |
-            set -eu
-            timeout 120 adb wait-for-device
-            boot_ready=0
-            for probe in $(seq 1 60); do
-              boot_state="$(timeout 3 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
-              if [ "$boot_state" = "1" ]; then boot_ready=1; break; fi
-              sleep 2
-            done
-            test "$boot_ready" -eq 1
-            package_ready=0
-            for probe in $(seq 1 60); do
-              if timeout 5 adb shell cmd package list packages >/dev/null 2>&1; then package_ready=1; break; fi
-              sleep 3
-            done
-            test "$package_ready" -eq 1
-            run_integration_file() {
-              test_file="$1"
-              expected_name="$2"
-              expected_summary="$3"
-              log_file="$4"
-              set +e
-              timeout 900 flutter test --no-pub -d emulator-5554 "$test_file" > "$log_file" 2>&1
-              test_status=$?
-              set -e
-              cat "$log_file"
-              if [ "$test_status" -eq 0 ]; then return 0; fi
-              if grep -Fq "$expected_name" "$log_file" &&
-                 grep -Fq "$expected_summary" "$log_file" &&
-                 grep -Fq "Error waiting for a debug connection: The log reader stopped unexpectedly" "$log_file" &&
-                 ! grep -E "Some tests failed|Test failed|Exception caught by flutter test|Expected:|Actual:" "$log_file"; then
-                echo "::warning::All asserted tests passed; Flutter reported only its known post-test debug log-reader teardown error."
-                return 0
-              fi
-              return "$test_status"
-            }
-            run_integration_file               integration_test/database_android_integration_test.dart               "Android native SQLite persists academic rows and attachment BLOBs after reopen"               "1 test passed."               android-sqlite-integration.log
-            run_integration_file               integration_test/document_viewer_android_integration_test.dart               "Android Office handoff returns a typed status and preserves launched file"               "2 tests passed."               android-document-integration.log
-
-            flutter build apk --debug --no-pub --target-platform android-x64
-            debug_apk="build/app/outputs/flutter-apk/app-debug.apk"
-            test -s "$debug_apk"
-            adb install -r "$debug_apk"
-            adb shell am force-stop com.arfatalkamli.academicos || true
-            adb shell monkey -p com.arfatalkamli.academicos 1
-            sleep 8
-            app_pid="$(adb shell pidof com.arfatalkamli.academicos | tr -d '\r' || true)"
-            test -n "$app_pid"
-            adb shell dumpsys activity activities | grep -F "com.arfatalkamli.academicos" | head -n 5
-            echo "Android emulator smoke launch passed; package PID: $app_pid"
+          script: bash .github/scripts/android-qa-emulator.sh
 
       - name: Build obfuscated ARM64 QA Release (debug-key signature only)
         env:
