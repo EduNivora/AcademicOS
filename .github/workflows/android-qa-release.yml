@@ -100,21 +100,53 @@ jobs:
           set -euo pipefail
           flutter test --no-pub --concurrency=1 2>&1 | tee flutter-test.log
 
-      - name: Verify SQLite, documents, install, and launch on Android emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        env:
-          ANDROID_I_WANT_MY_TCG: 'yes'
-        with:
-          api-level: 34
-          target: default
-          arch: x86_64
-          profile: pixel_2
-          cores: 4
-          ram-size: 4096
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics
-          disable-animations: true
-          emulator-boot-timeout: 600
-          script: bash .github/scripts/android-qa-emulator.sh
+      - name: Inspect QA APK size composition
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from collections import defaultdict
+          from pathlib import Path
+          import zipfile
+
+          apk = Path("build/app/outputs/flutter-apk/app-arm64-v8a-release.apk")
+          if not apk.is_file():
+              raise SystemExit(f"APK not found: {apk}")
+          groups = defaultdict(lambda: [0, 0, 0])
+          entries = []
+          with zipfile.ZipFile(apk) as archive:
+              for item in archive.infolist():
+                  if item.is_dir():
+                      continue
+                  parts = item.filename.split("/")
+                  if parts[0] == "lib" and len(parts) > 2:
+                      group = "/".join(parts[:2])
+                  elif parts[0].startswith("classes") and parts[0].endswith(".dex"):
+                      group = "DEX"
+                  elif parts[0] == "assets":
+                      group = "assets"
+                  elif parts[0] == "res":
+                      group = "resources"
+                  else:
+                      group = parts[0]
+                  groups[group][0] += item.compress_size
+                  groups[group][1] += item.file_size
+                  groups[group][2] += 1
+                  entries.append((item.compress_size, item.file_size, item.filename))
+          lines = [
+              f"APK bytes: {apk.stat().st_size}",
+              "Largest APK entries (compressed bytes | uncompressed bytes | path):",
+          ]
+          for compressed, uncompressed, name in sorted(entries, reverse=True)[:40]:
+              lines.append(f"{compressed:>12} | {uncompressed:>12} | {name}")
+          lines.append("")
+          lines.append("APK component groups (compressed bytes | uncompressed bytes | files):")
+          for name, values in sorted(groups.items(), key=lambda pair: pair[1][0], reverse=True):
+              lines.append(f"{values[0]:>12} | {values[1]:>12} | {values[2]:>5} | {name}")
+          report = "\n".join(lines) + "\n"
+          Path("APK-COMPONENTS-qa.txt").write_text(report, encoding="utf-8")
+          print(report)
+          PY
 
       - name: Build obfuscated ARM64 QA Release (debug-key signature only)
         env:
@@ -167,3 +199,49 @@ jobs:
             android-document-integration.log
           if-no-files-found: error
           retention-days: 30
+
+      - name: Upload diagnostics when QA APK verification fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: edunivora-qa-failure-diagnostics-${{ github.sha }}
+          path: |
+            android-qa-release-build.log
+            APK-COMPONENTS-qa.txt
+            apk-badging-qa.txt
+            apk-signature-qa.txt
+            APK-METADATA-qa.txt
+            SHA256SUMS-qa.txt
+            flutter-analyze.machine.log
+            flutter-test.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Verify SQLite, documents, install, and launch on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          ANDROID_I_WANT_MY_TCG: 'yes'
+        with:
+          api-level: 34
+          target: default
+          arch: x86_64
+          profile: pixel_2
+          cores: 4
+          ram-size: 4096
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics
+          disable-animations: true
+          emulator-boot-timeout: 600
+          script: bash .github/scripts/android-qa-emulator.sh
+
+      - name: Upload Android emulator verification logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: edunivora-android-emulator-verification-${{ github.sha }}
+          path: |
+            android-sqlite-integration.log
+            android-document-integration.log
+            android-emulator-debug-build.log
+          if-no-files-found: ignore
+          retention-days: 14
+
