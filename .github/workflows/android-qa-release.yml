@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: edunivora-qa-release-v2-${{ github.ref }}
+  group: edunivora-qa-release-v3-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -94,12 +94,6 @@ jobs:
             echo "::notice::Analyzer returned a non-zero status for infos only; no errors or warnings were found."
           fi
 
-      - name: Run Flutter unit and widget tests
-        shell: bash
-        run: |
-          set -euo pipefail
-          flutter test --no-pub --concurrency=1 2>&1 | tee flutter-test.log
-
       - name: Build obfuscated ARM64 QA Release + x86_64 emulator companion (debug-key signature only)
         env:
           ORG_GRADLE_PROJECT_qaRelease: 'true'
@@ -112,6 +106,12 @@ jobs:
             --split-debug-info=build/symbols/qa 2>&1 | tee android-qa-release-build.log
 
 
+
+      - name: Run Flutter unit and widget tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter test --no-pub --concurrency=1 2>&1 | tee flutter-test.log
       - name: Inspect QA APK size composition
         shell: bash
         run: |
@@ -193,6 +193,8 @@ jobs:
             build/symbols/qa/**
             apk-badging-qa.txt
             apk-signature-qa.txt
+            apk-signature-x86_64-qa.txt
+            APK-COMPONENTS-qa.txt
             APK-METADATA-qa.txt
             SHA256SUMS-qa.txt
             android-qa-release-build.log
