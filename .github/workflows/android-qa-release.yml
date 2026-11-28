@@ -100,6 +100,18 @@ jobs:
           set -euo pipefail
           flutter test --no-pub --concurrency=1 2>&1 | tee flutter-test.log
 
+      - name: Build obfuscated ARM64 QA Release (debug-key signature only)
+        env:
+          ORG_GRADLE_PROJECT_qaRelease: 'true'
+        run: |
+          set -euo pipefail
+          flutter build apk --release --no-pub \
+            --target-platform android-arm64 \
+            --split-per-abi \
+            --obfuscate \
+            --split-debug-info=build/symbols/qa 2>&1 | tee android-qa-release-build.log
+
+
       - name: Inspect QA APK size composition
         shell: bash
         run: |
@@ -147,18 +159,6 @@ jobs:
           Path("APK-COMPONENTS-qa.txt").write_text(report, encoding="utf-8")
           print(report)
           PY
-
-      - name: Build obfuscated ARM64 QA Release (debug-key signature only)
-        env:
-          ORG_GRADLE_PROJECT_qaRelease: 'true'
-        run: |
-          set -euo pipefail
-          flutter build apk --release --no-pub \
-            --target-platform android-arm64 \
-            --split-per-abi \
-            --obfuscate \
-            --split-debug-info=build/symbols/qa 2>&1 | tee android-qa-release-build.log
-
       - name: Verify package, signature, size, and checksum
         shell: bash
         run: |
@@ -195,8 +195,6 @@ jobs:
             android-qa-release-build.log
             flutter-analyze.machine.log
             flutter-test.log
-            android-sqlite-integration.log
-            android-document-integration.log
           if-no-files-found: error
           retention-days: 30
 
