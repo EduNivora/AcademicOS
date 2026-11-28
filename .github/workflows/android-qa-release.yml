@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: edunivora-qa-release-${{ github.ref }}
+  group: edunivora-qa-release-v2-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -100,7 +100,7 @@ jobs:
           set -euo pipefail
           flutter test --no-pub --concurrency=1 2>&1 | tee flutter-test.log
 
-      - name: Build obfuscated ARM64 QA Release (debug-key signature only)
+      - name: Build obfuscated ARM64 QA Release + x86_64 emulator companion (debug-key signature only)
         env:
           ORG_GRADLE_PROJECT_qaRelease: 'true'
         run: |
