@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: edunivora-qa-release-v3-${{ github.ref }}
+  group: edunivora-qa-release-v4-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -92,6 +92,19 @@ jobs:
           PY
           if [ "$analyze_status" -ne 0 ]; then
             echo "::notice::Analyzer returned a non-zero status for infos only; no errors or warnings were found."
+          fi
+
+      - name: Regenerate release plugin registrant without dev-only plugins
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter pub get
+          flutter build --config-only
+          registrant="android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java"
+          if [ -f "$registrant" ] && grep -Fq "IntegrationTestPlugin" "$registrant"; then
+            echo "::error::Release plugin registrant still contains the dev-only integration_test plugin."
+            grep -n "IntegrationTestPlugin" "$registrant" || true
+            exit 1
           fi
 
       - name: Build obfuscated ARM64 QA Release + x86_64 emulator companion (debug-key signature only)
