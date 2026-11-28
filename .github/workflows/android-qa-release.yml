@@ -106,7 +106,7 @@ jobs:
         run: |
           set -euo pipefail
           flutter build apk --release --no-pub \
-            --target-platform android-arm64 \
+            --target-platform android-arm64,android-x64 \
             --split-per-abi \
             --obfuscate \
             --split-debug-info=build/symbols/qa 2>&1 | tee android-qa-release-build.log
@@ -164,12 +164,15 @@ jobs:
         run: |
           set -euo pipefail
           apk="build/app/outputs/flutter-apk/app-arm64-v8a-release.apk"
+          emulator_apk="build/app/outputs/flutter-apk/app-x86_64-release.apk"
           test -s "$apk"
+          test -s "$emulator_apk"
           build_tools="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
           "$build_tools/aapt" dump badging "$apk" > apk-badging-qa.txt
           grep -q "package: name='com.arfatalkamli.academicos'" apk-badging-qa.txt
           grep -q "application-label:'EduNivora'" apk-badging-qa.txt
           "$build_tools/apksigner" verify --verbose --print-certs "$apk" > apk-signature-qa.txt
+          "$build_tools/apksigner" verify --verbose --print-certs "$emulator_apk" > apk-signature-x86_64-qa.txt
           apk_bytes="$(stat -c%s "$apk")"
           apk_mib="$(awk -v bytes="$apk_bytes" 'BEGIN { printf "%.3f", bytes / 1048576 }')"
           sha256="$(sha256sum "$apk" | awk '{print $1}')"
